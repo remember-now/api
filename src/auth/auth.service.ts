@@ -1,14 +1,19 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto } from './dto';
 import * as argon from 'argon2';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { User } from 'generated/prisma';
 
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService) {}
 
-  async signup(dto: AuthDto) {
+  async registerUser(dto: AuthDto) {
     const hash = await argon.hash(dto.password);
 
     try {
@@ -22,6 +27,7 @@ export class AuthService {
       return {
         id: user.id,
         email: user.email,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
@@ -36,7 +42,7 @@ export class AuthService {
     }
   }
 
-  async signin(dto: AuthDto) {
+  async validateUser(dto: AuthDto) {
     const user = await this.prisma.user.findUnique({
       where: {
         email: dto.email,
@@ -50,8 +56,19 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  async getUserById(id: number): Promise<User> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
   }
 }
