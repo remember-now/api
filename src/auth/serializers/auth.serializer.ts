@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 
-import { AuthService } from './auth.service';
 import { User, Role } from 'generated/prisma';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class AuthSerializer extends PassportSerializer {
-  constructor(private readonly authService: AuthService) {
+  constructor(private readonly userService: UserService) {
     super();
   }
 
@@ -22,7 +22,7 @@ export class AuthSerializer extends PassportSerializer {
     done: (err: Error | null, user: Omit<User, 'passwordHash'> | null) => void,
   ) {
     try {
-      const user = await this.authService.getUserById(payload.id);
+      const user = await this.userService.getUserById(payload.id);
       const { passwordHash: _, ...userWithoutPassword } = user;
       done(null, userWithoutPassword);
     } catch (error) {
