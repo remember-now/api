@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { REDIS, RedisModule } from './redis';
 import { RedisStore } from 'connect-redis';
 import { RedisClientType } from 'redis';
+import { UserModule } from './user/user.module';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 
@@ -21,8 +22,9 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    AuthModule,
     RedisModule,
+    UserModule,
+    AuthModule,
   ],
   providers: [Logger],
 })
