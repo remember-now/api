@@ -8,6 +8,8 @@ import {
 import * as passport from 'passport';
 import * as session from 'express-session';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ZodValidationPipe } from 'nestjs-zod';
+import { APP_PIPE } from '@nestjs/core';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -26,7 +28,13 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     UserModule,
     AuthModule,
   ],
-  providers: [Logger],
+  providers: [
+    Logger,
+    {
+      provide: APP_PIPE,
+      useClass: ZodValidationPipe,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   constructor(
