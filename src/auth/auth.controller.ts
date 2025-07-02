@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Get,
   InternalServerErrorException,
   Post,
   Req,
@@ -13,7 +12,6 @@ import { LocalGuard } from '../local.guard';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import { LoggedInGuard } from 'src/logged-in.guard';
-import { AdminGuard } from 'src/admin.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -44,19 +42,5 @@ export class AuthController {
         }
       });
     });
-  }
-
-  // TODO: Remove test route once User service and Auth is decoupled
-  @UseGuards(LoggedInGuard)
-  @Get('me')
-  getMe(@Req() req: Request) {
-    return { user: req.user, message: 'You are authenticated!' };
-  }
-
-  // TODO: Remove test route once User service and Auth is decoupled
-  @UseGuards(AdminGuard)
-  @Get('admin-only')
-  adminOnly() {
-    return { message: 'Admin access granted!' };
   }
 }
