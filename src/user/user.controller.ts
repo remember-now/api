@@ -1,14 +1,14 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { User } from 'generated/prisma';
-import { AdminGuard } from 'src/admin.guard';
-import { LoggedInGuard } from 'src/logged-in.guard';
+import { GetUser } from 'src/auth/decorator';
+import { AdminGuard, LoggedInGuard } from 'src/auth/guard';
 
-@Controller('user')
+@UseGuards(LoggedInGuard)
+@Controller('users')
 export class UserController {
-  @UseGuards(LoggedInGuard)
   @Get('me')
-  getMe(@Req() req: Request & { user: Partial<User> }) {
-    return { user: req.user, message: 'You are authenticated!' };
+  getMe(@GetUser() user: Partial<User>) {
+    return user;
   }
 
   // TODO: Remove this testing code

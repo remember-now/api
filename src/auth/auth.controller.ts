@@ -8,10 +8,9 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 
-import { LocalGuard } from '../local.guard';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
-import { LoggedInGuard } from 'src/logged-in.guard';
+import { LocalGuard, LoggedInGuard } from './guard';
 
 @Controller('auth')
 export class AuthController {
