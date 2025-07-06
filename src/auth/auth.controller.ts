@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   InternalServerErrorException,
   Post,
   Req,
@@ -21,12 +23,14 @@ export class AuthController {
     return this.authService.registerUser(dto);
   }
 
+  @HttpCode(HttpStatus.OK)
   @UseGuards(LocalGuard)
   @Post('login')
   loginUser(@Req() req: Request & { session: any }) {
     return { message: 'Login successful', user: req.user };
   }
 
+  @HttpCode(HttpStatus.OK)
   @UseGuards(LoggedInGuard)
   @Post('logout')
   async logoutUser(
