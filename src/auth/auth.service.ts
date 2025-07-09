@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuthDto } from './dto';
 import { UserService } from 'src/user/user.service';
 import * as argon from 'argon2';
@@ -22,18 +26,23 @@ export class AuthService {
   }
 
   async validateUser(dto: AuthDto) {
-    const user = await this.userService.getUserByEmail(dto.email);
-    if (!user) throw new ForbiddenException('Invalid credentials');
+    try {
+      const user = await this.userService.getUserByEmail(dto.email);
+      const pwMatches = await argon.verify(user.passwordHash, dto.password);
+      if (!pwMatches) throw new ForbiddenException('Invalid credentials');
 
-    const pwMatches = await argon.verify(user.passwordHash, dto.password);
-    if (!pwMatches) throw new ForbiddenException('Invalid credentials');
-
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+      return {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new ForbiddenException('Invalid credentials');
+      }
+      throw error;
+    }
   }
 }
