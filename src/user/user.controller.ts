@@ -1,20 +1,84 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  UseGuards,
+  Param,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Query,
+} from '@nestjs/common';
 import { User } from 'generated/prisma';
 import { GetUser } from 'src/auth/decorator';
 import { AdminGuard, LoggedInGuard } from 'src/auth/guard';
+import { UserService } from './user.service';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UpdateSelfDto,
+  GetUserParamsDto,
+  GetUsersQueryDto,
+  DeleteSelfDto,
+} from './dto';
 
 @UseGuards(LoggedInGuard)
 @Controller('users')
 export class UserController {
+  constructor(private userService: UserService) {}
+
   @Get('me')
-  getMe(@GetUser() user: Partial<User>) {
+  getMe(@GetUser() user: Omit<User, 'passwordHash'>) {
     return user;
   }
 
-  // TODO: Remove this testing code
+  @Put('me')
+  updateMe(
+    @GetUser() user: Omit<User, 'passwordHash'>,
+    @Body() dto: UpdateSelfDto,
+  ) {
+    return this.userService.updateSelf(user.id, dto);
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteMe(
+    @GetUser() user: Omit<User, 'passwordHash'>,
+    @Body() dto: DeleteSelfDto,
+  ) {
+    return this.userService.deleteSelf(user.id, dto);
+  }
+
   @UseGuards(AdminGuard)
-  @Get('admin-only')
-  adminOnly() {
-    return { message: 'Admin access granted!' };
+  @Post()
+  createUser(@Body() dto: CreateUserDto) {
+    return this.userService.createUserWithDto(dto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get()
+  getAllUsers(@Query() query: GetUsersQueryDto) {
+    return this.userService.getAllUsers(query);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get(':id')
+  getUserById(@Param() params: GetUserParamsDto) {
+    return this.userService.getUserById(params.id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id')
+  updateUser(@Param() params: GetUserParamsDto, @Body() dto: UpdateUserDto) {
+    return this.userService.updateUser(params.id, dto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteUser(@Param() params: GetUserParamsDto) {
+    return this.userService.deleteUser(params.id);
   }
 }
