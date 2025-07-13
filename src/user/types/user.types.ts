@@ -1,7 +1,9 @@
 import { User } from 'generated/prisma';
 
+export type UserWithoutPassword = Omit<User, 'passwordHash'>;
+
 export interface PaginatedUsers {
-  users: Omit<User, 'passwordHash'>[];
+  users: UserWithoutPassword[];
   pagination: {
     page: number;
     limit: number;

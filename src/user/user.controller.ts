@@ -11,7 +11,6 @@ import {
   HttpStatus,
   Query,
 } from '@nestjs/common';
-import { User } from 'generated/prisma';
 import { GetUser } from 'src/auth/decorator';
 import { AdminGuard, LoggedInGuard } from 'src/auth/guard';
 import { UserService } from './user.service';
@@ -23,6 +22,7 @@ import {
   GetUsersQueryDto,
   DeleteSelfDto,
 } from './dto';
+import { UserWithoutPassword } from './types';
 
 @UseGuards(LoggedInGuard)
 @Controller('users')
@@ -30,24 +30,18 @@ export class UserController {
   constructor(private userService: UserService) {}
 
   @Get('me')
-  getMe(@GetUser() user: Omit<User, 'passwordHash'>) {
+  getMe(@GetUser() user: UserWithoutPassword) {
     return user;
   }
 
   @Put('me')
-  updateMe(
-    @GetUser() user: Omit<User, 'passwordHash'>,
-    @Body() dto: UpdateSelfDto,
-  ) {
+  updateMe(@GetUser() user: UserWithoutPassword, @Body() dto: UpdateSelfDto) {
     return this.userService.updateSelf(user.id, dto);
   }
 
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteMe(
-    @GetUser() user: Omit<User, 'passwordHash'>,
-    @Body() dto: DeleteSelfDto,
-  ) {
+  deleteMe(@GetUser() user: UserWithoutPassword, @Body() dto: DeleteSelfDto) {
     return this.userService.deleteSelf(user.id, dto);
   }
 

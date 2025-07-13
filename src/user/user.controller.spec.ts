@@ -11,13 +11,13 @@ import {
   GetUsersQueryDto,
   DeleteSelfDto,
 } from './dto';
-import { PaginatedUsers } from './types';
+import { PaginatedUsers, UserWithoutPassword } from './types';
 
 describe('UserController', () => {
   let userController: UserController;
   let userService: DeepMocked<UserService>;
 
-  const mockUser: Omit<User, 'passwordHash'> = {
+  const mockUser: UserWithoutPassword = {
     id: 1,
     email: 'test@example.com',
     role: Role.USER,

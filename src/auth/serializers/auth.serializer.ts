@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 
 import { User, Role } from 'generated/prisma';
+import { UserWithoutPassword } from 'src/user/types';
 import { UserService } from 'src/user/user.service';
 
 @Injectable()
@@ -19,7 +20,7 @@ export class AuthSerializer extends PassportSerializer {
 
   async deserializeUser(
     payload: { id: number; role: Role },
-    done: (err: Error | null, user: Omit<User, 'passwordHash'> | null) => void,
+    done: (err: Error | null, user: UserWithoutPassword | null) => void,
   ) {
     try {
       const user = await this.userService.getUserById(payload.id);

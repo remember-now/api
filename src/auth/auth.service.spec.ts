@@ -6,6 +6,7 @@ import { Role, User } from 'generated/prisma';
 import { AuthDto } from './dto';
 import * as argon from 'argon2';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { UserWithoutPassword } from 'src/user/types';
 
 jest.mock('argon2');
 const mockArgon = argon as jest.Mocked<typeof argon>;
@@ -43,7 +44,7 @@ describe('AuthService', () => {
       const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$...';
       mockArgon.hash.mockResolvedValueOnce(hashedPassword);
 
-      const expectedResult: Omit<User, 'passwordHash'> = {
+      const expectedResult: UserWithoutPassword = {
         id: 1,
         email: 'test@example.com',
         role: Role.USER,

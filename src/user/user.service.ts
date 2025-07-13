@@ -14,7 +14,7 @@ import {
   DeleteSelfDto,
 } from './dto';
 import * as argon from 'argon2';
-import { PaginatedUsers } from './types';
+import { PaginatedUsers, UserWithoutPassword } from './types';
 
 @Injectable()
 export class UserService {
@@ -123,7 +123,7 @@ export class UserService {
   async updateUser(
     id: number,
     dto: UpdateUserDto,
-  ): Promise<Omit<User, 'passwordHash'>> {
+  ): Promise<UserWithoutPassword> {
     const updateData: Partial<User> = {};
 
     if (dto.email) {
@@ -162,7 +162,7 @@ export class UserService {
   async updateSelf(
     userId: number,
     dto: UpdateSelfDto,
-  ): Promise<Omit<User, 'passwordHash'>> {
+  ): Promise<UserWithoutPassword> {
     const existingUser = await this.getUserById(userId);
 
     const pwMatches = await argon.verify(

@@ -4,8 +4,9 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import { InternalServerErrorException } from '@nestjs/common';
-import { Role, User } from 'generated/prisma';
+import { Role } from 'generated/prisma';
 import { Request } from 'express';
+import { UserWithoutPassword } from 'src/user/types';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -37,7 +38,7 @@ describe('AuthController', () => {
         password: 'password123',
       };
 
-      const expectedResult: Omit<User, 'passwordHash'> = {
+      const expectedResult: UserWithoutPassword = {
         id: 1,
         email: 'test@example.com',
         role: Role.USER,

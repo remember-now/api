@@ -13,6 +13,7 @@ import {
   DeleteSelfDto,
 } from './dto';
 import * as argon from 'argon2';
+import { UserWithoutPassword } from './types';
 
 jest.mock('argon2');
 const mockArgon = argon as jest.Mocked<typeof argon>;
@@ -30,7 +31,7 @@ describe('UserService', () => {
     updatedAt: new Date('2025-01-01'),
   };
 
-  const mockUserWithoutPassword: Omit<User, 'passwordHash'> = {
+  const mockUserWithoutPassword: UserWithoutPassword = {
     id: 1,
     email: 'test@example.com',
     role: Role.USER,
