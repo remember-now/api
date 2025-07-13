@@ -2,10 +2,13 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { User } from 'generated/prisma';
 
 export const GetUser = createParamDecorator(
-  (data: keyof User | undefined, ctx: ExecutionContext) => {
+  (
+    data: keyof Omit<User, 'passwordHash'> | undefined,
+    ctx: ExecutionContext,
+  ) => {
     const request = ctx
       .switchToHttp()
-      .getRequest<Request & { user: Partial<User> }>();
+      .getRequest<Request & { user: Omit<User, 'passwordHash'> }>();
     if (data && data in request.user) {
       return request.user[data];
     }
