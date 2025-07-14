@@ -6,6 +6,7 @@ import {
 import { User, Role } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PasswordService } from 'src/auth/password.service';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -13,12 +14,14 @@ import {
   GetUsersQueryDto,
   DeleteSelfDto,
 } from './dto';
-import * as argon from 'argon2';
 import { PaginatedUsers, UserWithoutPassword } from './types';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private passwordService: PasswordService,
+  ) {}
 
   async createUser(
     email: string,
@@ -51,7 +54,7 @@ export class UserService {
   }
 
   async createUserWithDto(dto: CreateUserDto) {
-    const hash = await argon.hash(dto.password);
+    const hash = await this.passwordService.hash(dto.password);
     return this.createUser(dto.email, hash, dto.role as Role);
   }
 
@@ -130,7 +133,7 @@ export class UserService {
       updateData.email = dto.email;
     }
     if (dto.password) {
-      updateData.passwordHash = await argon.hash(dto.password);
+      updateData.passwordHash = await this.passwordService.hash(dto.password);
     }
     if (dto.role && Object.values(Role).includes(dto.role as Role)) {
       updateData.role = dto.role as Role;
@@ -165,7 +168,7 @@ export class UserService {
   ): Promise<UserWithoutPassword> {
     const existingUser = await this.getUserById(userId);
 
-    const pwMatches = await argon.verify(
+    const pwMatches = await this.passwordService.verify(
       existingUser.passwordHash,
       dto.currentPassword,
     );
@@ -178,7 +181,7 @@ export class UserService {
       updateData.email = dto.email;
     }
     if (dto.password) {
-      updateData.passwordHash = await argon.hash(dto.password);
+      updateData.passwordHash = await this.passwordService.hash(dto.password);
     }
 
     try {
@@ -223,7 +226,7 @@ export class UserService {
   async deleteSelf(userId: number, dto: DeleteSelfDto): Promise<void> {
     const existingUser = await this.getUserById(userId);
 
-    const pwMatches = await argon.verify(
+    const pwMatches = await this.passwordService.verify(
       existingUser.passwordHash,
       dto.currentPassword,
     );

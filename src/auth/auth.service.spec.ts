@@ -2,19 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { UserService } from 'src/user/user.service';
+import { PasswordService } from './password.service';
 import { Role, User } from 'generated/prisma';
 import { AuthDto } from './dto';
-import * as argon from 'argon2';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserWithoutPassword } from 'src/user/types';
 import { Session } from 'express-session';
 
-jest.mock('argon2');
-const mockArgon = argon as jest.Mocked<typeof argon>;
-
 describe('AuthService', () => {
   let authService: AuthService;
   let userService: DeepMocked<UserService>;
+  let passwordService: DeepMocked<PasswordService>;
   let mockSession: DeepMocked<Session>;
 
   beforeEach(async () => {
@@ -26,6 +24,7 @@ describe('AuthService', () => {
 
     authService = module.get(AuthService);
     userService = module.get(UserService);
+    passwordService = module.get(PasswordService);
     mockSession = createMock<Session>();
   });
 
@@ -38,14 +37,14 @@ describe('AuthService', () => {
   });
 
   describe('registerUser', () => {
-    it('should call userService.createUser with a hashed password', async () => {
-      const authDto: AuthDto = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
+    const authDto: AuthDto = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
 
+    it('should call userService.createUser with a hashed password', async () => {
       const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$...';
-      mockArgon.hash.mockResolvedValueOnce(hashedPassword);
+      passwordService.hash.mockResolvedValueOnce(hashedPassword);
 
       const expectedResult: UserWithoutPassword = {
         id: 1,
@@ -58,8 +57,8 @@ describe('AuthService', () => {
 
       const result = await authService.registerUser(authDto);
 
-      expect(mockArgon.hash).toHaveBeenCalledWith(authDto.password);
-      expect(mockArgon.hash).toHaveBeenCalledTimes(1);
+      expect(passwordService.hash).toHaveBeenCalledWith(authDto.password);
+      expect(passwordService.hash).toHaveBeenCalledTimes(1);
 
       expect(userService.createUser).toHaveBeenCalledWith(
         authDto.email,
@@ -87,18 +86,18 @@ describe('AuthService', () => {
 
     it('should return user data when credentials are valid', async () => {
       userService.getUserByEmail.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
+      passwordService.verify.mockResolvedValueOnce(true);
 
       const result = await authService.validateUser(authDto);
 
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
       expect(userService.getUserByEmail).toHaveBeenCalledTimes(1);
 
-      expect(mockArgon.verify).toHaveBeenCalledWith(
+      expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
         authDto.password,
       );
-      expect(mockArgon.verify).toHaveBeenCalledTimes(1);
+      expect(passwordService.verify).toHaveBeenCalledTimes(1);
 
       expect(result).toEqual({
         id: mockUser.id,
@@ -121,12 +120,12 @@ describe('AuthService', () => {
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
       expect(userService.getUserByEmail).toHaveBeenCalledTimes(1);
 
-      expect(mockArgon.verify).not.toHaveBeenCalled();
+      expect(passwordService.verify).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when password is incorrect', async () => {
       userService.getUserByEmail.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(false);
+      passwordService.verify.mockResolvedValueOnce(false);
 
       await expect(authService.validateUser(authDto)).rejects.toThrow(
         new ForbiddenException('Invalid credentials'),
@@ -135,11 +134,11 @@ describe('AuthService', () => {
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
       expect(userService.getUserByEmail).toHaveBeenCalledTimes(1);
 
-      expect(mockArgon.verify).toHaveBeenCalledWith(
+      expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
         authDto.password,
       );
-      expect(mockArgon.verify).toHaveBeenCalledTimes(1);
+      expect(passwordService.verify).toHaveBeenCalledTimes(1);
     });
 
     it('should re-throw non-NotFoundException errors', async () => {
@@ -151,14 +150,14 @@ describe('AuthService', () => {
       );
 
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
-      expect(mockArgon.verify).not.toHaveBeenCalled();
+      expect(passwordService.verify).not.toHaveBeenCalled();
     });
   });
 
   describe('destroyUserSession', () => {
     it('should successfully destroy session', async () => {
       mockSession.destroy.mockImplementation((callback) => {
-        callback(null);
+        callback(undefined);
         return mockSession;
       });
 

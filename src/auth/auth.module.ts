@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { UserModule } from 'src/user/user.module';
 import { LocalStrategy } from './strategy';
 import { AuthSerializer } from './serializers';
+import { PasswordService } from './password.service';
 
 @Module({
   imports: [
@@ -14,7 +15,8 @@ import { AuthSerializer } from './serializers';
     }),
     UserModule,
   ],
-  providers: [AuthService, LocalStrategy, AuthSerializer],
+  providers: [AuthService, PasswordService, LocalStrategy, AuthSerializer],
   controllers: [AuthController],
+  exports: [AuthService, PasswordService],
 })
 export class AuthModule {}

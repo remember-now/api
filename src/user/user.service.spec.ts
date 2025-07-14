@@ -3,6 +3,7 @@ import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PasswordService } from 'src/auth/password.service';
 import { Role, User } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import {
@@ -12,15 +13,12 @@ import {
   GetUsersQueryDto,
   DeleteSelfDto,
 } from './dto';
-import * as argon from 'argon2';
 import { UserWithoutPassword } from './types';
-
-jest.mock('argon2');
-const mockArgon = argon as jest.Mocked<typeof argon>;
 
 describe('UserService', () => {
   let userService: UserService;
   let prismaService: DeepMockProxy<PrismaService>;
+  let passwordService: DeepMockProxy<PasswordService>;
 
   const mockUser: User = {
     id: 1,
@@ -47,6 +45,10 @@ describe('UserService', () => {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
         },
+        {
+          provide: PasswordService,
+          useValue: mockDeep<PasswordService>(),
+        },
       ],
     }).compile();
 
@@ -54,11 +56,15 @@ describe('UserService', () => {
     prismaService = module.get<PrismaService>(
       PrismaService,
     ) as DeepMockProxy<PrismaService>;
+    passwordService = module.get<PasswordService>(
+      PasswordService,
+    ) as DeepMockProxy<PasswordService>;
   });
 
   afterEach(() => {
     jest.clearAllMocks();
     mockReset(prismaService);
+    mockReset(passwordService);
   });
 
   it('should be defined', () => {
@@ -119,12 +125,12 @@ describe('UserService', () => {
       };
       const hashedPassword = 'hashedPassword123';
 
-      mockArgon.hash.mockResolvedValueOnce(hashedPassword);
+      passwordService.hash.mockResolvedValueOnce(hashedPassword);
       prismaService.user.create.mockResolvedValueOnce(mockUser);
 
       const result = await userService.createUserWithDto(createUserDto);
 
-      expect(mockArgon.hash).toHaveBeenCalledWith(createUserDto.password);
+      expect(passwordService.hash).toHaveBeenCalledWith(createUserDto.password);
       expect(prismaService.user.create).toHaveBeenCalledWith({
         data: {
           email: createUserDto.email,
@@ -325,12 +331,12 @@ describe('UserService', () => {
       };
       const hashedPassword = 'hashedNewPassword';
 
-      mockArgon.hash.mockResolvedValueOnce(hashedPassword);
+      passwordService.hash.mockResolvedValueOnce(hashedPassword);
       prismaService.user.update.mockResolvedValueOnce(mockUser);
 
       await userService.updateUser(1, updateDto);
 
-      expect(mockArgon.hash).toHaveBeenCalledWith('newPassword123');
+      expect(passwordService.hash).toHaveBeenCalledWith('newPassword123');
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { passwordHash: hashedPassword },
@@ -397,7 +403,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
+      passwordService.verify.mockResolvedValueOnce(true);
       prismaService.user.update.mockResolvedValueOnce({
         ...mockUser,
         email: 'newemail@example.com',
@@ -408,7 +414,7 @@ describe('UserService', () => {
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(mockArgon.verify).toHaveBeenCalledWith(
+      expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
         'currentPassword123',
       );
@@ -434,13 +440,13 @@ describe('UserService', () => {
       const hashedNewPassword = 'hashedNewPassword';
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
-      mockArgon.hash.mockResolvedValueOnce(hashedNewPassword);
+      passwordService.verify.mockResolvedValueOnce(true);
+      passwordService.hash.mockResolvedValueOnce(hashedNewPassword);
       prismaService.user.update.mockResolvedValueOnce(mockUser);
 
       await userService.updateSelf(1, updateDto);
 
-      expect(mockArgon.hash).toHaveBeenCalledWith('newPassword123');
+      expect(passwordService.hash).toHaveBeenCalledWith('newPassword123');
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { passwordHash: hashedNewPassword },
@@ -461,7 +467,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(false);
+      passwordService.verify.mockResolvedValueOnce(false);
 
       await expect(userService.updateSelf(1, updateDto)).rejects.toThrow(
         new ForbiddenException('Current password is incorrect'),
@@ -477,7 +483,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
+      passwordService.verify.mockResolvedValueOnce(true);
 
       const prismaError = new PrismaClientKnownRequestError(
         'Unique constraint failed',
@@ -536,7 +542,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
+      passwordService.verify.mockResolvedValueOnce(true);
       prismaService.user.delete.mockResolvedValueOnce(mockUser);
 
       await userService.deleteSelf(1, deleteDto);
@@ -544,7 +550,7 @@ describe('UserService', () => {
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(mockArgon.verify).toHaveBeenCalledWith(
+      expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
         'currentPassword123',
       );
@@ -560,7 +566,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(false);
+      passwordService.verify.mockResolvedValueOnce(false);
 
       await expect(userService.deleteSelf(1, deleteDto)).rejects.toThrow(
         new ForbiddenException('Current password is incorrect'),
@@ -576,7 +582,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      mockArgon.verify.mockResolvedValueOnce(true);
+      passwordService.verify.mockResolvedValueOnce(true);
 
       const error = new Error('Deletion failed');
       prismaService.user.delete.mockRejectedValueOnce(error);

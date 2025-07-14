@@ -31,7 +31,7 @@ import { AuthService } from 'src/auth/auth.service';
 @Controller('users')
 export class UserController {
   constructor(
-    private userService: UserService,
+    private readonly userService: UserService,
     private readonly authService: AuthService,
   ) {}
 
