@@ -70,17 +70,14 @@ describe('AuthController', () => {
 
   describe('loginUser', () => {
     it('should return login success message with user data', () => {
-      const mockRequest = createMock<Request>({
-        user: {
-          id: 1,
-          email: 'test@example.com',
-          role: Role.USER,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        session: {},
-      });
-      const result = authController.loginUser(mockRequest);
+      const mockUserWithoutPassword = {
+        id: 1,
+        email: 'test@example.com',
+        role: Role.USER,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const result = authController.loginUser(mockUserWithoutPassword);
 
       expect(result).toEqual({
         message: 'Login successful',

@@ -13,6 +13,8 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import { LocalGuard, LoggedInGuard } from './guard';
+import { GetUser } from './decorator';
+import { UserWithoutPassword } from 'src/user/types';
 
 @Controller('auth')
 export class AuthController {
@@ -26,8 +28,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalGuard)
   @Post('login')
-  loginUser(@Req() req: Request & { session: any }) {
-    return { message: 'Login successful', user: req.user };
+  loginUser(@GetUser() user: UserWithoutPassword) {
+    return { message: 'Login successful', user };
   }
 
   @HttpCode(HttpStatus.OK)
