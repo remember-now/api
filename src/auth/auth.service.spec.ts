@@ -7,6 +7,7 @@ import { AuthDto } from './dto';
 import * as argon from 'argon2';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserWithoutPassword } from 'src/user/types';
+import { Session } from 'express-session';
 
 jest.mock('argon2');
 const mockArgon = argon as jest.Mocked<typeof argon>;
@@ -14,6 +15,7 @@ const mockArgon = argon as jest.Mocked<typeof argon>;
 describe('AuthService', () => {
   let authService: AuthService;
   let userService: DeepMocked<UserService>;
+  let mockSession: DeepMocked<Session>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,6 +26,7 @@ describe('AuthService', () => {
 
     authService = module.get(AuthService);
     userService = module.get(UserService);
+    mockSession = createMock<Session>();
   });
 
   afterEach(() => {
@@ -149,6 +152,40 @@ describe('AuthService', () => {
 
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
       expect(mockArgon.verify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('destroyUserSession', () => {
+    it('should successfully destroy session', async () => {
+      mockSession.destroy.mockImplementation((callback) => {
+        callback(null);
+        return mockSession;
+      });
+
+      await expect(
+        authService.destroyUserSession(mockSession),
+      ).resolves.toBeUndefined();
+      expect(mockSession.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle session destruction errors gracefully', async () => {
+      const sessionError = new Error('Session destruction failed');
+      mockSession.destroy.mockImplementation((callback) => {
+        callback(sessionError);
+        return mockSession;
+      });
+
+      const loggerSpy = jest
+        .spyOn(authService['logger'], 'error')
+        .mockImplementation();
+
+      await expect(
+        authService.destroyUserSession(mockSession),
+      ).resolves.toBeUndefined();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to destroy user session',
+        sessionError,
+      );
     });
   });
 });

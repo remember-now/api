@@ -10,7 +10,6 @@ import {
   HttpCode,
   HttpStatus,
   Query,
-  Logger,
   Session,
 } from '@nestjs/common';
 import { GetUser } from 'src/auth/decorator';
@@ -26,13 +25,15 @@ import {
 } from './dto';
 import { UserWithoutPassword } from './types';
 import { Session as ExpressSession } from 'express-session';
+import { AuthService } from 'src/auth/auth.service';
 
 @UseGuards(LoggedInGuard)
 @Controller('users')
 export class UserController {
-  private readonly logger = new Logger(UserController.name);
-
-  constructor(private userService: UserService) {}
+  constructor(
+    private userService: UserService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get('me')
   getMe(@GetUser() user: UserWithoutPassword) {
@@ -53,14 +54,7 @@ export class UserController {
   ) {
     await this.userService.deleteSelf(user.id, dto);
 
-    session.destroy((err) => {
-      if (err) {
-        this.logger.error(
-          'Error destroying session after account deletion',
-          err,
-        );
-      }
-    });
+    void this.authService.destroyUserSession(session).catch(() => {});
   }
 
   @UseGuards(AdminGuard)

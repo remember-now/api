@@ -13,10 +13,12 @@ import {
 } from './dto';
 import { PaginatedUsers, UserWithoutPassword } from './types';
 import { Session as ExpressSession } from 'express-session';
+import { AuthService } from 'src/auth/auth.service';
 
 describe('UserController', () => {
   let userController: UserController;
   let userService: DeepMocked<UserService>;
+  let authService: DeepMocked<AuthService>;
   let mockSession: DeepMocked<ExpressSession>;
 
   const mockUser: UserWithoutPassword = {
@@ -36,6 +38,7 @@ describe('UserController', () => {
 
     userController = module.get(UserController);
     userService = module.get(UserService);
+    authService = module.get(AuthService);
     mockSession = createMock<ExpressSession>();
   });
 
@@ -87,12 +90,13 @@ describe('UserController', () => {
   });
 
   describe('deleteMe', () => {
-    it('should call userService.deleteSelf and destroy session on success', async () => {
+    it('should call userService.deleteSelf and authService.destroyUserSession', async () => {
       const deleteSelfDto: DeleteSelfDto = {
         currentPassword: 'currentPassword123',
         confirmationText: 'DELETE MY ACCOUNT',
       };
       userService.deleteSelf.mockResolvedValueOnce(undefined);
+      authService.destroyUserSession.mockResolvedValueOnce(undefined);
 
       const result = await userController.deleteMe(
         mockUser,
@@ -104,12 +108,13 @@ describe('UserController', () => {
         deleteSelfDto,
       );
       expect(userService.deleteSelf).toHaveBeenCalledTimes(1);
-      expect(mockSession.destroy).toHaveBeenCalledTimes(1);
-      expect(mockSession.destroy).toHaveBeenCalledWith(expect.any(Function));
+
+      expect(authService.destroyUserSession).toHaveBeenCalledWith(mockSession);
+      expect(authService.destroyUserSession).toHaveBeenCalledTimes(1);
       expect(result).toBeUndefined();
     });
 
-    it('should handle deletion errors and not call session.destroy', async () => {
+    it('should handle user deletion errors', async () => {
       const deleteSelfDto: DeleteSelfDto = {
         currentPassword: 'currentPassword123',
         confirmationText: 'DELETE MY ACCOUNT',
@@ -121,64 +126,23 @@ describe('UserController', () => {
         userController.deleteMe(mockUser, deleteSelfDto, mockSession),
       ).rejects.toThrow('Deletion failed');
 
-      expect(mockSession.destroy).not.toHaveBeenCalled();
+      expect(authService.destroyUserSession).not.toHaveBeenCalled();
     });
 
-    it('should log error when session destruction fails', async () => {
+    it('should not fail if session destruction fails', async () => {
       const deleteSelfDto: DeleteSelfDto = {
         currentPassword: 'currentPassword123',
         confirmationText: 'DELETE MY ACCOUNT',
       };
-      const sessionError = new Error('Session destruction failed');
 
       userService.deleteSelf.mockResolvedValueOnce(undefined);
-
-      mockSession.destroy.mockImplementation(
-        (callback: (err?: any) => void) => {
-          callback(sessionError);
-          return mockSession;
-        },
+      authService.destroyUserSession.mockRejectedValueOnce(
+        new Error('Session error'),
       );
-      const loggerSpy = jest
-        .spyOn(userController['logger'], 'error')
-        .mockImplementation(() => {});
 
-      await userController.deleteMe(mockUser, deleteSelfDto, mockSession);
-
-      expect(userService.deleteSelf).toHaveBeenCalledWith(
-        mockUser.id,
-        deleteSelfDto,
-      );
-      expect(mockSession.destroy).toHaveBeenCalledTimes(1);
-      expect(loggerSpy).toHaveBeenCalledWith(
-        'Error destroying session after account deletion',
-        sessionError,
-      );
-    });
-
-    it('should successfully destroy session without errors', async () => {
-      const deleteSelfDto: DeleteSelfDto = {
-        currentPassword: 'currentPassword123',
-        confirmationText: 'DELETE MY ACCOUNT',
-      };
-      userService.deleteSelf.mockResolvedValueOnce(undefined);
-
-      mockSession.destroy.mockImplementation(
-        (callback: (err?: any) => void) => {
-          callback();
-          return mockSession;
-        },
-      );
-      const loggerSpy = jest.spyOn(userController['logger'], 'error');
-
-      await userController.deleteMe(mockUser, deleteSelfDto, mockSession);
-
-      expect(userService.deleteSelf).toHaveBeenCalledWith(
-        mockUser.id,
-        deleteSelfDto,
-      );
-      expect(mockSession.destroy).toHaveBeenCalledTimes(1);
-      expect(loggerSpy).not.toHaveBeenCalled();
+      await expect(
+        userController.deleteMe(mockUser, deleteSelfDto, mockSession),
+      ).resolves.toBeUndefined();
     });
   });
 
