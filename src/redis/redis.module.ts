@@ -1,7 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleDestroy } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Redis from 'redis';
 import { REDIS } from './redis.constants';
+import { ModuleRef } from '@nestjs/core';
+import { RedisClientType } from 'redis';
 
 @Module({
   imports: [ConfigModule],
@@ -24,4 +26,11 @@ import { REDIS } from './redis.constants';
   ],
   exports: [REDIS],
 })
-export class RedisModule {}
+export class RedisModule implements OnModuleDestroy {
+  constructor(private moduleRef: ModuleRef) {}
+
+  async onModuleDestroy() {
+    const redisClient = this.moduleRef.get<RedisClientType>(REDIS);
+    await redisClient.quit();
+  }
+}
