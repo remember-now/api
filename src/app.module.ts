@@ -54,7 +54,8 @@ export class AppModule implements NestModule {
             'SESSION_SECRET',
             'super_secret_value',
           ),
-          resave: false,
+          resave: true,
+          rolling: true,
           cookie: {
             sameSite: true,
             httpOnly: false,

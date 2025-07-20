@@ -19,7 +19,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
-      - '5435:5432'
+      - '${POSTGRES_PORT:-5435}:5432'
     networks:
       - app
     restart: unless-stopped
@@ -39,7 +39,7 @@ services:
     image: redis:8
     command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
     ports:
-      - '6380:6379'
+      - '${REDIS_PORT:-6380}:6379'
     networks:
       - app
     restart: unless-stopped
