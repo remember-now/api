@@ -157,6 +157,9 @@ export class UserService {
         if (error.code === 'P2002') {
           throw new ForbiddenException('Email already taken');
         }
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
       }
       throw error;
     }

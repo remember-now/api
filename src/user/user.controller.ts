@@ -11,6 +11,7 @@ import {
   HttpStatus,
   Query,
   Session,
+  Logger,
 } from '@nestjs/common';
 import { GetUser } from 'src/auth/decorator';
 import { AdminGuard, LoggedInGuard } from 'src/auth/guard';
@@ -30,6 +31,8 @@ import { AuthService } from 'src/auth/auth.service';
 @UseGuards(LoggedInGuard)
 @Controller('users')
 export class UserController {
+  private readonly logger = new Logger(UserController.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly authService: AuthService,
@@ -54,7 +57,14 @@ export class UserController {
   ) {
     await this.userService.deleteSelf(user.id, dto);
 
-    void this.authService.destroyUserSession(session).catch(() => {});
+    try {
+      await this.authService.destroyUserSession(session);
+    } catch (error) {
+      this.logger.error(
+        'Failed to destroy session after account deletion',
+        error,
+      );
+    }
   }
 
   @UseGuards(AdminGuard)

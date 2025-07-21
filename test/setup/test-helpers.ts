@@ -1,5 +1,6 @@
 import { spec } from 'pactum';
 import { TestSetup } from './test-setup';
+import { TestDataFactory } from './test-data-factory';
 import { UserResponse } from 'test/types/api-responses';
 
 export interface SessionResult {
@@ -8,80 +9,22 @@ export interface SessionResult {
     email: string;
     password: string;
   };
-  sessionCookieStoreKey: string;
+  sessionKey: string;
   userData: UserResponse;
 }
 
 export class TestHelpers {
   private static sessionCounter = 0;
 
-  /**
-   * Generate unique test data
-   */
-  static generateUniqueUser(prefix = 'test'): {
-    email: string;
-    password: string;
-  } {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(7);
-    return {
-      email: `${prefix}-${timestamp}-${random}@example.com`,
-      password: `password-${timestamp}`,
-    };
+  static generateSessionKey(prefix = 'session'): string {
+    return `${prefix}_${++this.sessionCounter}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   }
 
   /**
-   * Create and login a user in one step
-   * Returns complete user session info
+   * Create authenticated spec with session cookie
    */
-  static async createUserWithSession(
-    userPrefix = 'test',
-  ): Promise<SessionResult> {
-    const userCredentials = this.generateUniqueUser(userPrefix);
-
-    const userId: number = await spec()
-      .post(`${TestSetup.baseUrl}/auth/signup`)
-      .withBody(userCredentials)
-      .expectStatus(201)
-      .returns('id');
-
-    const sessionCookieStoreKey = this.generateSessionKey();
-    const userData: UserResponse = await spec()
-      .post(`${TestSetup.baseUrl}/auth/login`)
-      .withBody(userCredentials)
-      .expectStatus(200)
-      .stores(sessionCookieStoreKey, 'res.headers.set-cookie')
-      .returns('user');
-
-    return {
-      userId,
-      credentials: userCredentials,
-      sessionCookieStoreKey,
-      userData,
-    };
-  }
-
-  /**
-   * Login existing user and return session info
-   */
-  static async loginUser(userCredentials: {
-    email: string;
-    password: string;
-  }): Promise<SessionResult> {
-    const sessionCookieStoreKey = this.generateSessionKey();
-    const userData: UserResponse = await spec()
-      .post(`${TestSetup.baseUrl}/auth/login`)
-      .withBody(userCredentials)
-      .expectStatus(200)
-      .stores(sessionCookieStoreKey, 'res.headers.set-cookie')
-      .returns('user');
-
-    return {
-      userId: userData.id,
-      credentials: userCredentials,
-      sessionCookieStoreKey,
-      userData,
-    };
+  static authenticatedRequest(sessionKey: string) {
+    return spec().withCookies(`$S{${sessionKey}}`);
   }
 
   /**
@@ -90,7 +33,7 @@ export class TestHelpers {
   static async createUser(
     userPrefix = 'test',
   ): Promise<{ id: number; credentials: { email: string; password: string } }> {
-    const credentials = this.generateUniqueUser(userPrefix);
+    const credentials = TestDataFactory.createUserCredentials(userPrefix);
     const id: number = await spec()
       .post(`${TestSetup.baseUrl}/auth/signup`)
       .withBody(credentials)
@@ -101,59 +44,64 @@ export class TestHelpers {
   }
 
   /**
-   * Logout user
+   * Login existing user and return session info
    */
-  static async logoutUser(sessionCookieStoreKey: string): Promise<void> {
-    await spec()
+  static async loginUser(userCredentials: {
+    email: string;
+    password: string;
+  }): Promise<SessionResult> {
+    const sessionKey = this.generateSessionKey();
+    const userData: UserResponse = await spec()
+      .post(`${TestSetup.baseUrl}/auth/login`)
+      .withBody(userCredentials)
+      .expectStatus(200)
+      .stores(sessionKey, 'res.headers.set-cookie')
+      .returns('user');
+
+    return {
+      userId: userData.id,
+      credentials: userCredentials,
+      sessionKey,
+      userData,
+    };
+  }
+
+  /**
+   * Logout user by sessionKey
+   */
+  static async logoutUser(sessionKey: string): Promise<void> {
+    await this.authenticatedRequest(sessionKey)
       .post(`${TestSetup.baseUrl}/auth/logout`)
-      .withCookies(`$S{${sessionCookieStoreKey}}`)
       .expectStatus(200);
   }
 
   /**
-   * Generate unique session storage key
+   * Create and login a user in one step
    */
-  private static generateSessionKey(): string {
-    return `session_${++this.sessionCounter}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  }
+  static async createUserWithSession(
+    userPrefix = 'test',
+  ): Promise<SessionResult> {
+    const userCredentials = TestDataFactory.createUserCredentials(userPrefix);
 
-  /**
-   * Validate authenticated access
-   */
-  static async validateAuthenticatedAccess(
-    sessionCookieStoreKey: string,
-  ): Promise<UserResponse> {
-    return await spec()
-      .get(`${TestSetup.baseUrl}/users/me`)
-      .withCookies(`$S{${sessionCookieStoreKey}}`)
+    const userId: number = await spec()
+      .post(`${TestSetup.baseUrl}/auth/signup`)
+      .withBody(userCredentials)
+      .expectStatus(201)
+      .returns('id');
+
+    const sessionKey = this.generateSessionKey();
+    const userData: UserResponse = await spec()
+      .post(`${TestSetup.baseUrl}/auth/login`)
+      .withBody(userCredentials)
       .expectStatus(200)
-      .returns('');
-  }
+      .stores(sessionKey, 'res.headers.set-cookie')
+      .returns('user');
 
-  /**
-   * Validate unauthenticated rejection
-   */
-  static async validateUnauthenticatedRejection(
-    endpoint: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  ): Promise<void> {
-    const url = `${TestSetup.baseUrl}${endpoint}`;
-
-    switch (method) {
-      case 'GET':
-        await spec().get(url).expectStatus(403);
-        break;
-      case 'POST':
-        await spec().post(url).expectStatus(403);
-        break;
-      case 'PUT':
-        await spec().put(url).expectStatus(403);
-        break;
-      case 'DELETE':
-        await spec().delete(url).expectStatus(403);
-        break;
-      default:
-        throw new Error(`Unsupported HTTP method: ${method as string}`);
-    }
+    return {
+      userId,
+      credentials: userCredentials,
+      sessionKey,
+      userData,
+    };
   }
 }

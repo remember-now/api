@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 const GetUserParamsSchema = z.object({
-  id: z.string().transform((val) => parseInt(val, 10)),
+  id: z.coerce.number().int().gte(1),
 });
 
 const GetUsersQuerySchema = z

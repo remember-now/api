@@ -393,6 +393,22 @@ describe('UserService', () => {
         new ForbiddenException('Email already taken'),
       );
     });
+
+    it('should throw NotFoundException when a user is not found', async () => {
+      const updateDto: UpdateUserDto = {
+        email: 'taken@example.com',
+      };
+
+      const prismaError = new PrismaClientKnownRequestError('User not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      prismaService.user.update.mockRejectedValueOnce(prismaError);
+
+      await expect(userService.updateUser(1, updateDto)).rejects.toThrow(
+        new NotFoundException('User not found'),
+      );
+    });
   });
 
   describe('updateSelf', () => {

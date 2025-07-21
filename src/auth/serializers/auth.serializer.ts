@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 
 import { User, Role } from 'generated/prisma';
@@ -27,7 +27,11 @@ export class AuthSerializer extends PassportSerializer {
       const { passwordHash: _, ...userWithoutPassword } = user;
       done(null, userWithoutPassword);
     } catch (error) {
-      done(error as Error, null);
+      if (error instanceof NotFoundException) {
+        done(null, null);
+      } else {
+        done(error as Error, null);
+      }
     }
   }
 }

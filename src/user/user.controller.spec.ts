@@ -139,10 +139,17 @@ describe('UserController', () => {
       authService.destroyUserSession.mockRejectedValueOnce(
         new Error('Session error'),
       );
+      const loggerSpy = jest
+        .spyOn(userController['logger'], 'error')
+        .mockImplementation(() => {});
 
       await expect(
         userController.deleteMe(mockUser, deleteSelfDto, mockSession),
       ).resolves.toBeUndefined();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Failed to destroy session after account deletion',
+        expect.any(Error),
+      );
     });
   });
 

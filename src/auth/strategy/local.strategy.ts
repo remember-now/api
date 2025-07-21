@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 import { AuthService } from '../auth.service';
 import { AuthSchema } from '../dto';
+import { ZodError } from 'zod';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
@@ -15,7 +16,14 @@ export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
   }
 
   async validate(email: string, password: string) {
-    const parsed = AuthSchema.parse({ email, password });
-    return this.authService.validateUser(parsed);
+    try {
+      const parsed = AuthSchema.parse({ email, password });
+      return this.authService.validateUser(parsed);
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
+        return false;
+      }
+      throw error;
+    }
   }
 }
