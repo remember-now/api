@@ -1,8 +1,10 @@
 import { spec, e2e } from 'pactum';
-import { TestSetup as s } from '../setup/test-setup';
-import { TestHelpers as h } from '../setup/test-helpers';
-import { TestAssertions as a } from '../setup/test-assertions';
-import { TestDataFactory as f } from '../setup/test-data-factory';
+import {
+  TestSetup as s,
+  TestHelpers as h,
+  TestAssertions as a,
+  TestDataFactory as f,
+} from 'test/setup';
 
 describe('User Lifecycle Integration (e2e)', () => {
   describe('Complete User Journey', () => {

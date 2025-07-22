@@ -1,6 +1,8 @@
-import { TestSetup as s } from '../setup/test-setup';
-import { TestHelpers as h } from '../setup/test-helpers';
-import { TestDataFactory as f } from '../setup/test-data-factory';
+import {
+  TestSetup as s,
+  TestHelpers as h,
+  TestDataFactory as f,
+} from 'test/setup';
 
 describe('User Isolation Integration (e2e)', () => {
   it('should prevent users from affecting each other during updates', async () => {

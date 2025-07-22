@@ -1,12 +1,11 @@
 import { spec } from 'pactum';
-import { TestSetup as s } from '../setup/test-setup';
-import { TestHelpers as h } from '../setup/test-helpers';
-import { TestAssertions as a } from '../setup/test-assertions';
-import { TestDataFactory as f } from '../setup/test-data-factory';
 import {
-  PaginatedUsersResponse,
-  UserWithPasswordResponse,
-} from 'test/types/api-responses';
+  TestSetup as s,
+  TestHelpers as h,
+  TestAssertions as a,
+  TestDataFactory as f,
+} from 'test/setup';
+import { PaginatedUsersResponse, UserWithPasswordResponse } from 'test/types';
 
 describe('User Admin (e2e)', () => {
   describe('POST /users (Admin Only)', () => {

@@ -6,7 +6,7 @@ import {
   MessageResponse,
   UserResponse,
   ValidationErrorResponse,
-} from 'test/types/api-responses';
+} from 'test/types';
 import { ExpectHandlerContext } from 'pactum/src/exports/handler';
 
 export class TestAssertions {

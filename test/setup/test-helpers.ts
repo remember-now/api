@@ -1,7 +1,7 @@
 import { spec } from 'pactum';
 import { TestSetup } from './test-setup';
 import { TestDataFactory } from './test-data-factory';
-import { UserResponse } from 'test/types/api-responses';
+import { UserResponse } from 'test/types';
 import { DatabaseUtils } from './database-utils';
 import { Role } from 'generated/prisma';
 
