@@ -5,28 +5,13 @@ const GetUserParamsSchema = z.object({
   id: z.coerce.number().int().gte(1),
 });
 
-const GetUsersQuerySchema = z
-  .object({
-    page: z
-      .string()
-      .optional()
-      .default('1')
-      .transform((val) => parseInt(val, 10)),
-    limit: z
-      .string()
-      .optional()
-      .default('10')
-      .transform((val) => parseInt(val, 10)),
-    search: z.string().optional(),
-  })
-  .refine((data) => data.page > 0, {
-    message: 'Page must be greater than 0',
-    path: ['page'],
-  })
-  .refine((data) => data.limit > 0 && data.limit <= 100, {
-    message: 'Limit must be between 1 and 100',
-    path: ['limit'],
-  });
+const GetUsersQuerySchema = z.object({
+  page: z.coerce.number().int().gte(1).default(1),
+
+  limit: z.coerce.number().int().gte(1).lte(100).default(10),
+
+  search: z.string().min(1).optional(),
+});
 
 export class GetUserParamsDto extends createZodDto(GetUserParamsSchema) {}
 export class GetUsersQueryDto extends createZodDto(GetUsersQuerySchema) {}

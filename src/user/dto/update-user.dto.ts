@@ -35,19 +35,17 @@ const UpdateSelfSchema = z
       .preprocess((val) => {
         if (typeof val !== 'string') return val;
         return val.trim().toLowerCase();
-      }, z.string().toLowerCase().email('Please enter a valid email address'))
+      }, z.string().max(254).toLowerCase().email('Please enter a valid email address'))
       .optional(),
     password: z
       .string()
       .min(5, 'Password must be at least 5 characters')
+      .max(60)
       .optional(),
-    currentPassword: z.preprocess(
-      (val) => {
-        if (typeof val !== 'string') return val;
-        return val.trim();
-      },
-      z.string().min(1, 'Current password is required'),
-    ),
+    currentPassword: z.preprocess((val) => {
+      if (typeof val !== 'string') return val;
+      return val.trim();
+    }, z.string().min(1, 'Current password is required').max(60)),
   })
   .refine((data) => data.email !== undefined || data.password !== undefined, {
     message: 'At least one field (email or password) must be provided',
