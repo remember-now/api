@@ -13,8 +13,10 @@
   },
   "collectCoverageFrom": ["src/**/*.(t|j)s"],
   "coverageDirectory": "../coverage",
-  "testTimeout": 60000,
-  "maxWorkers": 1,
+  "testTimeout": 10000,
+  "maxWorkers": "50%",
+  "workerIdleMemoryLimit": "1GB",
   "globalSetup": "<rootDir>/setup/global-setup.ts",
-  "globalTeardown": "<rootDir>/setup/global-teardown.ts"
+  "globalTeardown": "<rootDir>/setup/global-teardown.ts",
+  "setupFilesAfterEnv": ["<rootDir>/setup/jest.setup.ts"]
 }

@@ -2,6 +2,8 @@ import { spec } from 'pactum';
 import { TestSetup } from './test-setup';
 import { TestDataFactory } from './test-data-factory';
 import { UserResponse } from 'test/types/api-responses';
+import { DatabaseUtils } from './database-utils';
+import { Role } from 'generated/prisma';
 
 export interface SessionResult {
   userId: number;
@@ -15,6 +17,7 @@ export interface SessionResult {
 
 export class TestHelpers {
   private static sessionCounter = 0;
+  private static prisma = DatabaseUtils.getPrismaClient();
 
   static generateSessionKey(prefix = 'session'): string {
     return `${prefix}_${++this.sessionCounter}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -81,27 +84,45 @@ export class TestHelpers {
   static async createUserWithSession(
     userPrefix = 'test',
   ): Promise<SessionResult> {
-    const userCredentials = TestDataFactory.createUserCredentials(userPrefix);
+    const { credentials } = await this.createUser(userPrefix);
 
-    const userId: number = await spec()
-      .post(`${TestSetup.baseUrl}/auth/signup`)
-      .withBody(userCredentials)
-      .expectStatus(201)
-      .returns('id');
+    return await this.loginUser(credentials);
+  }
 
-    const sessionKey = this.generateSessionKey();
-    const userData: UserResponse = await spec()
-      .post(`${TestSetup.baseUrl}/auth/login`)
-      .withBody(userCredentials)
-      .expectStatus(200)
-      .stores(sessionKey, 'res.headers.set-cookie')
-      .returns('user');
+  /**
+   * Create admin only (no login)
+   */
+  static async createAdmin(
+    adminPrefix = 'admin',
+  ): Promise<{ id: number; credentials: { email: string; password: string } }> {
+    const { id, credentials } = await this.createUser(adminPrefix);
 
-    return {
-      userId,
-      credentials: userCredentials,
-      sessionKey,
-      userData,
-    };
+    await this.promoteUserToAdmin(id);
+
+    return { id, credentials };
+  }
+
+  /**
+   * Create and login an admin in one step
+   */
+  static async createAdminWithSession(
+    adminPrefix = 'admin',
+  ): Promise<SessionResult> {
+    const { id: userId, credentials: adminCredentials } =
+      await this.createUser(adminPrefix);
+
+    await this.promoteUserToAdmin(userId);
+
+    return await this.loginUser(adminCredentials);
+  }
+
+  /**
+   * Promote an existing user to admin role
+   */
+  static async promoteUserToAdmin(userId: number): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: Role.ADMIN },
+    });
   }
 }

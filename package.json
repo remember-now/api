@@ -26,7 +26,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e:base": "dotenv -e .env.test -- jest --config ./test/jest-e2e.json",
-    "test:e2e": "npm run db:test:restart && npm run test:e2e:base -- --runInBand ; npm run db:test:rm",
+    "test:e2e": "npm run db:test:restart && npm run test:e2e:base ; npm run db:test:rm",
     "test:e2e:watch": "npm run db:test:restart && npm run test:e2e:base -- --watch --no-cache ; npm run db:test:rm",
     "test:e2e:auth": "npm run db:test:restart && npm run test:e2e:base -- --testPathPattern=auth ; npm run db:test:rm",
     "test:e2e:user": "npm run db:test:restart && npm run test:e2e:base -- --testPathPattern=user ; npm run db:test:rm",
