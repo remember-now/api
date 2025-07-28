@@ -1,3 +1,11 @@
+/test
+*.md
+init-dbs.sh
+docker-compose.yml
+docker-compose.test.yml
+.git
+.aws
+
 # compiled output
 /dist
 /node_modules
