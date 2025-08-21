@@ -25,6 +25,7 @@ describe('UserController', () => {
     id: 1,
     email: 'test@example.com',
     role: Role.USER,
+    agentId: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
   };
@@ -160,13 +161,21 @@ describe('UserController', () => {
         password: 'password123',
         role: Role.ADMIN,
       };
-      userService.createUserWithDto.mockResolvedValueOnce(mockUser);
+      const createUserResult = {
+        id: 1,
+        email: 'admin@example.com',
+        role: Role.ADMIN,
+        agentId: null,
+        createdAt: new Date('2025-01-01'),
+        updatedAt: new Date('2025-01-01'),
+      };
+      userService.createUserWithDto.mockResolvedValueOnce(createUserResult);
 
       const result = await userController.createUser(createUserDto);
 
       expect(userService.createUserWithDto).toHaveBeenCalledWith(createUserDto);
       expect(userService.createUserWithDto).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(createUserResult);
     });
 
     it('should handle creation errors', async () => {

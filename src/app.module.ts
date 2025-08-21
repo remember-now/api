@@ -18,6 +18,7 @@ import { RedisStore } from 'connect-redis';
 import { RedisClientType } from 'redis';
 import { UserModule } from './user/user.module';
 import { LettaModule } from './letta/letta.module';
+import { AgentModule } from './agent/agent.module';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 
@@ -29,6 +30,7 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     UserModule,
     AuthModule,
     LettaModule,
+    AgentModule,
   ],
   providers: [
     Logger,

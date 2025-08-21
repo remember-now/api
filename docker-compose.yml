@@ -41,9 +41,10 @@ services:
     image: letta/letta:latest
     environment:
       - LETTA_PG_URI=postgresql://${LETTA_DB_NAME}:${LETTA_DB_PASS}@postgres:5432/${LETTA_DB_NAME}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - SECURE=true
-      - LETTA_SERVER_PASSWORD=${LETTA_PASS}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SECURE=${LETTA_SECURE:-true}
+      - LETTA_SERVER_PASSWORD=${LETTA_PASS:-changeme}
+      - LETTA_ENVIRONMENT=""
     ports:
       - '${LETTA_PORT:-8283}:8283'
     networks:
@@ -59,6 +60,7 @@ services:
       - APP_DATABASE_URL=postgresql://${APP_DB_NAME}:${APP_DB_PASS}@postgres:5432/${APP_DB_NAME}
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
       - LETTA_URL=http://letta:8283
+      - LETTA_PASS=${LETTA_PASS:-changeme}
       - SESSION_SECRET=${SESSION_SECRET:-super_secret_value}
       - SESSION_EXPIRY_HOURS=${SESSION_EXPIRY_HOURS:-336}
     ports:

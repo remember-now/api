@@ -6,7 +6,6 @@ import { PasswordService } from './password.service';
 import { Role, User } from 'generated/prisma';
 import { AuthDto } from './dto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { UserWithoutPassword } from 'src/user/types';
 import { Session } from 'express-session';
 
 describe('AuthService', () => {
@@ -46,15 +45,23 @@ describe('AuthService', () => {
       const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$...';
       passwordService.hash.mockResolvedValueOnce(hashedPassword);
 
-      const expectedResult: UserWithoutPassword = {
+      const userServiceResult = {
+        id: 1,
+        email: 'test@example.com',
+        role: Role.USER,
+        agentId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      userService.createUser.mockResolvedValueOnce(userServiceResult);
+
+      const expectedResult = {
         id: 1,
         email: 'test@example.com',
         role: Role.USER,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      userService.createUser.mockResolvedValueOnce(expectedResult);
-
       const result = await authService.registerUser(authDto);
 
       expect(passwordService.hash).toHaveBeenCalledWith(authDto.password);
@@ -80,6 +87,7 @@ describe('AuthService', () => {
       email: 'test@example.com',
       passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
       role: Role.USER,
+      agentId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

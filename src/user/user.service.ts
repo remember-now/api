@@ -40,6 +40,7 @@ export class UserService {
         id: user.id,
         email: user.email,
         role: user.role,
+        agentId: null,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
@@ -83,6 +84,7 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        agentId: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -149,6 +151,7 @@ export class UserService {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
       return updatedUser;
@@ -197,6 +200,7 @@ export class UserService {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
       return updatedUser;
@@ -240,5 +244,25 @@ export class UserService {
     await this.prisma.user.delete({
       where: { id: userId },
     });
+  }
+
+  async updateUserAgentId(
+    userId: number,
+    agentId: string | null,
+  ): Promise<void> {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { agentId },
+      });
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('User not found');
+      }
+      throw error;
+    }
   }
 }

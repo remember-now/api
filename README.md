@@ -31,7 +31,7 @@
 # Install dependencies
 $ npm install
 
-# Fill out .env file (ANTHROPIC_API_KEY is required)
+# Fill out .env file (GEMINI_API_KEY is required)
 $ cp .env.example .env
 
 # Make sure Docker is running

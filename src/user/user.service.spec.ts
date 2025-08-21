@@ -25,6 +25,7 @@ describe('UserService', () => {
     email: 'test@example.com',
     passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
     role: Role.USER,
+    agentId: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
   };
@@ -33,6 +34,7 @@ describe('UserService', () => {
     id: 1,
     email: 'test@example.com',
     role: Role.USER,
+    agentId: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
   };
@@ -178,6 +180,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -220,6 +223,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -320,6 +324,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
       expect(result.email).toBe('updated@example.com');
@@ -346,6 +351,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
     });
@@ -371,6 +377,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
     });
@@ -443,6 +450,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
       expect(result.email).toBe('newemail@example.com');
@@ -472,6 +480,7 @@ describe('UserService', () => {
           role: true,
           createdAt: true,
           updatedAt: true,
+          agentId: true,
         },
       });
     });
@@ -604,6 +613,61 @@ describe('UserService', () => {
       prismaService.user.delete.mockRejectedValueOnce(error);
 
       await expect(userService.deleteSelf(1, deleteDto)).rejects.toThrow(error);
+    });
+  });
+
+  describe('updateUserAgentId', () => {
+    it('should update user agentId successfully', async () => {
+      const agentId = 'agent-123';
+      const updatedUser = { ...mockUser, agentId };
+
+      prismaService.user.update.mockResolvedValueOnce(updatedUser);
+
+      await userService.updateUserAgentId(1, agentId);
+
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { agentId },
+      });
+    });
+
+    it('should set agentId to null successfully', async () => {
+      const updatedUser = { ...mockUser, agentId: null };
+
+      prismaService.user.update.mockResolvedValueOnce(updatedUser);
+
+      await userService.updateUserAgentId(1, null);
+
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { agentId: null },
+      });
+    });
+
+    it('should throw NotFoundException when user is not found', async () => {
+      const prismaError = new PrismaClientKnownRequestError('User not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      prismaService.user.update.mockRejectedValueOnce(prismaError);
+
+      await expect(
+        userService.updateUserAgentId(999, 'agent-123'),
+      ).rejects.toThrow(new NotFoundException('User not found'));
+
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 999 },
+        data: { agentId: 'agent-123' },
+      });
+    });
+
+    it('should rethrow unknown errors', async () => {
+      const unknownError = new Error('Database connection failed');
+      prismaService.user.update.mockRejectedValueOnce(unknownError);
+
+      await expect(
+        userService.updateUserAgentId(1, 'agent-123'),
+      ).rejects.toThrow(unknownError);
     });
   });
 });

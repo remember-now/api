@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "prisma:dev:deploy": "prisma migrate deploy",
+    "prisma:dev:deploy": "dotenv -e .env -- prisma migrate deploy",
     "prisma:test:deploy": "dotenv -e .env.test -- prisma migrate deploy",
     "infra:dev:up": "docker compose up --wait postgres redis letta -d",
     "infra:dev:rm": "docker compose down postgres redis letta -v",

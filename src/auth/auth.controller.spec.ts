@@ -6,7 +6,6 @@ import { AuthDto } from './dto';
 import { InternalServerErrorException } from '@nestjs/common';
 import { Role } from 'generated/prisma';
 import { Request } from 'express';
-import { UserWithoutPassword } from 'src/user/types';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -38,7 +37,7 @@ describe('AuthController', () => {
         password: 'password123',
       };
 
-      const expectedResult: UserWithoutPassword = {
+      const expectedResult = {
         id: 1,
         email: 'test@example.com',
         role: Role.USER,
@@ -74,6 +73,7 @@ describe('AuthController', () => {
         id: 1,
         email: 'test@example.com',
         role: Role.USER,
+        agentId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -85,6 +85,7 @@ describe('AuthController', () => {
           id: 1,
           email: 'test@example.com',
           role: Role.USER,
+          agentId: null,
           createdAt: expect.any(Date) as Date,
           updatedAt: expect.any(Date) as Date,
         },

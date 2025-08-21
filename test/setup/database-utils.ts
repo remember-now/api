@@ -4,7 +4,6 @@ export class DatabaseUtils {
   private static prisma = new PrismaClient();
 
   static async cleanDatabase(): Promise<void> {
-    await this.prisma.memory.deleteMany();
     await this.prisma.user.deleteMany();
   }
 
