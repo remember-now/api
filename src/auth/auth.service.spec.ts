@@ -3,10 +3,9 @@ import { AuthService } from './auth.service';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { UserService } from 'src/user/user.service';
 import { PasswordService } from './password.service';
-import { Role, User } from 'generated/prisma';
-import { AuthDto } from './dto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Session } from 'express-session';
+import { UserFactory, AuthFactory } from 'src/test/factories';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -36,32 +35,16 @@ describe('AuthService', () => {
   });
 
   describe('registerUser', () => {
-    const authDto: AuthDto = {
-      email: 'test@example.com',
-      password: 'password123',
-    };
+    const authDto = AuthFactory.createAuthDto();
 
     it('should call userService.createUser with a hashed password', async () => {
       const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$...';
       passwordService.hash.mockResolvedValueOnce(hashedPassword);
 
-      const userServiceResult = {
-        id: 1,
-        email: 'test@example.com',
-        role: Role.USER,
-        agentId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const userServiceResult = UserFactory.createUserServiceResult();
       userService.createUser.mockResolvedValueOnce(userServiceResult);
 
-      const expectedResult = {
-        id: 1,
-        email: 'test@example.com',
-        role: Role.USER,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const expectedResult = UserFactory.createAuthServiceResult();
       const result = await authService.registerUser(authDto);
 
       expect(passwordService.hash).toHaveBeenCalledWith(authDto.password);
@@ -77,20 +60,8 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
-    const authDto: AuthDto = {
-      email: 'test@example.com',
-      password: 'password123',
-    };
-
-    const mockUser: User = {
-      id: 1,
-      email: 'test@example.com',
-      passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
-      role: Role.USER,
-      agentId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const authDto = AuthFactory.createAuthDto();
+    const mockUser = UserFactory.createUser();
 
     it('should return user data when credentials are valid', async () => {
       userService.getUserByEmail.mockResolvedValueOnce(mockUser);
@@ -107,13 +78,7 @@ describe('AuthService', () => {
       );
       expect(passwordService.verify).toHaveBeenCalledTimes(1);
 
-      expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        role: mockUser.role,
-        createdAt: mockUser.createdAt,
-        updatedAt: mockUser.updatedAt,
-      });
+      expect(result).toEqual(UserFactory.createAuthServiceResult());
     });
 
     it('should throw ForbiddenException when getUserByEmail throws NotFoundException', async () => {

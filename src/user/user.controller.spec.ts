@@ -3,17 +3,11 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { Role, User } from 'generated/prisma';
-import {
-  CreateUserDto,
-  UpdateUserDto,
-  UpdateSelfDto,
-  GetUserParamsDto,
-  GetUsersQueryDto,
-  DeleteSelfDto,
-} from './dto';
-import { PaginatedUsers, UserWithoutPassword } from './types';
+import { GetUserParamsDto, GetUsersQueryDto, UpdateUserDto } from './dto';
+import { PaginatedUsers } from './types';
 import { Session as ExpressSession } from 'express-session';
 import { AuthService } from 'src/auth/auth.service';
+import { UserFactory, UserDtoFactory } from 'src/test/factories';
 
 describe('UserController', () => {
   let userController: UserController;
@@ -21,14 +15,7 @@ describe('UserController', () => {
   let authService: DeepMocked<AuthService>;
   let mockSession: DeepMocked<ExpressSession>;
 
-  const mockUser: UserWithoutPassword = {
-    id: 1,
-    email: 'test@example.com',
-    role: Role.USER,
-    agentId: null,
-    createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01'),
-  };
+  const mockUser = UserFactory.createUserWithoutPassword();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -61,10 +48,7 @@ describe('UserController', () => {
 
   describe('updateMe', () => {
     it('should call userService.updateSelf with correct parameters', async () => {
-      const updateSelfDto: UpdateSelfDto = {
-        email: 'newemail@example.com',
-        currentPassword: 'currentPassword123',
-      };
+      const updateSelfDto = UserDtoFactory.createUpdateSelfDto();
       userService.updateSelf.mockResolvedValueOnce(mockUser);
       const result = await userController.updateMe(mockUser, updateSelfDto);
 
@@ -77,10 +61,7 @@ describe('UserController', () => {
     });
 
     it('should handle update errors', async () => {
-      const updateSelfDto: UpdateSelfDto = {
-        email: 'newemail@example.com',
-        currentPassword: 'currentPassword123',
-      };
+      const updateSelfDto = UserDtoFactory.createUpdateSelfDto();
       const error = new Error('Update failed');
       userService.updateSelf.mockRejectedValueOnce(error);
 
@@ -92,10 +73,7 @@ describe('UserController', () => {
 
   describe('deleteMe', () => {
     it('should call userService.deleteSelf and authService.destroyUserSession', async () => {
-      const deleteSelfDto: DeleteSelfDto = {
-        currentPassword: 'currentPassword123',
-        confirmationText: 'DELETE MY ACCOUNT',
-      };
+      const deleteSelfDto = UserDtoFactory.createDeleteSelfDto();
       userService.deleteSelf.mockResolvedValueOnce(undefined);
       authService.destroyUserSession.mockResolvedValueOnce(undefined);
 
@@ -116,10 +94,7 @@ describe('UserController', () => {
     });
 
     it('should handle user deletion errors', async () => {
-      const deleteSelfDto: DeleteSelfDto = {
-        currentPassword: 'currentPassword123',
-        confirmationText: 'DELETE MY ACCOUNT',
-      };
+      const deleteSelfDto = UserDtoFactory.createDeleteSelfDto();
       const error = new Error('Deletion failed');
       userService.deleteSelf.mockRejectedValueOnce(error);
 
@@ -131,10 +106,7 @@ describe('UserController', () => {
     });
 
     it('should not fail if session destruction fails', async () => {
-      const deleteSelfDto: DeleteSelfDto = {
-        currentPassword: 'currentPassword123',
-        confirmationText: 'DELETE MY ACCOUNT',
-      };
+      const deleteSelfDto = UserDtoFactory.createDeleteSelfDto();
 
       userService.deleteSelf.mockResolvedValueOnce(undefined);
       authService.destroyUserSession.mockRejectedValueOnce(
@@ -156,11 +128,7 @@ describe('UserController', () => {
 
   describe('createUser (Admin only)', () => {
     it('should call userService.createUserWithDto with correct parameters', async () => {
-      const createUserDto: CreateUserDto = {
-        email: 'admin@example.com',
-        password: 'password123',
-        role: Role.ADMIN,
-      };
+      const createUserDto = UserDtoFactory.createCreateUserDto();
       const createUserResult = {
         id: 1,
         email: 'admin@example.com',
@@ -179,11 +147,7 @@ describe('UserController', () => {
     });
 
     it('should handle creation errors', async () => {
-      const createUserDto: CreateUserDto = {
-        email: 'admin@example.com',
-        password: 'password123',
-        role: Role.ADMIN,
-      };
+      const createUserDto = UserDtoFactory.createCreateUserDto();
       const error = new Error('Creation failed');
       userService.createUserWithDto.mockRejectedValueOnce(error);
 

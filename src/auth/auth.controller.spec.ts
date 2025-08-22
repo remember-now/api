@@ -2,10 +2,9 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthDto } from './dto';
 import { InternalServerErrorException } from '@nestjs/common';
-import { Role } from 'generated/prisma';
 import { Request } from 'express';
+import { UserFactory, AuthFactory } from 'src/test/factories';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -32,18 +31,8 @@ describe('AuthController', () => {
 
   describe('registerUser', () => {
     it('should call authService.registerUser with correct parameters', async () => {
-      const authDto: AuthDto = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
-
-      const expectedResult = {
-        id: 1,
-        email: 'test@example.com',
-        role: Role.USER,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const authDto = AuthFactory.createAuthDto();
+      const expectedResult = UserFactory.createAuthServiceResult();
       authService.registerUser.mockResolvedValueOnce(expectedResult);
 
       const result = await authController.registerUser(authDto);
@@ -54,10 +43,7 @@ describe('AuthController', () => {
     });
 
     it('should handle registration errors', async () => {
-      const authDto: AuthDto = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
+      const authDto = AuthFactory.createAuthDto();
       const error = new Error('Registration failed');
       authService.registerUser.mockRejectedValueOnce(error);
 
@@ -69,26 +55,12 @@ describe('AuthController', () => {
 
   describe('loginUser', () => {
     it('should return login success message with user data', () => {
-      const mockUserWithoutPassword = {
-        id: 1,
-        email: 'test@example.com',
-        role: Role.USER,
-        agentId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const mockUserWithoutPassword = UserFactory.createUserWithoutPassword();
       const result = authController.loginUser(mockUserWithoutPassword);
 
       expect(result).toEqual({
         message: 'Login successful',
-        user: {
-          id: 1,
-          email: 'test@example.com',
-          role: Role.USER,
-          agentId: null,
-          createdAt: expect.any(Date) as Date,
-          updatedAt: expect.any(Date) as Date,
-        },
+        user: mockUserWithoutPassword,
       });
     });
   });

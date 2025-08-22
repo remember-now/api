@@ -7,37 +7,20 @@ import { PasswordService } from 'src/auth/password.service';
 import { Role, User } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import {
-  CreateUserDto,
   UpdateUserDto,
   UpdateSelfDto,
   GetUsersQueryDto,
   DeleteSelfDto,
 } from './dto';
-import { UserWithoutPassword } from './types';
+import { UserFactory, UserDtoFactory } from 'src/test/factories';
 
 describe('UserService', () => {
   let userService: UserService;
   let prismaService: DeepMockProxy<PrismaService>;
   let passwordService: DeepMockProxy<PasswordService>;
 
-  const mockUser: User = {
-    id: 1,
-    email: 'test@example.com',
-    passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
-    role: Role.USER,
-    agentId: null,
-    createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01'),
-  };
-
-  const mockUserWithoutPassword: UserWithoutPassword = {
-    id: 1,
-    email: 'test@example.com',
-    role: Role.USER,
-    agentId: null,
-    createdAt: new Date('2025-01-01'),
-    updatedAt: new Date('2025-01-01'),
-  };
+  const mockUser = UserFactory.createUser();
+  const mockUserWithoutPassword = UserFactory.createUserWithoutPassword();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -120,11 +103,10 @@ describe('UserService', () => {
 
   describe('createUserWithDto', () => {
     it('should hash password and create user', async () => {
-      const createUserDto: CreateUserDto = {
+      const createUserDto = UserDtoFactory.createCreateUserDto({
         email: 'test@example.com',
-        password: 'password123',
         role: Role.USER,
-      };
+      });
       const hashedPassword = 'hashedPassword123';
 
       passwordService.hash.mockResolvedValueOnce(hashedPassword);
