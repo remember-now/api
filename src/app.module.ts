@@ -19,12 +19,22 @@ import { RedisClientType } from 'redis';
 import { UserModule } from './user/user.module';
 import { LettaModule } from './letta/letta.module';
 import { AgentModule } from './agent/agent.module';
+import { BullModule } from '@nestjs/bullmq';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          url: configService.get<string>('REDIS_URL'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     PrismaModule,
     RedisModule,
     UserModule,

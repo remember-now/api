@@ -65,7 +65,7 @@ export class AgentService {
     }
   }
 
-  private async createAgentAndLinkToUser(userId: number): Promise<string> {
+  async createAgentAndLinkToUser(userId: number): Promise<string> {
     const agent = await this.createDefaultAgent();
 
     try {
@@ -176,18 +176,36 @@ export class AgentService {
     }
   }
 
-  async deleteUserAgent(userId: number): Promise<void> {
-    const user = await this.userService.getUserById(userId);
-    if (!user.agentId) {
-      return;
+  async deleteAgentById(agentId: string, userId?: number): Promise<void> {
+    await this.deleteAgentFromLetta(agentId);
+    if (userId) {
+      await this.clearUserAgentId(userId);
     }
+  }
 
+  private async deleteAgentFromLetta(agentId: string): Promise<void> {
     try {
-      await this.client.agents.delete(user.agentId);
+      await this.client.agents.delete(agentId);
+    } catch (error) {
+      this.logger.error('Failed to delete agent from Letta', error);
+      throw new InternalServerErrorException('Failed to delete agent');
+    }
+  }
+
+  private async clearUserAgentId(userId: number): Promise<void> {
+    try {
       await this.userService.updateUserAgentId(userId, null);
     } catch (error) {
-      this.logger.error('Failed to delete user agent', error);
-      throw new InternalServerErrorException('Failed to delete user agent');
+      if (error instanceof NotFoundException) {
+        this.logger.debug(
+          `User ${userId} no longer exists, skipping agentId update`,
+        );
+        return;
+      }
+      this.logger.error(
+        `Could not update user ${userId} agentId to null`,
+        error,
+      );
     }
   }
 }

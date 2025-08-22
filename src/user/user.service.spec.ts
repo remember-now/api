@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import { UserService } from './user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PasswordService } from 'src/auth/password.service';
@@ -13,6 +14,7 @@ import {
   DeleteSelfDto,
 } from './dto';
 import { UserFactory, UserDtoFactory } from 'src/test/factories';
+import { QueueNames } from 'src/common/constants';
 
 describe('UserService', () => {
   let userService: UserService;
@@ -22,10 +24,19 @@ describe('UserService', () => {
   const mockUser = UserFactory.createUser();
   const mockUserWithoutPassword = UserFactory.createUserWithoutPassword();
 
+  const mockQueue = {
+    add: jest.fn(),
+    process: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
+        {
+          provide: getQueueToken(QueueNames.AGENT_PROVISIONING),
+          useValue: mockQueue,
+        },
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
@@ -50,6 +61,7 @@ describe('UserService', () => {
     jest.clearAllMocks();
     mockReset(prismaService);
     mockReset(passwordService);
+    mockQueue.add.mockClear();
   });
 
   it('should be defined', () => {
@@ -57,7 +69,7 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
-    it('should create a user successfully', async () => {
+    it('should create a user successfully and enqueue agent creation', async () => {
       prismaService.user.create.mockResolvedValueOnce(mockUser);
 
       const result = await userService.createUser(
@@ -73,6 +85,11 @@ describe('UserService', () => {
           role: Role.USER,
         },
       });
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'create-agent',
+        { userId: mockUser.id },
+        expect.any(Object),
+      );
       expect(result).toEqual(mockUserWithoutPassword);
     });
 
@@ -508,14 +525,36 @@ describe('UserService', () => {
   });
 
   describe('deleteUser', () => {
-    it('should delete user successfully', async () => {
-      prismaService.user.delete.mockResolvedValueOnce(mockUser);
+    it('should delete user successfully and enqueue agent deletion', async () => {
+      const userWithAgent = UserFactory.createUser({
+        agentId: 'test-agent-id',
+      });
+      prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);
+      prismaService.user.delete.mockResolvedValueOnce(userWithAgent);
 
       await userService.deleteUser(1);
 
       expect(prismaService.user.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'delete-agent',
+        { userId: 1, agentId: 'test-agent-id' },
+        expect.any(Object),
+      );
+    });
+
+    it('should delete user without agentId and not enqueue agent deletion', async () => {
+      const userWithoutAgent = UserFactory.createUser({ agentId: null });
+      prismaService.user.findUnique.mockResolvedValueOnce(userWithoutAgent);
+      prismaService.user.delete.mockResolvedValueOnce(userWithoutAgent);
+
+      await userService.deleteUser(1);
+
+      expect(prismaService.user.delete).toHaveBeenCalledWith({
+        where: { id: 1 },
+      });
+      expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when a user is not found', async () => {
@@ -542,15 +581,18 @@ describe('UserService', () => {
   });
 
   describe('deleteSelf', () => {
-    it('should delete self when current password is correct', async () => {
+    it('should delete self when current password is correct and enqueue agent deletion', async () => {
       const deleteDto: DeleteSelfDto = {
         currentPassword: 'currentPassword123',
         confirmationText: 'DELETE MY ACCOUNT',
       };
 
-      prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
+      const userWithAgent = UserFactory.createUser({
+        agentId: 'test-agent-id',
+      });
+      prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);
       passwordService.verify.mockResolvedValueOnce(true);
-      prismaService.user.delete.mockResolvedValueOnce(mockUser);
+      prismaService.user.delete.mockResolvedValueOnce(userWithAgent);
 
       await userService.deleteSelf(1, deleteDto);
 
@@ -558,12 +600,17 @@ describe('UserService', () => {
         where: { id: 1 },
       });
       expect(passwordService.verify).toHaveBeenCalledWith(
-        mockUser.passwordHash,
+        userWithAgent.passwordHash,
         'currentPassword123',
       );
       expect(prismaService.user.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'delete-agent',
+        { userId: 1, agentId: 'test-agent-id' },
+        expect.any(Object),
+      );
     });
 
     it('should throw ForbiddenException when current password is incorrect', async () => {

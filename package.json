@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@letta-ai/letta-client": "^0.1.164",
+    "@nestjs/bullmq": "^11.0.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -53,6 +54,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "^6.12.0",
     "argon2": "^0.43.0",
+    "bullmq": "^5.58.0",
     "connect-redis": "^9.0.0",
     "express-session": "^1.18.1",
     "nestjs-zod": "^4.3.1",

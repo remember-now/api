@@ -94,7 +94,7 @@ export class UserController {
   @UseGuards(AdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteUser(@Param() params: GetUserParamsDto) {
-    return this.userService.deleteUser(params.id);
+  async deleteUser(@Param() params: GetUserParamsDto) {
+    await this.userService.deleteUser(params.id);
   }
 }

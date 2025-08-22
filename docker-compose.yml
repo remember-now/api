@@ -53,6 +53,20 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'curl',
+          '-f',
+          '-H',
+          'Authorization: Bearer ${LETTA_PASS:-changeme}',
+          'http://localhost:8283/v1/health/',
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   app:
     build: .
@@ -73,7 +87,7 @@ services:
       redis:
         condition: service_healthy
       letta:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
 networks:

@@ -1,8 +1,11 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { User, Role } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -15,12 +18,18 @@ import {
   DeleteSelfDto,
 } from './dto';
 import { PaginatedUsers, UserWithoutPassword } from './types';
+import { AgentJobData } from 'src/agent/types';
+import { QueueNames } from 'src/common/constants';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
-    private prisma: PrismaService,
-    private passwordService: PasswordService,
+    @InjectQueue(QueueNames.AGENT_PROVISIONING)
+    private readonly agentQueue: Queue<AgentJobData>,
+    private readonly prisma: PrismaService,
+    private readonly passwordService: PasswordService,
   ) {}
 
   async createUser(
@@ -36,6 +45,8 @@ export class UserService {
           role: role,
         },
       });
+      await this.enqueueAgentCreation(user.id);
+
       return {
         id: user.id,
         email: user.email,
@@ -216,9 +227,14 @@ export class UserService {
 
   async deleteUser(id: number): Promise<void> {
     try {
+      const user = await this.getUserById(id);
+
       await this.prisma.user.delete({
         where: { id },
       });
+      if (user.agentId) {
+        await this.enqueueAgentDeletion(id, user.agentId);
+      }
     } catch (error) {
       if (
         error instanceof PrismaClientKnownRequestError &&
@@ -244,6 +260,9 @@ export class UserService {
     await this.prisma.user.delete({
       where: { id: userId },
     });
+    if (existingUser.agentId) {
+      await this.enqueueAgentDeletion(userId, existingUser.agentId);
+    }
   }
 
   async updateUserAgentId(
@@ -263,6 +282,57 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
       throw error;
+    }
+  }
+
+  private async enqueueAgentCreation(userId: number): Promise<void> {
+    try {
+      await this.agentQueue.add(
+        'create-agent',
+        { userId },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+          removeOnComplete: 10,
+          removeOnFail: 5,
+        },
+      );
+      this.logger.log(`Enqueued agent creation for user ${userId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue agent creation for user ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  private async enqueueAgentDeletion(
+    userId: number,
+    agentId: string,
+  ): Promise<void> {
+    try {
+      await this.agentQueue.add(
+        'delete-agent',
+        { userId, agentId },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+          removeOnComplete: 10,
+          removeOnFail: 5,
+        },
+      );
+      this.logger.log(`Enqueued agent deletion for user ${userId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue agent deletion for user ${userId}:`,
+        error,
+      );
     }
   }
 }
