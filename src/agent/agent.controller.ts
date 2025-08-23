@@ -5,14 +5,22 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Put,
+  Delete,
   Res,
   UseGuards,
   Logger,
+  Param,
 } from '@nestjs/common';
 import { Response } from 'express';
 
 import { AgentService } from './agent.service';
-import { ChatRequestDto } from './dto';
+import {
+  ChatRequestDto,
+  CreateMemoryBlockDto,
+  UpdateMemoryBlockDto,
+  GetMemoryBlockParamsDto,
+} from './dto';
 import { LoggedInGuard } from 'src/auth/guard';
 import { GetUser } from 'src/auth/decorator';
 
@@ -74,5 +82,44 @@ export class AgentController {
       this.logger.error('Streaming failed', error);
       res.status(500).json({ error: 'Streaming failed' });
     }
+  }
+
+  @Get('blocks')
+  listMemoryBlocks(@GetUser('id') userId: number) {
+    return this.agentService.listMemoryBlocks(userId);
+  }
+
+  @Get('blocks/:blockLabel')
+  getMemoryBlock(
+    @Param() params: GetMemoryBlockParamsDto,
+    @GetUser('id') userId: number,
+  ) {
+    return this.agentService.getMemoryBlock(userId, params.blockLabel);
+  }
+
+  @Post('blocks')
+  createMemoryBlock(
+    @Body() dto: CreateMemoryBlockDto,
+    @GetUser('id') userId: number,
+  ) {
+    return this.agentService.createMemoryBlock(userId, dto);
+  }
+
+  @Put('blocks/:blockLabel')
+  updateMemoryBlock(
+    @Param() params: GetMemoryBlockParamsDto,
+    @Body() dto: UpdateMemoryBlockDto,
+    @GetUser('id') userId: number,
+  ) {
+    return this.agentService.updateMemoryBlock(userId, params.blockLabel, dto);
+  }
+
+  @Delete('blocks/:blockLabel')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteMemoryBlock(
+    @Param() params: GetMemoryBlockParamsDto,
+    @GetUser('id') userId: number,
+  ) {
+    return this.agentService.deleteMemoryBlock(userId, params.blockLabel);
   }
 }

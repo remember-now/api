@@ -6,10 +6,19 @@ import {
 } from '@nestjs/common';
 import { LettaService } from 'src/letta';
 import { UserService } from 'src/user/user.service';
-import { ChatRequestDto } from './dto';
+import {
+  ChatRequestDto,
+  CreateMemoryBlockDto,
+  UpdateMemoryBlockDto,
+} from './dto';
 import { LettaError } from '@letta-ai/letta-client';
-import type { AssistantMessage } from '@letta-ai/letta-client/api/types';
+import type {
+  AgentType,
+  AssistantMessage,
+  BlockUpdate,
+} from '@letta-ai/letta-client/api/types';
 import { ConfigService } from '@nestjs/config';
+import * as AGENT_CONFIG from './templates/agent-config.json';
 
 @Injectable()
 export class AgentService {
@@ -23,18 +32,8 @@ export class AgentService {
 
   private async createDefaultAgent() {
     return await this.client.agents.create({
-      agentType: 'memgpt_v2_agent',
-      memoryBlocks: [
-        {
-          label: 'human',
-          value: `The user wants an assistant that remembers everything for them so they never have to remember anything again. They want the lasting sense of peace that comes from knowing that no piece of useful knowledge shared with me is lost.`,
-        },
-        {
-          label: 'persona',
-          value:
-            "I am an assistant that helps users by remembering everything for them. I remind them of important things, help them find information they've shared before, and act as their augmented memory companion. I am proactive in helping them remember things they might need.",
-        },
-      ],
+      agentType: AGENT_CONFIG.agentType as AgentType,
+      memoryBlocks: AGENT_CONFIG.memoryBlocks,
       model: this.configService.get<string>(
         'MODEL',
         'google_ai/gemini-2.5-pro',
@@ -206,6 +205,118 @@ export class AgentService {
         `Could not update user ${userId} agentId to null`,
         error,
       );
+    }
+  }
+
+  async listMemoryBlocks(userId: number) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      return await this.client.agents.blocks.list(agentId);
+    } catch (error) {
+      this.logger.error('Failed to list memory blocks', error);
+
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Agent not found');
+      }
+      throw new InternalServerErrorException('Failed to list memory blocks');
+    }
+  }
+
+  async getMemoryBlock(userId: number, blockLabel: string) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      return await this.client.agents.blocks.retrieve(agentId, blockLabel);
+    } catch (error) {
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Memory block not found');
+      }
+      this.logger.error(`Failed to get memory block ${blockLabel}`, error);
+      throw new InternalServerErrorException('Failed to get memory block');
+    }
+  }
+
+  async createMemoryBlock(userId: number, dto: CreateMemoryBlockDto) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      const block = await this.client.blocks.create({
+        label: dto.label,
+        value: dto.value,
+        description: dto.description,
+        limit: dto.limit,
+        readOnly: dto.readOnly,
+      });
+      if (!block.id) {
+        throw new InternalServerErrorException(
+          'Failed to create block for - no ID returned',
+        );
+      }
+      await this.client.agents.blocks.attach(agentId, block.id);
+
+      return block;
+    } catch (error) {
+      this.logger.error('Failed to create memory block', error);
+
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Agent not found');
+      }
+      throw new InternalServerErrorException('Failed to create memory block');
+    }
+  }
+
+  async updateMemoryBlock(
+    userId: number,
+    blockLabel: string,
+    dto: UpdateMemoryBlockDto,
+  ) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      const updatePayload: BlockUpdate = {};
+      if (dto.value !== undefined) updatePayload.value = dto.value;
+      if (dto.description !== undefined)
+        updatePayload.description = dto.description;
+      if (dto.limit !== undefined) updatePayload.limit = dto.limit;
+      if (dto.readOnly !== undefined) updatePayload.readOnly = dto.readOnly;
+
+      return await this.client.agents.blocks.modify(
+        agentId,
+        blockLabel,
+        updatePayload,
+      );
+    } catch (error) {
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Memory block not found');
+      }
+      this.logger.error(`Failed to update memory block ${blockLabel}`, error);
+      throw new InternalServerErrorException('Failed to update memory block');
+    }
+  }
+
+  async deleteMemoryBlock(userId: number, blockLabel: string) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      const block = await this.client.agents.blocks.retrieve(
+        agentId,
+        blockLabel,
+      );
+      if (block.id) {
+        await this.client.agents.blocks.detach(agentId, block.id);
+      }
+      return {
+        message: 'Memory block deleted successfully',
+        blockLabel: blockLabel,
+        userId: userId,
+      };
+    } catch (error) {
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Memory block not found');
+      }
+      this.logger.error(`Failed to delete memory block ${blockLabel}`, error);
+      throw new InternalServerErrorException('Failed to delete memory block');
     }
   }
 }
