@@ -72,6 +72,7 @@ services:
     build: .
     environment:
       - APP_DATABASE_URL=postgresql://${APP_DB_NAME}:${APP_DB_PASS}@postgres:5432/${APP_DB_NAME}
+      - FRONTEND_URL=${FRONTEND_URL}
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
       - LETTA_URL=http://letta:8283
       - LETTA_PASS=${LETTA_PASS:-changeme}
