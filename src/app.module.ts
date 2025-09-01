@@ -8,8 +8,8 @@ import {
 import * as passport from 'passport';
 import * as session from 'express-session';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ZodValidationPipe } from 'nestjs-zod';
-import { APP_PIPE } from '@nestjs/core';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { APP_INTERCEPTOR, APP_PIPE, APP_FILTER } from '@nestjs/core';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +20,7 @@ import { UserModule } from './user/user.module';
 import { LettaModule } from './letta/letta.module';
 import { AgentModule } from './agent/agent.module';
 import { BullModule } from '@nestjs/bullmq';
+import { HttpExceptionFilter } from './common/http-exception.filter';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 
@@ -47,6 +48,14 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     {
       provide: APP_PIPE,
       useClass: ZodValidationPipe,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ZodSerializerInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
     },
   ],
 })
