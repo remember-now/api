@@ -25,6 +25,11 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Frontend Type Generation
+
+The `openapi.json` is auto-generated when you run `npm run start:dev`.
+Make sure to commit changes when you modify routes/DTOs.
+
 ## Project setup
 
 ```bash
@@ -47,8 +52,14 @@ $ npm run start:docker
 # Run app on host (development)
 $ npm run infra:dev:up && npm run prisma:dev:deploy && npm run start:dev
 
-# When done developing, clean up with:
-$ npm run infra:dev:rm
+# When done developing for the day (preserves data):
+$ npm run infra:dev:stop
+
+# Resume development with existing data:
+$ npm run infra:dev:start && npm run start:dev
+
+# Full reset (destroys all data):
+$ npm run infra:dev:reset
 ```
 
 ## Run tests

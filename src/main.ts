@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { writeFileSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,8 +29,13 @@ async function bootstrap() {
     .setVersion('1.0')
     .build();
   const openApiDoc = SwaggerModule.createDocument(app, config);
+  const cleanedDoc = cleanupOpenApiDoc(openApiDoc);
 
-  SwaggerModule.setup('api', app, cleanupOpenApiDoc(openApiDoc));
+  if (process.env.NODE_ENV === 'dev') {
+    writeFileSync('./openapi.json', JSON.stringify(cleanedDoc, null, 2));
+    logger.log('OpenAPI spec written to openapi.json');
+  }
+  SwaggerModule.setup('api', app, cleanedDoc);
 
   await app.listen(process.env.PORT ?? 3333);
   logger.log(`Application listening at ${await app.getUrl()}`);
