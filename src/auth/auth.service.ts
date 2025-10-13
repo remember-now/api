@@ -8,6 +8,7 @@ import { AuthDto } from './dto';
 import { UserService } from 'src/user/user.service';
 import { PasswordService } from './password.service';
 import { Session } from 'express-session';
+import { UserWithoutPassword } from 'src/user/dto';
 
 @Injectable()
 export class AuthService {
@@ -20,19 +21,11 @@ export class AuthService {
 
   async registerUser(dto: AuthDto) {
     const hash = await this.passwordService.hash(dto.password);
-
     const user = await this.userService.createUser(dto.email, hash);
-
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+    return user;
   }
 
-  async validateUser(dto: AuthDto) {
+  async validateUser(dto: AuthDto): Promise<UserWithoutPassword> {
     try {
       const user = await this.userService.getUserByEmail(dto.email);
       const pwMatches = await this.passwordService.verify(
@@ -41,13 +34,8 @@ export class AuthService {
       );
       if (!pwMatches) throw new ForbiddenException('Invalid credentials');
 
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      return userWithoutPassword;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new ForbiddenException('Invalid credentials');

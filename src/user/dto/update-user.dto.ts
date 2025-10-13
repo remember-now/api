@@ -1,23 +1,14 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { Role } from 'generated/prisma';
+import { CreateUserSchema, RoleSchema } from './create-user.dto';
+import { PasswordSchema } from 'src/common/schemas';
 
-const roleValues = Object.values(Role) as [string, ...string[]];
-
-const UpdateUserSchema = z
+// Schemas
+export const UpdateUserSchema = z
   .object({
-    email: z
-      .preprocess((val) => {
-        if (typeof val !== 'string') return val;
-        return val.trim().toLowerCase();
-      }, z.string().max(254).toLowerCase().email('Please enter a valid email address'))
-      .optional(),
-    password: z
-      .string()
-      .min(5, 'Password must be at least 5 characters')
-      .max(60)
-      .optional(),
-    role: z.enum(roleValues).optional(),
+    email: CreateUserSchema.shape.email.optional(),
+    password: PasswordSchema.optional(),
+    role: RoleSchema.optional(),
   })
   .refine(
     (data) =>
@@ -27,21 +18,13 @@ const UpdateUserSchema = z
     {
       message: 'At least one field (email, password, or role) must be provided',
     },
-  );
+  )
+  .meta({ id: 'UpdateUser' });
 
-const UpdateSelfSchema = z
+export const UpdateSelfSchema = z
   .object({
-    email: z
-      .preprocess((val) => {
-        if (typeof val !== 'string') return val;
-        return val.trim().toLowerCase();
-      }, z.string().max(254).toLowerCase().email('Please enter a valid email address'))
-      .optional(),
-    password: z
-      .string()
-      .min(5, 'Password must be at least 5 characters')
-      .max(60)
-      .optional(),
+    email: CreateUserSchema.shape.email.optional(),
+    password: PasswordSchema.optional(),
     currentPassword: z.preprocess((val) => {
       if (typeof val !== 'string') return val;
       return val.trim();
@@ -49,7 +32,13 @@ const UpdateSelfSchema = z
   })
   .refine((data) => data.email !== undefined || data.password !== undefined, {
     message: 'At least one field (email or password) must be provided',
-  });
+  })
+  .meta({ id: 'UpdateSelf' });
 
+// DTO classes
 export class UpdateUserDto extends createZodDto(UpdateUserSchema) {}
 export class UpdateSelfDto extends createZodDto(UpdateSelfSchema) {}
+
+// Types
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type UpdateSelf = z.infer<typeof UpdateSelfSchema>;

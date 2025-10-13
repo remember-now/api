@@ -1,10 +1,20 @@
-import { Role, User } from 'generated/prisma';
-import { UserWithoutPassword } from 'src/user/types';
+import { Role, RoleSchema, User, UserWithoutPassword } from 'src/user/dto';
+import { User as PrismaUser, Role as PrismaRole } from 'generated/prisma';
 
 export interface UserFactoryOptions {
   id?: number;
   email?: string;
   role?: Role;
+  agentId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  passwordHash?: string;
+}
+
+export interface PrismaUserFactoryOptions {
+  id?: number;
+  email?: string;
+  role?: PrismaRole;
   agentId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -15,7 +25,17 @@ export class UserFactory {
   private static defaultUser: User = {
     id: 1,
     email: 'test@example.com',
-    role: Role.USER,
+    role: RoleSchema.enum.USER,
+    agentId: null,
+    createdAt: new Date('2025-01-01').toISOString(),
+    updatedAt: new Date('2025-01-01').toISOString(),
+    passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
+  };
+
+  private static defaultPrismaUser: PrismaUser = {
+    id: 1,
+    email: 'test@example.com',
+    role: PrismaRole.USER,
     agentId: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
@@ -68,10 +88,33 @@ export class UserFactory {
   static createAuthServiceResult(
     options: Omit<UserFactoryOptions, 'passwordHash' | 'agentId'> = {},
   ) {
-    const { passwordHash: _, agentId: __, ...userOptions } = this.defaultUser;
+    const { passwordHash: _, ...userOptions } = this.defaultUser;
     return {
       ...userOptions,
       ...options,
     };
+  }
+
+  /**
+   * Creates a full Prisma User object (including passwordHash) with Date objects
+   * Use this for mocking Prisma service calls
+   */
+  static createPrismaUser(options: PrismaUserFactoryOptions = {}): PrismaUser {
+    return {
+      ...this.defaultPrismaUser,
+      ...options,
+    };
+  }
+
+  /**
+   * Creates a Prisma UserWithoutPassword object (excludes passwordHash) with Date objects
+   * Use this for mocking Prisma service calls that select without passwordHash
+   */
+  static createPrismaUserWithoutPassword(
+    options: PrismaUserFactoryOptions = {},
+  ): Omit<PrismaUser, 'passwordHash'> {
+    const user = this.createPrismaUser(options);
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 }

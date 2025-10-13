@@ -2,9 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
-import { Role, User } from 'generated/prisma';
-import { GetUserParamsDto, GetUsersQueryDto, UpdateUserDto } from './dto';
-import { PaginatedUsers } from './types';
+import {
+  GetUserParamsDto,
+  GetUsersQueryDto,
+  PaginatedUsers,
+  RoleSchema,
+  UpdateUserDto,
+} from './dto';
 import { Session as ExpressSession } from 'express-session';
 import { AuthService } from 'src/auth/auth.service';
 import { UserFactory, UserDtoFactory } from 'src/test/factories';
@@ -126,16 +130,16 @@ describe('UserController', () => {
     });
   });
 
-  describe('createUser (Admin only)', () => {
+  describe('createUser ( only)', () => {
     it('should call userService.createUserWithDto with correct parameters', async () => {
       const createUserDto = UserDtoFactory.createCreateUserDto();
       const createUserResult = {
         id: 1,
         email: 'admin@example.com',
-        role: Role.ADMIN,
+        role: RoleSchema.enum.ADMIN,
         agentId: null,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01'),
+        createdAt: new Date('2025-01-01').toISOString(),
+        updatedAt: new Date('2025-01-01').toISOString(),
       };
       userService.createUserWithDto.mockResolvedValueOnce(createUserResult);
 
@@ -203,10 +207,7 @@ describe('UserController', () => {
   describe('getUserById (Admin only)', () => {
     it('should call userService.getUserById with correct parameters', async () => {
       const params: GetUserParamsDto = { id: 1 };
-      const mockFullUser: User = {
-        ...mockUser,
-        passwordHash: 'hashedPassword',
-      };
+      const mockFullUser = UserFactory.createUser();
 
       userService.getUserById.mockResolvedValueOnce(mockFullUser);
 
@@ -233,7 +234,7 @@ describe('UserController', () => {
       const params: GetUserParamsDto = { id: 1 };
       const updateUserDto: UpdateUserDto = {
         email: 'updated@example.com',
-        role: Role.ADMIN,
+        role: RoleSchema.enum.ADMIN,
       };
       userService.updateUser.mockResolvedValueOnce(mockUser);
 

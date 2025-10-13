@@ -5,24 +5,44 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { UserService } from './user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PasswordService } from 'src/auth/password.service';
-import { Role, User } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import {
   UpdateUserDto,
   UpdateSelfDto,
   GetUsersQueryDto,
   DeleteSelfDto,
+  RoleSchema,
 } from './dto';
 import { UserFactory, UserDtoFactory } from 'src/test/factories';
 import { QueueNames } from 'src/common/constants';
+import { User } from 'generated/prisma';
 
 describe('UserService', () => {
   let userService: UserService;
   let prismaService: DeepMockProxy<PrismaService>;
   let passwordService: DeepMockProxy<PasswordService>;
 
-  const mockUser = UserFactory.createUser();
-  const mockUserWithoutPassword = UserFactory.createUserWithoutPassword();
+  const mockUser = UserFactory.createPrismaUser();
+  const mockUserWithoutPassword = UserFactory.createPrismaUserWithoutPassword();
+
+  // Create matching DTO expectations with same data but string dates
+  const expectedUser = UserFactory.createUser({
+    id: mockUser.id,
+    email: mockUser.email,
+    role: mockUser.role,
+    agentId: mockUser.agentId,
+    createdAt: mockUser.createdAt.toISOString(),
+    updatedAt: mockUser.updatedAt.toISOString(),
+    passwordHash: mockUser.passwordHash,
+  });
+  const expectedUserWithoutPassword = UserFactory.createUserWithoutPassword({
+    id: mockUser.id,
+    email: mockUser.email,
+    role: mockUser.role,
+    agentId: mockUser.agentId,
+    createdAt: mockUser.createdAt.toISOString(),
+    updatedAt: mockUser.updatedAt.toISOString(),
+  });
 
   const mockQueue = {
     add: jest.fn(),
@@ -75,14 +95,14 @@ describe('UserService', () => {
       const result = await userService.createUser(
         'test@example.com',
         'hashedPassword',
-        Role.USER,
+        RoleSchema.enum.USER,
       );
 
       expect(prismaService.user.create).toHaveBeenCalledWith({
         data: {
           email: 'test@example.com',
           passwordHash: 'hashedPassword',
-          role: Role.USER,
+          role: RoleSchema.enum.USER,
         },
       });
       expect(mockQueue.add).toHaveBeenCalledWith(
@@ -90,7 +110,7 @@ describe('UserService', () => {
         { userId: mockUser.id },
         expect.any(Object),
       );
-      expect(result).toEqual(mockUserWithoutPassword);
+      expect(result).toEqual(expectedUserWithoutPassword);
     });
 
     it('should throw ForbiddenException when email is already taken', async () => {
@@ -104,7 +124,11 @@ describe('UserService', () => {
       prismaService.user.create.mockRejectedValueOnce(prismaError);
 
       await expect(
-        userService.createUser('test@example.com', 'hashedPassword', Role.USER),
+        userService.createUser(
+          'test@example.com',
+          'hashedPassword',
+          RoleSchema.enum.USER,
+        ),
       ).rejects.toThrow(new ForbiddenException('Credentials taken'));
     });
 
@@ -113,7 +137,11 @@ describe('UserService', () => {
       prismaService.user.create.mockRejectedValueOnce(unknownError);
 
       await expect(
-        userService.createUser('test@example.com', 'hashedPassword', Role.USER),
+        userService.createUser(
+          'test@example.com',
+          'hashedPassword',
+          RoleSchema.enum.USER,
+        ),
       ).rejects.toThrow(unknownError);
     });
   });
@@ -122,7 +150,7 @@ describe('UserService', () => {
     it('should hash password and create user', async () => {
       const createUserDto = UserDtoFactory.createCreateUserDto({
         email: 'test@example.com',
-        role: Role.USER,
+        role: RoleSchema.enum.USER,
       });
       const hashedPassword = 'hashedPassword123';
 
@@ -139,13 +167,13 @@ describe('UserService', () => {
           role: createUserDto.role,
         },
       });
-      expect(result).toEqual(mockUserWithoutPassword);
+      expect(result).toEqual(expectedUserWithoutPassword);
     });
   });
 
   describe('getAllUsers', () => {
     const mockPaginatedResult = {
-      users: [mockUserWithoutPassword],
+      users: [expectedUserWithoutPassword],
       pagination: {
         page: 1,
         limit: 10,
@@ -268,7 +296,7 @@ describe('UserService', () => {
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(expectedUser);
     });
 
     it('should throw NotFoundException when user not found', async () => {
@@ -289,7 +317,7 @@ describe('UserService', () => {
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
       });
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(expectedUser);
     });
 
     it('should throw NotFoundException when user not found', async () => {
@@ -357,19 +385,19 @@ describe('UserService', () => {
 
     it('should update user with role only', async () => {
       const updateDto: UpdateUserDto = {
-        role: Role.ADMIN,
+        role: RoleSchema.enum.ADMIN,
       };
 
       prismaService.user.update.mockResolvedValueOnce({
         ...mockUser,
-        role: Role.ADMIN,
+        role: RoleSchema.enum.ADMIN,
       });
 
       await userService.updateUser(1, updateDto);
 
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { role: Role.ADMIN },
+        data: { role: RoleSchema.enum.ADMIN },
         select: {
           id: true,
           email: true,
@@ -526,7 +554,7 @@ describe('UserService', () => {
 
   describe('deleteUser', () => {
     it('should delete user successfully and enqueue agent deletion', async () => {
-      const userWithAgent = UserFactory.createUser({
+      const userWithAgent = UserFactory.createPrismaUser({
         agentId: 'test-agent-id',
       });
       prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);
@@ -545,7 +573,7 @@ describe('UserService', () => {
     });
 
     it('should delete user without agentId and not enqueue agent deletion', async () => {
-      const userWithoutAgent = UserFactory.createUser({ agentId: null });
+      const userWithoutAgent = UserFactory.createPrismaUser({ agentId: null });
       prismaService.user.findUnique.mockResolvedValueOnce(userWithoutAgent);
       prismaService.user.delete.mockResolvedValueOnce(userWithoutAgent);
 
@@ -587,7 +615,7 @@ describe('UserService', () => {
         confirmationText: 'DELETE MY ACCOUNT',
       };
 
-      const userWithAgent = UserFactory.createUser({
+      const userWithAgent = UserFactory.createPrismaUser({
         agentId: 'test-agent-id',
       });
       prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);

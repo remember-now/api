@@ -2,50 +2,15 @@ import { spec, handler } from 'pactum';
 import { TestSetup } from './test-setup';
 import { TestHelpers } from './test-helpers';
 import {
-  AuthResponse,
-  MessageResponse,
-  UserResponse,
-  ValidationErrorResponse,
+  UserWithoutPassword,
+  LoginResponseSchema,
+  SignupResponseSchema,
+  LogoutResponseSchema,
+  UserWithoutPasswordSchema,
 } from 'test/types';
 import { ExpectHandlerContext } from 'pactum/src/exports/handler';
 
 export class TestAssertions {
-  private static isUserResponse(data: unknown): data is UserResponse {
-    if (!data || typeof data !== 'object') return false;
-    const obj = data as Record<string, unknown>;
-    return (
-      typeof obj.id === 'number' &&
-      typeof obj.email === 'string' &&
-      typeof obj.role === 'string' &&
-      typeof obj.createdAt === 'string' &&
-      typeof obj.updatedAt === 'string'
-    );
-  }
-
-  private static isAuthResponse(data: unknown): data is AuthResponse {
-    if (!data || typeof data !== 'object') return false;
-    const obj = data as Record<string, unknown>;
-    return typeof obj.message === 'string' && this.isUserResponse(obj.user);
-  }
-
-  private static isValidationErrorResponse(
-    data: unknown,
-  ): data is ValidationErrorResponse {
-    if (!data || typeof data !== 'object') return false;
-    const obj = data as Record<string, unknown>;
-    return (
-      typeof obj.statusCode === 'number' &&
-      typeof obj.message === 'string' &&
-      Array.isArray(obj.errors)
-    );
-  }
-
-  private static isMessageResponse(data: unknown): data is MessageResponse {
-    if (!data || typeof data !== 'object') return false;
-    const obj = data as Record<string, unknown>;
-    return typeof obj.message === 'string';
-  }
-
   /**
    * Initialize custom expect handlers
    */
@@ -58,25 +23,59 @@ export class TestAssertions {
             `Expected status 200 or 201 but got ${ctx.res.statusCode}`,
           );
         }
-        if (!this.isUserResponse(ctx.res.json)) {
-          throw new Error('Response is not a valid user response');
-        }
-        const body = ctx.res.json;
 
-        const forbiddenFields = ['password', 'passwordHash', 'hashedPassword'];
-        for (const field of forbiddenFields) {
-          if (field in body) {
-            throw new Error(`Response should not contain field: ${field}`);
-          }
+        const result = UserWithoutPasswordSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid UserWithoutPassword: ${result.error.message}`,
+          );
         }
+        const body = result.data;
+
         // Validate specific user data if provided
-        const userData = ctx.data as Partial<UserResponse>;
+        const userData = ctx.data as Partial<UserWithoutPassword>;
 
         if (userData) {
           for (const [key, value] of Object.entries(userData)) {
-            if (body[key] !== value) {
+            if (body[key as keyof UserWithoutPassword] !== value) {
               throw new Error(
-                `Expected ${key} to be ${String(value)} but got ${String(body[key])}`,
+                `Expected ${key} to be ${String(value)} but got ${String(body[key as keyof UserWithoutPassword])}`,
+              );
+            }
+          }
+        }
+      },
+    );
+
+    handler.addExpectHandler(
+      'successfulSignup',
+      (ctx: ExpectHandlerContext) => {
+        if (ctx.res.statusCode !== 201) {
+          throw new Error(`Expected status 201 but got ${ctx.res.statusCode}`);
+        }
+
+        const result = SignupResponseSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid SignupResponse: ${result.error.message}`,
+          );
+        }
+        const body = result.data;
+
+        if (body.message !== 'Registration successful') {
+          throw new Error(
+            `Expected message 'Registration successful' but got '${body.message}'`,
+          );
+        }
+
+        // Validate user data if provided
+        const userData = ctx.data as Partial<UserWithoutPassword>;
+
+        if (userData) {
+          for (const [key, value] of Object.entries(userData)) {
+            if (body.user[key as keyof UserWithoutPassword] !== value) {
+              throw new Error(
+                `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
               );
             }
           }
@@ -88,24 +87,29 @@ export class TestAssertions {
       if (ctx.res.statusCode !== 200) {
         throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
       }
-      if (!this.isAuthResponse(ctx.res.json)) {
-        throw new Error('Response is not a valid auth response');
+
+      const result = LoginResponseSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid LoginResponse: ${result.error.message}`,
+        );
       }
-      const body = ctx.res.json;
+      const body = result.data;
 
       if (body.message !== 'Login successful') {
         throw new Error(
           `Expected message 'Login successful' but got '${body.message}'`,
         );
       }
+
       // Validate user data if provided
-      const userData = ctx.data as Partial<UserResponse>;
+      const userData = ctx.data as Partial<UserWithoutPassword>;
 
       if (userData) {
         for (const [key, value] of Object.entries(userData)) {
-          if (body.user[key] !== value) {
+          if (body.user[key as keyof UserWithoutPassword] !== value) {
             throw new Error(
-              `Expected user.${key} to be ${String(value)} but got ${String(body.user[key])}`,
+              `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
             );
           }
         }
@@ -125,10 +129,20 @@ export class TestAssertions {
       if (ctx.res.statusCode !== 400) {
         throw new Error(`Expected status 400 but got ${ctx.res.statusCode}`);
       }
-      if (!this.isValidationErrorResponse(ctx.res.json)) {
+
+      const body = ctx.res.json as {
+        statusCode: number;
+        message: string;
+        errors: Array<{ code: string; path: string[]; message: string }>;
+      };
+
+      if (
+        typeof body.statusCode !== 'number' ||
+        typeof body.message !== 'string' ||
+        !Array.isArray(body.errors)
+      ) {
         throw new Error('Response is not a valid validation error response');
       }
-      const body = ctx.res.json;
 
       const hasFieldError = body.errors.some(
         (error) =>
@@ -154,11 +168,16 @@ export class TestAssertions {
         if (ctx.res.statusCode !== 200) {
           throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
         }
-        if (!this.isMessageResponse(ctx.res.json)) {
-          throw new Error('Response is not a valid message response');
+
+        // Use Zod to validate the response
+        const result = LogoutResponseSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid LogoutResponse: ${result.error.message}`,
+          );
         }
 
-        const body = ctx.res.json;
+        const body = result.data;
         if (body.message !== 'Logout successful') {
           throw new Error(
             `Expected message 'Logout successful' but got '${body.message}'`,
@@ -173,7 +192,7 @@ export class TestAssertions {
    */
   static async validateAuthenticatedAccess(
     sessionKey: string,
-  ): Promise<UserResponse> {
+  ): Promise<UserWithoutPassword> {
     return await TestHelpers.authenticatedRequest(sessionKey)
       .get(`${TestSetup.baseUrl}/users/me`)
       .expect('validUserResponse')

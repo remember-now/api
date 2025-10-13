@@ -11,6 +11,7 @@ import {
   UseGuards,
   Logger,
   Param,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 
@@ -20,6 +21,7 @@ import {
   CreateMemoryBlockDto,
   UpdateMemoryBlockDto,
   GetMemoryBlockParamsDto,
+  GetMessagesQueryDto,
 } from './dto';
 import { LoggedInGuard } from 'src/auth/guard';
 import { GetUser } from 'src/auth/decorator';
@@ -34,6 +36,14 @@ export class AgentController {
   @Get()
   getAgentInfo(@GetUser('id') userId: number) {
     return this.agentService.getAgentInfo(userId);
+  }
+
+  @Get('messages')
+  getMessages(
+    @GetUser('id') userId: number,
+    @Query() query: GetMessagesQueryDto,
+  ) {
+    return this.agentService.getMessages(query, userId);
   }
 
   @Post('chat')

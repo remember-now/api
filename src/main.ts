@@ -26,10 +26,6 @@ async function bootstrap() {
         'and adaptive learning capabilities to enhance cognitive recall and organization.',
     )
     .setVersion('1.0')
-    .addTag('auth', 'Authentication and authorization')
-    .addTag('agents', 'AI agent management')
-    .addTag('users', 'User management')
-    .addTag('memory', 'Memory storage and retrieval')
     .build();
   const openApiDoc = SwaggerModule.createDocument(app, config);
 

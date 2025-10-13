@@ -1,9 +1,8 @@
 import { spec } from 'pactum';
 import { TestSetup } from './test-setup';
 import { TestDataFactory } from './test-data-factory';
-import { UserResponse } from 'test/types';
+import { User, Role } from 'test/types';
 import { DatabaseUtils } from './database-utils';
-import { Role } from 'generated/prisma';
 
 export interface SessionResult {
   userId: number;
@@ -12,7 +11,7 @@ export interface SessionResult {
     password: string;
   };
   sessionKey: string;
-  userData: UserResponse;
+  userData: User;
 }
 
 export class TestHelpers {
@@ -41,7 +40,7 @@ export class TestHelpers {
       .post(`${TestSetup.baseUrl}/auth/signup`)
       .withBody(credentials)
       .expectStatus(201)
-      .returns('id');
+      .returns('user.id');
 
     return { id, credentials };
   }
@@ -54,7 +53,7 @@ export class TestHelpers {
     password: string;
   }): Promise<SessionResult> {
     const sessionKey = this.generateSessionKey();
-    const userData: UserResponse = await spec()
+    const userData: User = await spec()
       .post(`${TestSetup.baseUrl}/auth/login`)
       .withBody(userCredentials)
       .expectStatus(200)

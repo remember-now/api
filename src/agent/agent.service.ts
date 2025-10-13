@@ -9,14 +9,11 @@ import { UserService } from 'src/user/user.service';
 import {
   ChatRequestDto,
   CreateMemoryBlockDto,
+  GetMessagesQueryDto,
   UpdateMemoryBlockDto,
 } from './dto';
 import { LettaError } from '@letta-ai/letta-client';
-import type {
-  AgentType,
-  AssistantMessage,
-  BlockUpdate,
-} from '@letta-ai/letta-client/api/types';
+import type { AgentType, BlockUpdate } from '@letta-ai/letta-client/api/types';
 import { ConfigService } from '@nestjs/config';
 import * as AGENT_CONFIG from './templates/agent-config.json';
 
@@ -90,6 +87,32 @@ export class AgentService {
     }
   }
 
+  async getMessages(dto: GetMessagesQueryDto, userId: number) {
+    try {
+      const agentId = await this.getOrCreateUserAgent(userId);
+
+      const messages = await this.client.agents.messages.list(agentId, {
+        limit: dto.limit,
+        before: dto.before,
+      });
+
+      return {
+        messages,
+        params: {
+          limit: dto.limit,
+          before: dto.before,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Failed to get agent messages', error);
+
+      if (error instanceof LettaError && error.statusCode === 404) {
+        throw new NotFoundException('Agent not found');
+      }
+      throw new InternalServerErrorException('Failed to get agent messages');
+    }
+  }
+
   async sendMessage(dto: ChatRequestDto, userId: number) {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
@@ -102,16 +125,9 @@ export class AgentService {
           },
         ],
       });
-      const assistantMessages = response.messages
-        .filter(
-          (msg): msg is AssistantMessage =>
-            msg.messageType === 'assistant_message',
-        )
-        .map((msg) => msg.content as string)
-        .join(' ');
 
       return {
-        response: assistantMessages || 'I received your message.',
+        response: response.messages || 'I received your message.',
         usage: response.usage,
       };
     } catch (error) {

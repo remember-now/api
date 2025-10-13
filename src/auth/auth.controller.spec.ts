@@ -32,8 +32,12 @@ describe('AuthController', () => {
   describe('registerUser', () => {
     it('should call authService.registerUser with correct parameters', async () => {
       const authDto = AuthFactory.createAuthDto();
-      const expectedResult = UserFactory.createAuthServiceResult();
-      authService.registerUser.mockResolvedValueOnce(expectedResult);
+
+      const expectedResult = {
+        message: 'Registration successful',
+        user: UserFactory.createAuthServiceResult(),
+      };
+      authService.registerUser.mockResolvedValueOnce(expectedResult.user);
 
       const result = await authController.registerUser(authDto);
 

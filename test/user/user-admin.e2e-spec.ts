@@ -5,7 +5,7 @@ import {
   TestAssertions as a,
   TestDataFactory as f,
 } from 'test/setup';
-import { PaginatedUsersResponse, UserWithPasswordResponse } from 'test/types';
+import { PaginatedUsers, User } from 'test/types';
 
 describe('User Admin (e2e)', () => {
   describe('POST /users (Admin Only)', () => {
@@ -155,7 +155,7 @@ describe('User Admin (e2e)', () => {
         await h.createUser('list-2');
         await h.createUser('list-3');
 
-        const response: PaginatedUsersResponse = await h
+        const response: PaginatedUsers = await h
           .authenticatedRequest(sessionKey)
           .get(`${s.baseUrl}/users`)
           .expectStatus(200)
@@ -172,7 +172,7 @@ describe('User Admin (e2e)', () => {
         const { sessionKey } =
           await h.createAdminWithSession('admin-pagination');
 
-        const response: PaginatedUsersResponse = await h
+        const response: PaginatedUsers = await h
           .authenticatedRequest(sessionKey)
           .get(`${s.baseUrl}/users`)
           .withQueryParams('page', '1')
@@ -188,7 +188,7 @@ describe('User Admin (e2e)', () => {
         const { sessionKey } = await h.createAdminWithSession('admin-search');
         const _ = await h.createUser('searchable');
 
-        const response: PaginatedUsersResponse = await h
+        const response: PaginatedUsers = await h
           .authenticatedRequest(sessionKey)
           .get(`${s.baseUrl}/users`)
           .withQueryParams('search', 'searchable')
@@ -260,7 +260,7 @@ describe('User Admin (e2e)', () => {
         const { sessionKey } = await h.createAdminWithSession('admin-get-full');
         const targetUser = await h.createUser('full-access');
 
-        const response: UserWithPasswordResponse = await h
+        const response: User = await h
           .authenticatedRequest(sessionKey)
           .get(`${s.baseUrl}/users/${targetUser.id}`)
           .expectStatus(200)

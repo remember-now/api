@@ -1,25 +1,25 @@
-export interface UserResponse {
-  id: number;
-  email: string;
-  role: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type {
+  UserWithoutPassword,
+  User,
+  CreateUser,
+  UpdateUser,
+  UpdateSelf,
+} from 'src/user/dto';
 
-export interface UserWithPasswordResponse {
-  id: number;
-  email: string;
-  role: string;
-  passwordHash: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type {
+  Auth,
+  LoginResponse,
+  SignupResponse,
+  LogoutResponse,
+} from 'src/auth/dto';
 
-export interface AuthResponse {
-  message: string;
-  user: UserResponse;
-}
+export type {
+  PaginatedUsers,
+  GetUsersQuery,
+  GetUserParams,
+} from 'src/user/dto';
 
+// Validation error response type (from nestjs-zod)
 export interface ValidationErrorResponse {
   statusCode: number;
   message: string;
@@ -28,20 +28,4 @@ export interface ValidationErrorResponse {
     path: string[];
     message: string;
   }>;
-}
-
-export interface MessageResponse {
-  message: string;
-}
-
-export interface PaginatedUsersResponse {
-  users: UserResponse[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
 }

@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { User, Role } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PasswordService } from 'src/auth/password.service';
@@ -16,8 +15,11 @@ import {
   UpdateSelfDto,
   GetUsersQueryDto,
   DeleteSelfDto,
+  PaginatedUsers,
+  UserWithoutPassword,
+  Role,
+  User,
 } from './dto';
-import { PaginatedUsers, UserWithoutPassword } from './types';
 import { AgentJobData } from 'src/agent/types';
 import { QueueNames } from 'src/common/constants';
 
@@ -32,11 +34,24 @@ export class UserService {
     private readonly passwordService: PasswordService,
   ) {}
 
+  private transformUserDates<T extends { createdAt: Date; updatedAt: Date }>(
+    user: T,
+  ): Omit<T, 'createdAt' | 'updatedAt'> & {
+    createdAt: string;
+    updatedAt: string;
+  } {
+    return {
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+  }
+
   async createUser(
     email: string,
     passwordHash: string,
-    role: Role = Role.USER,
-  ) {
+    role: Role = 'USER',
+  ): Promise<UserWithoutPassword> {
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -52,8 +67,8 @@ export class UserService {
         email: user.email,
         role: user.role,
         agentId: null,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
       };
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -65,9 +80,9 @@ export class UserService {
     }
   }
 
-  async createUserWithDto(dto: CreateUserDto) {
+  async createUserWithDto(dto: CreateUserDto): Promise<UserWithoutPassword> {
     const hash = await this.passwordService.hash(dto.password);
-    return this.createUser(dto.email, hash, dto.role as Role);
+    return this.createUser(dto.email, hash, dto.role);
   }
 
   async getAllUsers(query: GetUsersQueryDto): Promise<PaginatedUsers> {
@@ -104,7 +119,7 @@ export class UserService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      users,
+      users: users.map((user) => this.transformUserDates(user)),
       pagination: {
         page,
         limit,
@@ -123,7 +138,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return user;
+    return this.transformUserDates(user);
   }
 
   async getUserByEmail(email: string): Promise<User> {
@@ -133,7 +148,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return user;
+    return this.transformUserDates(user);
   }
 
   async updateUser(
@@ -148,8 +163,8 @@ export class UserService {
     if (dto.password) {
       updateData.passwordHash = await this.passwordService.hash(dto.password);
     }
-    if (dto.role && Object.values(Role).includes(dto.role as Role)) {
-      updateData.role = dto.role as Role;
+    if (dto.role) {
+      updateData.role = dto.role;
     }
 
     try {
@@ -165,7 +180,7 @@ export class UserService {
           agentId: true,
         },
       });
-      return updatedUser;
+      return this.transformUserDates(updatedUser);
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -214,7 +229,7 @@ export class UserService {
           agentId: true,
         },
       });
-      return updatedUser;
+      return this.transformUserDates(updatedUser);
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {

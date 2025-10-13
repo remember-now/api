@@ -15,8 +15,7 @@ describe('Auth (e2e)', () => {
         await spec()
           .post(`${s.baseUrl}/auth/signup`)
           .withBody(newUser)
-          .expectStatus(201)
-          .expectJsonMatch({
+          .expect('successfulSignup', {
             email: newUser.email,
             role: 'USER',
           });
