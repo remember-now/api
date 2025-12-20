@@ -4,7 +4,7 @@ import { LoggedInGuard } from './logged-in.guard';
 
 @Injectable()
 export class AdminGuard extends LoggedInGuard {
-  canActivate(context: ExecutionContext): boolean {
+  override canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<
       Request & {
         session: { passport?: { user?: { role?: string } } };

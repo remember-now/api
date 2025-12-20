@@ -68,6 +68,8 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - express-session works with namespace import at runtime
         session({
           store: new RedisStore({
             client: this.redis,

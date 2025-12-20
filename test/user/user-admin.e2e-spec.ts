@@ -186,7 +186,7 @@ describe('User Admin (e2e)', () => {
 
       it('should search users by email', async () => {
         const { sessionKey } = await h.createAdminWithSession('admin-search');
-        const _ = await h.createUser('searchable');
+        await h.createUser('searchable');
 
         const response: PaginatedUsers = await h
           .authenticatedRequest(sessionKey)

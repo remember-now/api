@@ -26,7 +26,7 @@ import { UserWithoutPassword } from 'src/user/dto';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('signup')
   @ApiOperation({ summary: 'Register a new user' })
