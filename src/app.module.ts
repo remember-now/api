@@ -20,7 +20,7 @@ import { UserModule } from './user/user.module';
 import { LettaModule } from './letta/letta.module';
 import { AgentModule } from './agent/agent.module';
 import { BullModule } from '@nestjs/bullmq';
-import { HttpExceptionFilter } from './common/http-exception.filter';
+import { HttpExceptionFilter, SilentExceptionFilter } from './common';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 
@@ -52,6 +52,10 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     {
       provide: APP_INTERCEPTOR,
       useClass: ZodSerializerInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: SilentExceptionFilter,
     },
     {
       provide: APP_FILTER,
