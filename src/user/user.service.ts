@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { Prisma } from 'generated/prisma/client';
+
+const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PasswordService } from 'src/auth/password.service';
 import {

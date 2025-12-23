@@ -4,14 +4,16 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+// NOTE: Useful v7 migration info
+// https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7
+
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("APP_DATABASE_URL")
 }
 
 enum Role {

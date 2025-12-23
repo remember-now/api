@@ -27,6 +27,8 @@ export class RedisModule implements OnModuleDestroy {
 
   async onModuleDestroy() {
     const redisClient = this.moduleRef.get<RedisClientType>(REDIS);
-    await redisClient.quit();
+    if (redisClient.isOpen) {
+      await redisClient.quit();
+    }
   }
 }

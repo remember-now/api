@@ -29,5 +29,6 @@
       "generated/*": ["./generated/*"],
       "test/*": ["./test/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "prisma.config.ts", "generated"]
 }

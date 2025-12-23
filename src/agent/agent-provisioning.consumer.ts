@@ -1,16 +1,49 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
+import { Logger, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { AgentService } from './agent.service';
 import { CreateAgentJobData, DeleteAgentJobData } from './types';
 import { QueueNames } from 'src/common/constants';
 
 @Processor(QueueNames.AGENT_PROVISIONING)
-export class AgentProvisioningConsumer extends WorkerHost {
+export class AgentProvisioningConsumer
+  extends WorkerHost
+  implements OnModuleDestroy
+{
   private readonly logger = new Logger(AgentProvisioningConsumer.name);
+  private readonly isTest =
+    process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 
-  constructor(private readonly agentService: AgentService) {
+  constructor(
+    private readonly agentService: AgentService,
+    @InjectQueue(QueueNames.AGENT_PROVISIONING)
+    private readonly queue: Queue,
+  ) {
     super();
+  }
+
+  /**
+   * Check if error is a pool closure error during test teardown.
+   * These are expected when force closing workers in tests.
+   */
+  private isTestTeardownError(error: unknown): boolean {
+    return (
+      this.isTest &&
+      error instanceof Error &&
+      error.message?.includes('Cannot use a pool after calling end')
+    );
+  }
+
+  async onModuleDestroy() {
+    if (!this.worker) return;
+
+    const forceClose = this.isTest;
+
+    await this.worker.close(forceClose);
+
+    if (!this.queue.closing) {
+      await this.queue.close();
+    }
   }
 
   async process(job: Job): Promise<void> {
@@ -41,6 +74,9 @@ export class AgentProvisioningConsumer extends WorkerHost {
         );
         return;
       }
+      if (this.isTestTeardownError(error)) {
+        return;
+      }
       this.logger.error(`Failed to create agent for user ${userId}:`, error);
       throw error;
     }
@@ -55,6 +91,9 @@ export class AgentProvisioningConsumer extends WorkerHost {
         `Successfully deleted agent ${agentId} for user ${userId}`,
       );
     } catch (error) {
+      if (this.isTestTeardownError(error)) {
+        return;
+      }
       this.logger.error(
         `Failed to delete agent ${agentId} for user ${userId}:`,
         error,

@@ -75,6 +75,20 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Test stability verification
+
+The anti-flaky test runner executes unit tests once, then runs e2e tests repeatedly to detect intermittent failures and race conditions. Useful for validating test reliability after infrastructure changes.
+
+```bash
+# Run with default 15 iterations
+$ ./anti-flaky-test.sh
+
+# Run with custom iteration count
+$ ./anti-flaky-test.sh 30
+```
+
+The runner will exit immediately on first failure and display the failing test output. Test infrastructure is set up once and torn down automatically on completion or interruption.
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:

@@ -1,1 +1,1 @@
-export { Role } from 'generated/prisma';
+export { Role } from 'generated/prisma/client';

@@ -26,7 +26,7 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, expandVariables: true }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

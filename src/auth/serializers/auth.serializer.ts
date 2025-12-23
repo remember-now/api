@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 
-import { User, Role } from 'generated/prisma';
+import { User, Role } from 'generated/prisma/client';
 import { UserWithoutPassword } from 'src/user/dto';
 import { UserService } from 'src/user/user.service';
 

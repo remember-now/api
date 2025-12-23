@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { Role as PrismaRole } from 'generated/prisma';
+import { Role as PrismaRole } from 'generated/prisma/client';
 import { PasswordSchema } from 'src/common/schemas';
 
 // Schemas

@@ -5,7 +5,9 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { UserService } from './user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PasswordService } from 'src/auth/password.service';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { Prisma } from 'generated/prisma/client';
+
+const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 import {
   UpdateUserDto,
   UpdateSelfDto,
@@ -15,7 +17,7 @@ import {
 } from './dto';
 import { UserFactory, UserDtoFactory } from 'src/test/factories';
 import { QueueNames } from 'src/common/constants';
-import { User } from 'generated/prisma';
+import { User } from 'generated/prisma/client';
 
 describe('UserService', () => {
   let userService: UserService;
