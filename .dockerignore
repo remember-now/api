@@ -65,4 +65,16 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Dev tools and configs
+.prettierrc
+.prettierignore
+eslint.config.mjs
+jest.config.ts
+anti-flaky-test.sh
+.gitignore
+.husky
+.env.example
+openapi.json
+LICENSE
+
 /generated/prisma

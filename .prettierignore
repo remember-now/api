@@ -1,0 +1,13 @@
+# Generated files
+openapi.json
+generated/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Coverage
+coverage/
