@@ -3,7 +3,7 @@ import { Job, Queue } from 'bullmq';
 import { Logger, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { AgentService } from './agent.service';
 import { CreateAgentJobData, DeleteAgentJobData } from './types';
-import { QueueNames } from 'src/common/constants';
+import { QueueNames } from '@/common/constants';
 
 @Processor(QueueNames.AGENT_PROVISIONING)
 export class AgentProvisioningConsumer

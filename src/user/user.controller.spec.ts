@@ -10,8 +10,8 @@ import {
   UpdateUserDto,
 } from './dto';
 import { Session as ExpressSession } from 'express-session';
-import { AuthService } from 'src/auth/auth.service';
-import { UserFactory, UserDtoFactory } from 'src/test/factories';
+import { AuthService } from '@/auth/auth.service';
+import { UserFactory, UserDtoFactory } from '@/test/factories';
 
 describe('UserController', () => {
   let userController: UserController;

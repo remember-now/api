@@ -23,8 +23,8 @@ import {
   GetMemoryBlockParamsDto,
   GetMessagesQueryDto,
 } from './dto';
-import { LoggedInGuard } from 'src/auth/guard';
-import { GetUser } from 'src/auth/decorator';
+import { LoggedInGuard } from '@/auth/guard';
+import { GetUser } from '@/auth/decorator';
 
 @Controller('agent')
 @UseGuards(LoggedInGuard)

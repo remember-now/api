@@ -1,7 +1,7 @@
 import { spec } from 'pactum';
 import { TestSetup } from './test-setup';
 import { TestDataFactory } from './test-data-factory';
-import { User, Role } from 'test/types';
+import { User, Role } from '@test/types';
 import { DatabaseUtils } from './database-utils';
 
 export interface SessionResult {

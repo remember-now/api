@@ -4,8 +4,8 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { LettaService } from 'src/letta';
-import { UserService } from 'src/user/user.service';
+import { LettaService } from '@/letta';
+import { UserService } from '@/user/user.service';
 import {
   ChatRequestDto,
   CreateMemoryBlockDto,

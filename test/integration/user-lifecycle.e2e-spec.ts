@@ -4,7 +4,7 @@ import {
   TestHelpers as h,
   TestAssertions as a,
   TestDataFactory as f,
-} from 'test/setup';
+} from '@test/setup';
 
 describe('User Lifecycle Integration (e2e)', () => {
   describe('Complete User Journey', () => {

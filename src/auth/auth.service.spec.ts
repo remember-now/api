@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
-import { UserService } from 'src/user/user.service';
+import { UserService } from '@/user/user.service';
 import { PasswordService } from './password.service';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Session } from 'express-session';
-import { UserFactory, AuthFactory } from 'src/test/factories';
+import { UserFactory, AuthFactory } from '@/test/factories';
 
 describe('AuthService', () => {
   let authService: AuthService;

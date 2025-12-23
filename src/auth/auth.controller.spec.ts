@@ -4,7 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { InternalServerErrorException } from '@nestjs/common';
 import { Request } from 'express';
-import { UserFactory, AuthFactory } from 'src/test/factories';
+import { UserFactory, AuthFactory } from '@/test/factories';
 
 describe('AuthController', () => {
   let authController: AuthController;

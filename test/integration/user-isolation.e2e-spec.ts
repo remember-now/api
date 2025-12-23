@@ -2,7 +2,7 @@ import {
   TestSetup as s,
   TestHelpers as h,
   TestDataFactory as f,
-} from 'test/setup';
+} from '@test/setup';
 
 describe('User Isolation Integration (e2e)', () => {
   it('should prevent users from affecting each other during updates', async () => {

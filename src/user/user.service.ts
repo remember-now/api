@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Prisma } from 'generated/prisma/client';
+import { Prisma } from '@generated/prisma/client';
 
 const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
-import { PrismaService } from 'src/prisma/prisma.service';
-import { PasswordService } from 'src/auth/password.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { PasswordService } from '@/auth/password.service';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -22,8 +22,8 @@ import {
   Role,
   User,
 } from './dto';
-import { AgentJobData } from 'src/agent/types';
-import { QueueNames } from 'src/common/constants';
+import { AgentJobData } from '@/agent/types';
+import { QueueNames } from '@/common/constants';
 
 @Injectable()
 export class UserService {

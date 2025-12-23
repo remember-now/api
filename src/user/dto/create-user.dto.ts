@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { Role as PrismaRole } from 'generated/prisma/client';
-import { PasswordSchema } from 'src/common/schemas';
+import { Role as PrismaRole } from '@generated/prisma/client';
+import { PasswordSchema } from '@/common/schemas';
 
 // Schemas
 export const RoleSchema = z.enum(PrismaRole).meta({ id: 'Role' });

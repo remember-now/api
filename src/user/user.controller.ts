@@ -13,8 +13,8 @@ import {
   Session,
   Logger,
 } from '@nestjs/common';
-import { GetUser } from 'src/auth/decorator';
-import { AdminGuard, LoggedInGuard } from 'src/auth/guard';
+import { GetUser } from '@/auth/decorator';
+import { AdminGuard, LoggedInGuard } from '@/auth/guard';
 import { UserService } from './user.service';
 import {
   CreateUserDto,
@@ -29,7 +29,7 @@ import {
   PaginatedUsersDto,
 } from './dto';
 import { Session as ExpressSession } from 'express-session';
-import { AuthService } from 'src/auth/auth.service';
+import { AuthService } from '@/auth/auth.service';
 import { ApiOperation, ApiTags, ApiNoContentResponse } from '@nestjs/swagger';
 import { ZodResponse } from 'nestjs-zod';
 

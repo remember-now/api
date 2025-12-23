@@ -2,6 +2,6 @@ export {
   LoginResponseSchema,
   SignupResponseSchema,
   LogoutResponseSchema,
-} from 'src/auth/dto';
+} from '@/auth/dto';
 
-export { UserWithoutPasswordSchema } from 'src/user/dto';
+export { UserWithoutPasswordSchema } from '@/user/dto';

@@ -4,20 +4,16 @@ export type {
   CreateUser,
   UpdateUser,
   UpdateSelf,
-} from 'src/user/dto';
+} from '@/user/dto';
 
 export type {
   Auth,
   LoginResponse,
   SignupResponse,
   LogoutResponse,
-} from 'src/auth/dto';
+} from '@/auth/dto';
 
-export type {
-  PaginatedUsers,
-  GetUsersQuery,
-  GetUserParams,
-} from 'src/user/dto';
+export type { PaginatedUsers, GetUsersQuery, GetUserParams } from '@/user/dto';
 
 // Validation error response type (from nestjs-zod)
 export interface ValidationErrorResponse {

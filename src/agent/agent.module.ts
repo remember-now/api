@@ -3,9 +3,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { AgentService } from './agent.service';
 import { AgentController } from './agent.controller';
 import { AgentProvisioningConsumer } from './agent-provisioning.consumer';
-import { LettaModule } from 'src/letta/letta.module';
-import { UserModule } from 'src/user/user.module';
-import { QueueNames } from 'src/common/constants';
+import { LettaModule } from '@/letta/letta.module';
+import { UserModule } from '@/user/user.module';
+import { QueueNames } from '@/common/constants';
 
 @Module({
   imports: [

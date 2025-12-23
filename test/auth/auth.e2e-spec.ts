@@ -4,7 +4,7 @@ import {
   TestHelpers as h,
   TestAssertions as a,
   TestDataFactory as f,
-} from 'test/setup';
+} from '@test/setup';
 
 describe('Auth (e2e)', () => {
   describe('POST /auth/signup', () => {

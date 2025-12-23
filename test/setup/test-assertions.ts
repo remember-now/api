@@ -7,7 +7,7 @@ import {
   SignupResponseSchema,
   LogoutResponseSchema,
   UserWithoutPasswordSchema,
-} from 'test/types';
+} from '@test/types';
 import { ExpectHandlerContext } from 'pactum/src/exports/handler';
 
 export class TestAssertions {

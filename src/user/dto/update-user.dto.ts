@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CreateUserSchema, RoleSchema } from './create-user.dto';
-import { PasswordSchema } from 'src/common/schemas';
+import { PasswordSchema } from '@/common/schemas';
 
 // Schemas
 export const UpdateUserSchema = z

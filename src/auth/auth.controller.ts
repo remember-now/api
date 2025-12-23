@@ -21,7 +21,7 @@ import {
 } from './dto';
 import { LocalGuard, LoggedInGuard } from './guard';
 import { GetUser } from './decorator';
-import { UserWithoutPassword } from 'src/user/dto';
+import { UserWithoutPassword } from '@/user/dto';
 
 @ApiTags('Authentication')
 @Controller('auth')

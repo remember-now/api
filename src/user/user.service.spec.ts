@@ -3,9 +3,9 @@ import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { UserService } from './user.service';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { PasswordService } from 'src/auth/password.service';
-import { Prisma } from 'generated/prisma/client';
+import { PrismaService } from '@/prisma/prisma.service';
+import { PasswordService } from '@/auth/password.service';
+import { Prisma } from '@generated/prisma/client';
 
 const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 import {
@@ -15,9 +15,9 @@ import {
   DeleteSelfDto,
   RoleSchema,
 } from './dto';
-import { UserFactory, UserDtoFactory } from 'src/test/factories';
-import { QueueNames } from 'src/common/constants';
-import { User } from 'generated/prisma/client';
+import { UserFactory, UserDtoFactory } from '@/test/factories';
+import { QueueNames } from '@/common/constants';
+import { User } from '@generated/prisma/client';
 
 describe('UserService', () => {
   let userService: UserService;

@@ -5,10 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuthDto } from './dto';
-import { UserService } from 'src/user/user.service';
+import { UserService } from '@/user/user.service';
+import { UserWithoutPassword } from '@/user/dto';
 import { PasswordService } from './password.service';
 import { Session } from 'express-session';
-import { UserWithoutPassword } from 'src/user/dto';
 
 @Injectable()
 export class AuthService {
