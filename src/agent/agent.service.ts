@@ -1,20 +1,22 @@
+import { LettaError } from '@letta-ai/letta-client';
+import type { AgentType, BlockUpdate } from '@letta-ai/letta-client/api/types';
 import {
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
-  InternalServerErrorException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
 import { LettaService } from '@/letta';
 import { UserService } from '@/user/user.service';
+
 import {
   ChatRequestDto,
   CreateMemoryBlockDto,
   GetMessagesQueryDto,
   UpdateMemoryBlockDto,
 } from './dto';
-import { LettaError } from '@letta-ai/letta-client';
-import type { AgentType, BlockUpdate } from '@letta-ai/letta-client/api/types';
-import { ConfigService } from '@nestjs/config';
 import * as AGENT_CONFIG from './templates/agent-config.json';
 
 @Injectable()

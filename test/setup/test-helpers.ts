@@ -1,8 +1,10 @@
 import { spec } from 'pactum';
-import { TestSetup } from './test-setup';
-import { TestDataFactory } from './test-data-factory';
-import { User, Role } from '@test/types';
+
+import { Role, User } from '@test/types';
+
 import { DatabaseUtils } from './database-utils';
+import { TestDataFactory } from './test-data-factory';
+import { TestSetup } from './test-setup';
 
 export interface SessionResult {
   userId: number;

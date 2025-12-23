@@ -1,37 +1,39 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  UseGuards,
-  Param,
   Body,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
   Query,
   Session,
-  Logger,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Session as ExpressSession } from 'express-session';
+import { ZodResponse } from 'nestjs-zod';
+
+import { AuthService } from '@/auth/auth.service';
 import { GetUser } from '@/auth/decorator';
 import { AdminGuard, LoggedInGuard } from '@/auth/guard';
-import { UserService } from './user.service';
+
 import {
   CreateUserDto,
-  UpdateUserDto,
-  UpdateSelfDto,
+  DeleteSelfDto,
   GetUserParamsDto,
   GetUsersQueryDto,
-  DeleteSelfDto,
+  PaginatedUsersDto,
+  UpdateSelfDto,
+  UpdateUserDto,
+  UserDto,
   UserWithoutPassword,
   UserWithoutPasswordDto,
-  UserDto,
-  PaginatedUsersDto,
 } from './dto';
-import { Session as ExpressSession } from 'express-session';
-import { AuthService } from '@/auth/auth.service';
-import { ApiOperation, ApiTags, ApiNoContentResponse } from '@nestjs/swagger';
-import { ZodResponse } from 'nestjs-zod';
+import { UserService } from './user.service';
 
 @ApiTags('Users')
 @UseGuards(LoggedInGuard)

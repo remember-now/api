@@ -1,10 +1,12 @@
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
+import { InternalServerErrorException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request } from 'express';
+
+import { AuthFactory, UserFactory } from '@/test/factories';
+
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { InternalServerErrorException } from '@nestjs/common';
-import { Request } from 'express';
-import { UserFactory, AuthFactory } from '@/test/factories';
 
 describe('AuthController', () => {
   let authController: AuthController;

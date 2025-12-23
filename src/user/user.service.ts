@@ -1,29 +1,32 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+
 import { Prisma } from '@generated/prisma/client';
 
-const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
-import { PrismaService } from '@/prisma/prisma.service';
+import { AgentJobData } from '@/agent/types';
 import { PasswordService } from '@/auth/password.service';
+import { QueueNames } from '@/common/constants';
+import { PrismaService } from '@/prisma/prisma.service';
+
 import {
   CreateUserDto,
-  UpdateUserDto,
-  UpdateSelfDto,
-  GetUsersQueryDto,
   DeleteSelfDto,
+  GetUsersQueryDto,
   PaginatedUsers,
-  UserWithoutPassword,
   Role,
+  UpdateSelfDto,
+  UpdateUserDto,
   User,
+  UserWithoutPassword,
 } from './dto';
-import { AgentJobData } from '@/agent/types';
-import { QueueNames } from '@/common/constants';
+
+const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 
 @Injectable()
 export class UserService {

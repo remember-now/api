@@ -8,20 +8,21 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ZodResponse } from 'nestjs-zod';
 
+import { UserWithoutPassword } from '@/user/dto';
+
 import { AuthService } from './auth.service';
+import { GetUser } from './decorator';
 import {
-  SignupResponseDto,
+  AuthDto,
   LoginResponseDto,
   LogoutResponseDto,
-  AuthDto,
+  SignupResponseDto,
 } from './dto';
 import { LocalGuard, LoggedInGuard } from './guard';
-import { GetUser } from './decorator';
-import { UserWithoutPassword } from '@/user/dto';
 
 @ApiTags('Authentication')
 @Controller('auth')

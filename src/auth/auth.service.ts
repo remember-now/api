@@ -4,11 +4,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AuthDto } from './dto';
-import { UserService } from '@/user/user.service';
-import { UserWithoutPassword } from '@/user/dto';
-import { PasswordService } from './password.service';
 import { Session } from 'express-session';
+
+import { UserWithoutPassword } from '@/user/dto';
+import { UserService } from '@/user/user.service';
+
+import { AuthDto } from './dto';
+import { PasswordService } from './password.service';
 
 @Injectable()
 export class AuthService {

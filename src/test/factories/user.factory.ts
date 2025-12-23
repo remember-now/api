@@ -1,8 +1,9 @@
-import { Role, RoleSchema, User, UserWithoutPassword } from '@/user/dto';
 import {
-  User as PrismaUser,
   Role as PrismaRole,
+  User as PrismaUser,
 } from '@generated/prisma/client';
+
+import { Role, RoleSchema, User, UserWithoutPassword } from '@/user/dto';
 
 export interface UserFactoryOptions {
   id?: number;

@@ -1,10 +1,11 @@
 import { spec } from 'pactum';
 import { ExpectHandlerContext } from 'pactum/src/exports/handler';
+
 import {
-  TestSetup as s,
-  TestHelpers as h,
   TestAssertions as a,
   TestDataFactory as f,
+  TestHelpers as h,
+  TestSetup as s,
 } from '@test/setup';
 
 describe('Error Handling Integration (e2e)', () => {

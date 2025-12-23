@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 
+import { UserModule } from '@/user/user.module';
+
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UserModule } from '@/user/user.module';
-import { LocalStrategy } from './strategy';
-import { AuthSerializer } from './serializers';
 import { PasswordService } from './password.service';
+import { AuthSerializer } from './serializers';
+import { LocalStrategy } from './strategy';
 
 @Module({
   imports: [

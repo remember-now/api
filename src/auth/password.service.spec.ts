@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PasswordService } from './password.service';
 import * as argon from 'argon2';
+
+import { PasswordService } from './password.service';
 
 jest.mock('argon2');
 const mockArgon = argon as jest.Mocked<typeof argon>;

@@ -1,7 +1,8 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { UserWithoutPasswordSchema } from '@/user/dto';
+
 import { PasswordSchema } from '@/common/schemas/password.schema';
+import { UserWithoutPasswordSchema } from '@/user/dto';
 
 // Schemas
 

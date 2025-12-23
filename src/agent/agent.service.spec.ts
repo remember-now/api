@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AgentService } from './agent.service';
 import { createMock } from '@golevelup/ts-jest';
+import { Test, TestingModule } from '@nestjs/testing';
+
+import { AgentService } from './agent.service';
 
 describe('AgentService', () => {
   let service: AgentService;

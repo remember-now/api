@@ -1,9 +1,11 @@
-import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
+import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { Job, Queue } from 'bullmq';
+
+import { QueueNames } from '@/common/constants';
+
 import { AgentService } from './agent.service';
 import { CreateAgentJobData, DeleteAgentJobData } from './types';
-import { QueueNames } from '@/common/constants';
 
 @Processor(QueueNames.AGENT_PROVISIONING)
 export class AgentProvisioningConsumer

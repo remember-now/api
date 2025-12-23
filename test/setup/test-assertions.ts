@@ -1,14 +1,16 @@
-import { spec, handler } from 'pactum';
-import { TestSetup } from './test-setup';
-import { TestHelpers } from './test-helpers';
+import { handler, spec } from 'pactum';
+import { ExpectHandlerContext } from 'pactum/src/exports/handler';
+
 import {
-  UserWithoutPassword,
   LoginResponseSchema,
-  SignupResponseSchema,
   LogoutResponseSchema,
+  SignupResponseSchema,
+  UserWithoutPassword,
   UserWithoutPasswordSchema,
 } from '@test/types';
-import { ExpectHandlerContext } from 'pactum/src/exports/handler';
+
+import { TestHelpers } from './test-helpers';
+import { TestSetup } from './test-setup';
 
 export class TestAssertions {
   /**

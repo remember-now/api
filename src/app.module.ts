@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import {
   Inject,
   Logger,
@@ -5,22 +6,21 @@ import {
   Module,
   NestModule,
 } from '@nestjs/common';
-import * as passport from 'passport';
-import * as session from 'express-session';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
-import { APP_INTERCEPTOR, APP_PIPE, APP_FILTER } from '@nestjs/core';
-
-import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { REDIS, RedisModule } from './redis';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { RedisStore } from 'connect-redis';
+import * as session from 'express-session';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import * as passport from 'passport';
 import { RedisClientType } from 'redis';
-import { UserModule } from './user/user.module';
-import { LettaModule } from './letta/letta.module';
+
 import { AgentModule } from './agent/agent.module';
-import { BullModule } from '@nestjs/bullmq';
+import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
+import { LettaModule } from './letta/letta.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { REDIS, RedisModule } from './redis';
+import { UserModule } from './user/user.module';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
 

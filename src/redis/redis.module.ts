@@ -1,9 +1,10 @@
 import { Module, OnModuleDestroy } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import * as Redis from 'redis';
-import { REDIS } from './redis.constants';
 import { ModuleRef } from '@nestjs/core';
+import * as Redis from 'redis';
 import { RedisClientType } from 'redis';
+
+import { REDIS } from './redis.constants';
 
 @Module({
   imports: [ConfigModule],

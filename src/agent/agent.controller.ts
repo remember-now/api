@@ -1,30 +1,31 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
-  Post,
-  Put,
-  Delete,
-  Res,
-  UseGuards,
   Logger,
   Param,
+  Post,
+  Put,
   Query,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+
+import { GetUser } from '@/auth/decorator';
+import { LoggedInGuard } from '@/auth/guard';
 
 import { AgentService } from './agent.service';
 import {
   ChatRequestDto,
   CreateMemoryBlockDto,
-  UpdateMemoryBlockDto,
   GetMemoryBlockParamsDto,
   GetMessagesQueryDto,
+  UpdateMemoryBlockDto,
 } from './dto';
-import { LoggedInGuard } from '@/auth/guard';
-import { GetUser } from '@/auth/decorator';
 
 @Controller('agent')
 @UseGuards(LoggedInGuard)

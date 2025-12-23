@@ -1,7 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
-import { UserController } from './user.controller';
-import { UserService } from './user.service';
+import { Test, TestingModule } from '@nestjs/testing';
+import { Session as ExpressSession } from 'express-session';
+
+import { AuthService } from '@/auth/auth.service';
+import { UserDtoFactory, UserFactory } from '@/test/factories';
+
 import {
   GetUserParamsDto,
   GetUsersQueryDto,
@@ -9,9 +12,8 @@ import {
   RoleSchema,
   UpdateUserDto,
 } from './dto';
-import { Session as ExpressSession } from 'express-session';
-import { AuthService } from '@/auth/auth.service';
-import { UserFactory, UserDtoFactory } from '@/test/factories';
+import { UserController } from './user.controller';
+import { UserService } from './user.service';
 
 describe('UserController', () => {
   let userController: UserController;

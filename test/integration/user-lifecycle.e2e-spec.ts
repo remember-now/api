@@ -1,9 +1,10 @@
-import { spec, e2e } from 'pactum';
+import { e2e, spec } from 'pactum';
+
 import {
-  TestSetup as s,
-  TestHelpers as h,
   TestAssertions as a,
   TestDataFactory as f,
+  TestHelpers as h,
+  TestSetup as s,
 } from '@test/setup';
 
 describe('User Lifecycle Integration (e2e)', () => {
