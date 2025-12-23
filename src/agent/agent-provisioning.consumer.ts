@@ -1,51 +1,20 @@
-import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { InjectQueue, Processor } from '@nestjs/bullmq';
+import { NotFoundException } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 
+import { BaseQueueConsumer } from '@/common/base-queue-consumer';
 import { QueueNames } from '@/common/constants';
 
 import { AgentService } from './agent.service';
 import { CreateAgentJobData, DeleteAgentJobData } from './types';
 
 @Processor(QueueNames.AGENT_PROVISIONING)
-export class AgentProvisioningConsumer
-  extends WorkerHost
-  implements OnModuleDestroy
-{
-  private readonly logger = new Logger(AgentProvisioningConsumer.name);
-  private readonly isTest =
-    process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
-
+export class AgentProvisioningConsumer extends BaseQueueConsumer {
   constructor(
     private readonly agentService: AgentService,
-    @InjectQueue(QueueNames.AGENT_PROVISIONING)
-    private readonly queue: Queue,
+    @InjectQueue(QueueNames.AGENT_PROVISIONING) queue: Queue,
   ) {
-    super();
-  }
-
-  /**
-   * Check if error is a pool closure error during test teardown.
-   * These are expected when force closing workers in tests.
-   */
-  private isTestTeardownError(error: unknown): boolean {
-    return (
-      this.isTest &&
-      error instanceof Error &&
-      error.message?.includes('Cannot use a pool after calling end')
-    );
-  }
-
-  async onModuleDestroy() {
-    if (!this.worker) return;
-
-    const forceClose = this.isTest;
-
-    await this.worker.close(forceClose);
-
-    if (!this.queue.closing) {
-      await this.queue.close();
-    }
+    super(AgentProvisioningConsumer.name, queue);
   }
 
   async process(job: Job): Promise<void> {
