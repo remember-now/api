@@ -6,8 +6,8 @@ import { ConfigService } from '@nestjs/config';
 export class LettaService extends LettaClient {
   constructor(configService: ConfigService) {
     super({
-      baseUrl: configService.get<string>('LETTA_URL'),
-      token: configService.get<string>('LETTA_PASS'),
+      baseUrl: configService.getOrThrow<string>('LETTA_URL'),
+      token: configService.getOrThrow<string>('LETTA_PASS'),
       project: 'RememberNow',
     });
   }

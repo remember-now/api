@@ -12,7 +12,7 @@ import { RedisClientType } from 'redis';
       provide: REDIS,
       useFactory: async (configService: ConfigService) => {
         const client = Redis.createClient({
-          url: configService.get<string>('REDIS_URL'),
+          url: configService.getOrThrow<string>('REDIS_URL'),
         });
         await client.connect();
         return client;

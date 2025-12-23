@@ -31,7 +31,7 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         connection: {
-          url: configService.get<string>('REDIS_URL'),
+          url: configService.getOrThrow<string>('REDIS_URL'),
         },
       }),
       inject: [ConfigService],
@@ -79,10 +79,7 @@ export class AppModule implements NestModule {
             client: this.redis,
           }),
           saveUninitialized: false,
-          secret: this.configService.get<string>(
-            'SESSION_SECRET',
-            'super_secret_value',
-          ),
+          secret: this.configService.getOrThrow<string>('SESSION_SECRET'),
           resave: false,
           rolling: true,
           cookie: {
