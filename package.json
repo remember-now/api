@@ -39,7 +39,8 @@
     "test:e2e:integration": "npm run infra:test:reset && npm run test:e2e:base -- --testPathPattern=integration ; npm run infra:test:rm",
     "test:e2e:verbose": "npm run infra:test:reset && npm run test:e2e:base -- --verbose ; npm run infra:test:rm",
     "test:e2e:cov": "npm run infra:test:reset && npm run test:e2e:base -- --coverage ; npm run infra:test:rm",
-    "prepare": "husky"
+    "prepare": "husky",
+    "review": "claude -p '/review'"
   },
   "lint-staged": {
     "{src,apps,libs,test}/**/*.{js,jsx,ts,tsx}": [
