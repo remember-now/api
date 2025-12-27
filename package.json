@@ -4,7 +4,7 @@
   "description": "",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
     "prisma:dev:deploy": "dotenv -e .env -- prisma migrate deploy",
     "prisma:test:deploy": "dotenv -e .env.test -- prisma migrate deploy",
