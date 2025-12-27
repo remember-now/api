@@ -1,6 +1,6 @@
 {
-  "agentType": "memgpt_v2_agent",
-  "memoryBlocks": [
+  "agent_type": "letta_v1_agent",
+  "memory_blocks": [
     {
       "label": "human",
       "value": "The user wants an assistant that remembers everything for them so they never have to remember anything again. They want the sense of peace that comes from knowing that no piece of useful knowledge shared with me is lost."

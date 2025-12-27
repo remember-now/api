@@ -1,5 +1,6 @@
-import { LettaError } from '@letta-ai/letta-client';
-import type { AgentType, BlockUpdate } from '@letta-ai/letta-client/api/types';
+import { APIError } from '@letta-ai/letta-client';
+import type { AgentType } from '@letta-ai/letta-client/resources/agents/agents';
+import type { BlockUpdateParams } from '@letta-ai/letta-client/resources/agents/blocks';
 import {
   Injectable,
   InternalServerErrorException,
@@ -31,8 +32,8 @@ export class AgentService {
 
   private async createDefaultAgent() {
     return await this.client.agents.create({
-      agentType: AGENT_CONFIG.agentType as AgentType,
-      memoryBlocks: AGENT_CONFIG.memoryBlocks,
+      agent_type: AGENT_CONFIG.agent_type as AgentType,
+      memory_blocks: AGENT_CONFIG.memory_blocks,
       model: this.configService.get<string>(
         'MODEL',
         'google_ai/gemini-2.5-pro',
@@ -93,13 +94,13 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      const messages = await this.client.agents.messages.list(agentId, {
+      const messagesPage = await this.client.agents.messages.list(agentId, {
         limit: dto.limit,
         before: dto.before,
       });
 
       return {
-        messages,
+        messages: messagesPage.items,
         params: {
           limit: dto.limit,
           before: dto.before,
@@ -108,7 +109,7 @@ export class AgentService {
     } catch (error) {
       this.logger.error('Failed to get agent messages', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException('Failed to get agent messages');
@@ -135,7 +136,7 @@ export class AgentService {
     } catch (error) {
       this.logger.error('Failed to send message to agent', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException(
@@ -148,21 +149,21 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      const stream = await this.client.agents.messages.createStream(agentId, {
+      const stream = await this.client.agents.messages.stream(agentId, {
         messages: [
           {
             role: 'user',
             content: dto.message,
           },
         ],
-        streamTokens: true,
+        stream_tokens: true,
       });
 
       return stream;
     } catch (error) {
       this.logger.error('Failed to create message stream', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException(
@@ -175,16 +176,17 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
       const agent = await this.client.agents.retrieve(agentId);
+
       return {
         id: agent.id,
         name: agent.name,
-        llmConfig: agent.llmConfig,
-        created: agent.createdAt,
+        modelSettings: agent.model_settings,
+        created: agent.created_at,
       };
     } catch (error) {
       this.logger.error('Failed to get agent info', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException(
@@ -230,11 +232,12 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      return await this.client.agents.blocks.list(agentId);
+      const blocksPage = await this.client.agents.blocks.list(agentId);
+      return blocksPage.items;
     } catch (error) {
       this.logger.error('Failed to list memory blocks', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException('Failed to list memory blocks');
@@ -245,9 +248,11 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      return await this.client.agents.blocks.retrieve(agentId, blockLabel);
+      return await this.client.agents.blocks.retrieve(blockLabel, {
+        agent_id: agentId,
+      });
     } catch (error) {
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Memory block not found');
       }
       this.logger.error(`Failed to get memory block ${blockLabel}`, error);
@@ -264,20 +269,22 @@ export class AgentService {
         value: dto.value,
         description: dto.description,
         limit: dto.limit,
-        readOnly: dto.readOnly,
+        read_only: dto.readOnly,
       });
       if (!block.id) {
         throw new InternalServerErrorException(
           'Failed to create block for - no ID returned',
         );
       }
-      await this.client.agents.blocks.attach(agentId, block.id);
+      await this.client.agents.blocks.attach(block.id, {
+        agent_id: agentId,
+      });
 
       return block;
     } catch (error) {
       this.logger.error('Failed to create memory block', error);
 
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Agent not found');
       }
       throw new InternalServerErrorException('Failed to create memory block');
@@ -292,20 +299,18 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      const updatePayload: BlockUpdate = {};
+      const updatePayload: BlockUpdateParams = {
+        agent_id: agentId,
+      };
       if (dto.value !== undefined) updatePayload.value = dto.value;
       if (dto.description !== undefined)
         updatePayload.description = dto.description;
       if (dto.limit !== undefined) updatePayload.limit = dto.limit;
-      if (dto.readOnly !== undefined) updatePayload.readOnly = dto.readOnly;
+      if (dto.readOnly !== undefined) updatePayload.read_only = dto.readOnly;
 
-      return await this.client.agents.blocks.modify(
-        agentId,
-        blockLabel,
-        updatePayload,
-      );
+      return await this.client.agents.blocks.update(blockLabel, updatePayload);
     } catch (error) {
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Memory block not found');
       }
       this.logger.error(`Failed to update memory block ${blockLabel}`, error);
@@ -317,12 +322,13 @@ export class AgentService {
     try {
       const agentId = await this.getOrCreateUserAgent(userId);
 
-      const block = await this.client.agents.blocks.retrieve(
-        agentId,
-        blockLabel,
-      );
+      const block = await this.client.agents.blocks.retrieve(blockLabel, {
+        agent_id: agentId,
+      });
       if (block.id) {
-        await this.client.agents.blocks.detach(agentId, block.id);
+        await this.client.agents.blocks.detach(block.id, {
+          agent_id: agentId,
+        });
       }
       return {
         message: 'Memory block deleted successfully',
@@ -330,7 +336,7 @@ export class AgentService {
         userId: userId,
       };
     } catch (error) {
-      if (error instanceof LettaError && error.statusCode === 404) {
+      if (error instanceof APIError && error.status === 404) {
         throw new NotFoundException('Memory block not found');
       }
       this.logger.error(`Failed to delete memory block ${blockLabel}`, error);

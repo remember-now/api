@@ -70,16 +70,16 @@ export class AgentController {
       const stream = await this.agentService.sendMessageStream(dto, userId);
 
       for await (const chunk of stream) {
-        switch (chunk.messageType) {
+        switch (chunk.message_type) {
           case 'assistant_message':
-            if (chunk.content) {
+            if ('content' in chunk && chunk.content) {
               const content =
                 typeof chunk.content === 'string' ? chunk.content : '';
               res.write(content);
             }
             break;
           case 'reasoning_message':
-            if (chunk.reasoning) {
+            if ('reasoning' in chunk && chunk.reasoning) {
               this.logger.debug(`Agent reasoning: ${chunk.reasoning}`);
             }
             break;

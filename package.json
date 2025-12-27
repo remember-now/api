@@ -50,7 +50,7 @@
     "*.{json,md,yml,yaml}": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@letta-ai/letta-client": "^0.1.164",
+    "@letta-ai/letta-client": "^1.6.2",
     "@nestjs/bullmq": "^11.0.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

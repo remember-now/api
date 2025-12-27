@@ -1,14 +1,14 @@
-import { LettaClient } from '@letta-ai/letta-client';
+import Letta from '@letta-ai/letta-client';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class LettaService extends LettaClient {
+export class LettaService extends Letta {
   constructor(configService: ConfigService) {
     super({
-      baseUrl: configService.getOrThrow<string>('LETTA_URL'),
-      token: configService.getOrThrow<string>('LETTA_PASS'),
-      project: 'RememberNow',
+      baseURL: configService.getOrThrow<string>('LETTA_URL'),
+      apiKey: configService.getOrThrow<string>('LETTA_PASS'),
+      projectID: 'RememberNow',
     });
   }
 }
