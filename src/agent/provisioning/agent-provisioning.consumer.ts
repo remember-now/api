@@ -5,13 +5,13 @@ import { Job, Queue } from 'bullmq';
 import { BaseQueueConsumer } from '@/common/base-queue-consumer';
 import { QueueNames } from '@/common/constants';
 
-import { AgentService } from './agent.service';
-import { CreateAgentJobData, DeleteAgentJobData } from './types';
+import { CreateAgentJobData, DeleteAgentJobData } from '../types';
+import { AgentProviderService } from './agent-provider.service';
 
 @Processor(QueueNames.AGENT_PROVISIONING)
 export class AgentProvisioningConsumer extends BaseQueueConsumer {
   constructor(
-    private readonly agentService: AgentService,
+    private readonly agentProvider: AgentProviderService,
     @InjectQueue(QueueNames.AGENT_PROVISIONING) queue: Queue,
   ) {
     super(AgentProvisioningConsumer.name, queue);
@@ -36,7 +36,7 @@ export class AgentProvisioningConsumer extends BaseQueueConsumer {
     const { userId } = job.data;
 
     try {
-      await this.agentService.createAgentAndLinkToUser(userId);
+      await this.agentProvider.createAgentForUser(userId);
       this.logger.log(`Successfully created agent for user ${userId}`);
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -57,7 +57,7 @@ export class AgentProvisioningConsumer extends BaseQueueConsumer {
     const { userId, agentId } = job.data;
 
     try {
-      await this.agentService.deleteAgentById(agentId, userId);
+      await this.agentProvider.deleteAgent(agentId, userId);
       this.logger.log(
         `Successfully deleted agent ${agentId} for user ${userId}`,
       );

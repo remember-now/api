@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import z from 'zod';
+import { z } from 'zod';
 
 export const GetMessagesQuerySchema = z.object({
   limit: z.coerce.number().int().gte(1).lte(100).default(10),

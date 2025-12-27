@@ -18,6 +18,8 @@ import { AgentModule } from './agent/agent.module';
 import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
 import { LettaModule } from './letta/letta.module';
+import { MemoriesModule } from './memories/memories.module';
+import { MessagesModule } from './messages/messages.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { REDIS, RedisModule } from './redis';
 import { UserModule } from './user/user.module';
@@ -42,6 +44,8 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     AuthModule,
     LettaModule,
     AgentModule,
+    MessagesModule,
+    MemoriesModule,
   ],
   providers: [
     Logger,

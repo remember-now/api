@@ -5,9 +5,12 @@ import { QueueNames } from '@/common/constants';
 import { LettaModule } from '@/letta/letta.module';
 import { UserModule } from '@/user/user.module';
 
-import { AgentProvisioningConsumer } from './agent-provisioning.consumer';
 import { AgentController } from './agent.controller';
 import { AgentService } from './agent.service';
+import {
+  AgentProviderService,
+  AgentProvisioningConsumer,
+} from './provisioning';
 
 @Module({
   imports: [
@@ -17,7 +20,7 @@ import { AgentService } from './agent.service';
       name: QueueNames.AGENT_PROVISIONING,
     }),
   ],
-  providers: [AgentService, AgentProvisioningConsumer],
+  providers: [AgentService, AgentProviderService, AgentProvisioningConsumer],
   controllers: [AgentController],
   exports: [AgentService],
 })

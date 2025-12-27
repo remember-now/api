@@ -18,7 +18,9 @@
           }
         },
         "summary": "Get the current user",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "put": {
         "operationId": "UserController_updateMe",
@@ -46,7 +48,9 @@
           }
         },
         "summary": "Update the current user",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "delete": {
         "operationId": "UserController_deleteMe",
@@ -67,7 +71,9 @@
           }
         },
         "summary": "Delete the current user",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/users": {
@@ -97,7 +103,9 @@
           }
         },
         "summary": "Create a new user (Admin only)",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "get": {
         "operationId": "UserController_getAllUsers",
@@ -147,7 +155,9 @@
           }
         },
         "summary": "Get all users (Admin only)",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/users/{id}": {
@@ -178,7 +188,9 @@
           }
         },
         "summary": "Get user by ID (Admin only)",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "put": {
         "operationId": "UserController_updateUser",
@@ -217,7 +229,9 @@
           }
         },
         "summary": "Update user by ID (Admin only)",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "delete": {
         "operationId": "UserController_deleteUser",
@@ -239,7 +253,9 @@
           }
         },
         "summary": "Delete user by ID (Admin only)",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/auth/signup": {
@@ -269,7 +285,9 @@
           }
         },
         "summary": "Register a new user",
-        "tags": ["Authentication"]
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/auth/login": {
@@ -299,7 +317,9 @@
           }
         },
         "summary": "Login with email and password",
-        "tags": ["Authentication"]
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/auth/logout": {
@@ -319,7 +339,9 @@
           }
         },
         "summary": "Logout current user",
-        "tags": ["Authentication"]
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/agent": {
@@ -331,12 +353,15 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Get agent information and configuration",
+        "tags": [
+          "Agent"
+        ]
       }
     },
-    "/agent/messages": {
+    "/messages/history": {
       "get": {
-        "operationId": "AgentController_getMessages",
+        "operationId": "MessagesController_getMessages",
         "parameters": [
           {
             "name": "limit",
@@ -364,12 +389,15 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Get message history",
+        "tags": [
+          "Messages"
+        ]
       }
     },
-    "/agent/chat": {
+    "/messages": {
       "post": {
-        "operationId": "AgentController_sendMessage",
+        "operationId": "MessagesController_sendMessage",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -386,12 +414,15 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Send a message to the agent",
+        "tags": [
+          "Messages"
+        ]
       }
     },
-    "/agent/chat/stream": {
+    "/messages/stream": {
       "post": {
-        "operationId": "AgentController_sendMessageStream",
+        "operationId": "MessagesController_sendMessageStream",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -408,22 +439,28 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Send a message and stream the response",
+        "tags": [
+          "Messages"
+        ]
       }
     },
-    "/agent/blocks": {
+    "/memories": {
       "get": {
-        "operationId": "AgentController_listMemoryBlocks",
+        "operationId": "MemoriesController_listMemoryBlocks",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "List all memory blocks for the current user",
+        "tags": [
+          "Memories"
+        ]
       },
       "post": {
-        "operationId": "AgentController_createMemoryBlock",
+        "operationId": "MemoriesController_createMemoryBlock",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -440,12 +477,15 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Create a new memory block",
+        "tags": [
+          "Memories"
+        ]
       }
     },
-    "/agent/blocks/{blockLabel}": {
+    "/memories/{blockLabel}": {
       "get": {
-        "operationId": "AgentController_getMemoryBlock",
+        "operationId": "MemoriesController_getMemoryBlock",
         "parameters": [
           {
             "name": "blockLabel",
@@ -462,10 +502,13 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Get a specific memory block by label",
+        "tags": [
+          "Memories"
+        ]
       },
       "put": {
-        "operationId": "AgentController_updateMemoryBlock",
+        "operationId": "MemoriesController_updateMemoryBlock",
         "parameters": [
           {
             "name": "blockLabel",
@@ -492,10 +535,13 @@
             "description": ""
           }
         },
-        "tags": ["Agent"]
+        "summary": "Update a memory block",
+        "tags": [
+          "Memories"
+        ]
       },
       "delete": {
-        "operationId": "AgentController_deleteMemoryBlock",
+        "operationId": "MemoriesController_deleteMemoryBlock",
         "parameters": [
           {
             "name": "blockLabel",
@@ -509,10 +555,13 @@
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Memory block successfully deleted"
           }
         },
-        "tags": ["Agent"]
+        "summary": "Delete a memory block",
+        "tags": [
+          "Memories"
+        ]
       }
     }
   },
@@ -529,7 +578,10 @@
       "Role_Output": {
         "id": "Role_Output",
         "type": "string",
-        "enum": ["USER", "ADMIN"]
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
       },
       "UserWithoutPasswordDto_Output": {
         "type": "object",
@@ -590,7 +642,9 @@
             "maxLength": 60
           }
         },
-        "required": ["currentPassword"],
+        "required": [
+          "currentPassword"
+        ],
         "id": "UpdateSelf"
       },
       "DeleteSelf": {
@@ -605,13 +659,19 @@
             "type": "string"
           }
         },
-        "required": ["currentPassword", "confirmationText"],
+        "required": [
+          "currentPassword",
+          "confirmationText"
+        ],
         "id": "DeleteSelf"
       },
       "Role": {
         "id": "Role",
         "type": "string",
-        "enum": ["USER", "ADMIN"]
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
       },
       "CreateUser": {
         "type": "object",
@@ -632,7 +692,10 @@
             "$ref": "#/components/schemas/Role"
           }
         },
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "id": "CreateUser"
       },
       "PaginatedUsers_Output": {
@@ -721,7 +784,10 @@
             "additionalProperties": false
           }
         },
-        "required": ["users", "pagination"],
+        "required": [
+          "users",
+          "pagination"
+        ],
         "id": "PaginatedUsers_Output",
         "additionalProperties": false
       },
@@ -804,7 +870,10 @@
             "maxLength": 60
           }
         },
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "id": "Auth"
       },
       "LoginResponse": {
@@ -854,7 +923,10 @@
             "additionalProperties": false
           }
         },
-        "required": ["message", "user"],
+        "required": [
+          "message",
+          "user"
+        ],
         "additionalProperties": false
       },
       "SignupResponseDto_Output": {
@@ -907,7 +979,10 @@
             "additionalProperties": false
           }
         },
-        "required": ["message", "user"],
+        "required": [
+          "message",
+          "user"
+        ],
         "id": "LoginResponse_Output",
         "additionalProperties": false
       },
@@ -918,7 +993,9 @@
             "type": "string"
           }
         },
-        "required": ["message"],
+        "required": [
+          "message"
+        ],
         "id": "LogoutResponse_Output",
         "additionalProperties": false
       },
@@ -930,7 +1007,9 @@
             "minLength": 1
           }
         },
-        "required": ["message"]
+        "required": [
+          "message"
+        ]
       },
       "CreateMemoryBlockDto": {
         "type": "object",
@@ -958,7 +1037,9 @@
             "type": "boolean"
           }
         },
-        "required": ["label"]
+        "required": [
+          "label"
+        ]
       },
       "UpdateMemoryBlockDto": {
         "type": "object",
