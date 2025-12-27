@@ -9,10 +9,9 @@ import { Queue } from 'bullmq';
 
 import { Prisma } from '@generated/prisma/client';
 
-import { AgentJobData } from '@/agent/types';
 import { PasswordService } from '@/auth/password.service';
-import { QueueNames } from '@/common/constants';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/providers/database/postgres';
+import { AgentJobData, QueueNames } from '@/providers/queue/bullmq';
 
 import {
   CreateUserDto,

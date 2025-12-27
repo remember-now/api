@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AgentModule } from '@/agent/agent.module';
-import { LettaModule } from '@/letta/letta.module';
+import { LettaModule } from '@/providers/agent/letta';
 
 import { MemoriesController } from './memories.controller';
 import { MemoriesService } from './memories.service';

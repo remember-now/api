@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { LettaService } from '@/letta';
+import { LettaService } from '@/providers/agent/letta';
 import { UserService } from '@/user/user.service';
 
 import * as AGENT_CONFIG from '../templates/agent-config.json';

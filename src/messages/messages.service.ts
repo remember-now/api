@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 
 import { AgentService } from '@/agent/agent.service';
-import { LettaService } from '@/letta';
+import { LettaService } from '@/providers/agent/letta';
 
 import { ChatRequestDto, GetMessagesQueryDto } from './dto';
 

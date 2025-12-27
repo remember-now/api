@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { LettaService } from '@/letta';
+import { LettaService } from '@/providers/agent/letta';
 
 import { AgentProviderService } from './provisioning';
 

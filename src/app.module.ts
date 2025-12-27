@@ -1,4 +1,3 @@
-import { BullModule } from '@nestjs/bullmq';
 import {
   Inject,
   Logger,
@@ -17,11 +16,12 @@ import { RedisClientType } from 'redis';
 import { AgentModule } from './agent/agent.module';
 import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
-import { LettaModule } from './letta/letta.module';
 import { MemoriesModule } from './memories/memories.module';
 import { MessagesModule } from './messages/messages.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { REDIS, RedisModule } from './redis';
+import { LettaModule } from './providers/agent/letta';
+import { REDIS, RedisModule } from './providers/cache/redis';
+import { PrismaModule } from './providers/database/postgres';
+import { QueueModule } from './providers/queue/bullmq';
 import { UserModule } from './user/user.module';
 
 const TWO_WEEKS_IN_HOURS = 14 * 24;
@@ -29,15 +29,7 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, expandVariables: true }),
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          url: configService.getOrThrow<string>('REDIS_URL'),
-        },
-      }),
-      inject: [ConfigService],
-    }),
+    QueueModule,
     PrismaModule,
     RedisModule,
     UserModule,

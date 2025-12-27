@@ -2,7 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { forwardRef, Module } from '@nestjs/common';
 
 import { AuthModule } from '@/auth/auth.module';
-import { QueueNames } from '@/common/constants';
+import { QueueNames } from '@/providers/queue/bullmq';
 
 import { UserController } from './user.controller';
 import { UserService } from './user.service';

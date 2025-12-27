@@ -7,8 +7,8 @@ import { Prisma } from '@generated/prisma/client';
 import { User } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
-import { QueueNames } from '@/common/constants';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/providers/database/postgres';
+import { QueueNames } from '@/providers/queue/bullmq';
 import { UserDtoFactory, UserFactory } from '@/test/factories';
 
 import {
