@@ -4,6 +4,10 @@
 /build
 *.tsbuildinfo
 
+# planning
+PLAN.md
+letta
+
 # Logs
 logs
 *.log
