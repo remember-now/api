@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Post,
   Query,
   Res,
@@ -23,7 +22,7 @@ import { MessagesService } from './messages.service';
 @Controller('messages')
 @UseGuards(LoggedInGuard)
 export class MessagesController {
-  private readonly logger = new Logger(MessagesController.name);
+  // private readonly logger = new Logger(MessagesController.name);
 
   constructor(private readonly messagesService: MessagesService) {}
 
@@ -46,43 +45,12 @@ export class MessagesController {
   @Post('stream')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a message and stream the response' })
-  async sendMessageStream(
+  sendMessageStream(
     @Body() dto: ChatRequestDto,
     @Res() res: Response,
     @GetUser('id') userId: number,
   ) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-
-    try {
-      const stream = await this.messagesService.sendMessageStream(dto, userId);
-
-      for await (const chunk of stream) {
-        switch (chunk.message_type) {
-          case 'assistant_message':
-            if ('content' in chunk && chunk.content) {
-              const content =
-                typeof chunk.content === 'string' ? chunk.content : '';
-              res.write(content);
-            }
-            break;
-          case 'reasoning_message':
-            if ('reasoning' in chunk && chunk.reasoning) {
-              this.logger.debug(`Agent reasoning: ${chunk.reasoning}`);
-            }
-            break;
-          case 'usage_statistics':
-            this.logger.log(`Usage: ${JSON.stringify(chunk)}`);
-            break;
-        }
-      }
-      res.end();
-    } catch (error) {
-      this.logger.error('Streaming failed', error);
-      res.status(500).json({ error: 'Streaming failed' });
-    }
+    // TODO: Implement
+    return { dto, res, userId };
   }
 }

@@ -18,7 +18,6 @@ import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
 import { MemoriesModule } from './memories/memories.module';
 import { MessagesModule } from './messages/messages.module';
-import { LettaModule } from './providers/agent/letta';
 import { REDIS, RedisModule } from './providers/cache/redis';
 import { PrismaModule } from './providers/database/postgres';
 import { QueueModule } from './providers/queue/bullmq';
@@ -34,7 +33,6 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
     RedisModule,
     UserModule,
     AuthModule,
-    LettaModule,
     AgentModule,
     MessagesModule,
     MemoriesModule,

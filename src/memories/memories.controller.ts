@@ -70,10 +70,10 @@ export class MemoriesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a memory block' })
   @ApiNoContentResponse({ description: 'Memory block successfully deleted' })
-  async deleteMemoryBlock(
+  deleteMemoryBlock(
     @Param() params: GetMemoryBlockParamsDto,
     @GetUser('id') userId: number,
   ) {
-    await this.memoriesService.deleteMemoryBlock(userId, params.blockLabel);
+    this.memoriesService.deleteMemoryBlock(userId, params.blockLabel);
   }
 }

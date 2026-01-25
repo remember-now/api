@@ -1,4 +1,3 @@
-import { getQueueToken } from '@nestjs/bullmq';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep, mockReset } from 'jest-mock-extended';
@@ -8,7 +7,6 @@ import { User } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
 import { PrismaService } from '@/providers/database/postgres';
-import { QueueNames } from '@/providers/queue/bullmq';
 import { UserDtoFactory, UserFactory } from '@/test/factories';
 
 import {
@@ -49,19 +47,10 @@ describe('UserService', () => {
     updatedAt: mockUser.updatedAt.toISOString(),
   });
 
-  const mockQueue = {
-    add: jest.fn(),
-    process: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
-        {
-          provide: getQueueToken(QueueNames.AGENT_PROVISIONING),
-          useValue: mockQueue,
-        },
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
@@ -86,7 +75,6 @@ describe('UserService', () => {
     jest.clearAllMocks();
     mockReset(prismaService);
     mockReset(passwordService);
-    mockQueue.add.mockClear();
   });
 
   it('should be defined', () => {
@@ -94,7 +82,7 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
-    it('should create a user successfully and enqueue agent creation', async () => {
+    it('should create a user successfully', async () => {
       prismaService.user.create.mockResolvedValueOnce(mockUser);
 
       const result = await userService.createUser(
@@ -110,11 +98,6 @@ describe('UserService', () => {
           role: RoleSchema.enum.USER,
         },
       });
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'create-agent',
-        { userId: mockUser.id },
-        expect.any(Object),
-      );
       expect(result).toEqual(expectedUserWithoutPassword);
     });
 
@@ -558,7 +541,7 @@ describe('UserService', () => {
   });
 
   describe('deleteUser', () => {
-    it('should delete user successfully and enqueue agent deletion', async () => {
+    it('should delete user successfully', async () => {
       const userWithAgent = UserFactory.createPrismaUser({
         agentId: 'test-agent-id',
       });
@@ -570,14 +553,9 @@ describe('UserService', () => {
       expect(prismaService.user.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'delete-agent',
-        { userId: 1, agentId: 'test-agent-id' },
-        expect.any(Object),
-      );
     });
 
-    it('should delete user without agentId and not enqueue agent deletion', async () => {
+    it('should delete user without agentId', async () => {
       const userWithoutAgent = UserFactory.createPrismaUser({ agentId: null });
       prismaService.user.findUnique.mockResolvedValueOnce(userWithoutAgent);
       prismaService.user.delete.mockResolvedValueOnce(userWithoutAgent);
@@ -587,7 +565,6 @@ describe('UserService', () => {
       expect(prismaService.user.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(mockQueue.add).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when a user is not found', async () => {
@@ -614,7 +591,7 @@ describe('UserService', () => {
   });
 
   describe('deleteSelf', () => {
-    it('should delete self when current password is correct and enqueue agent deletion', async () => {
+    it('should delete self when current password is correct', async () => {
       const deleteDto: DeleteSelfDto = {
         currentPassword: 'currentPassword123',
         confirmationText: 'DELETE MY ACCOUNT',
@@ -639,11 +616,6 @@ describe('UserService', () => {
       expect(prismaService.user.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(mockQueue.add).toHaveBeenCalledWith(
-        'delete-agent',
-        { userId: 1, agentId: 'test-agent-id' },
-        expect.any(Object),
-      );
     });
 
     it('should throw ForbiddenException when current password is incorrect', async () => {

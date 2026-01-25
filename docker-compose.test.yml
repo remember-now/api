@@ -1,14 +1,9 @@
 services:
   postgres:
-    volumes:
-      - ./init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
     restart: 'no'
 
   redis:
     volumes: []
-    restart: 'no'
-
-  letta:
     restart: 'no'
 
   app:
