@@ -37,11 +37,11 @@ services:
   app:
     build: .
     environment:
-      - APP_DATABASE_URL=${APP_DATABASE_URL}
-      - FRONTEND_URL=${FRONTEND_URL}
+      - POSTGRES_URL=${POSTGRES_URL}
+      - APP_FRONTEND_URL=${APP_FRONTEND_URL}
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
-      - SESSION_SECRET=${SESSION_SECRET:-super_secret_value}
-      - SESSION_EXPIRY_HOURS=${SESSION_EXPIRY_HOURS:-336}
+      - APP_SESSION_SECRET=${APP_SESSION_SECRET:-super_secret_value}
+      - APP_SESSION_EXPIRY_HOURS=${APP_SESSION_EXPIRY_HOURS:-336}
     ports:
       - '${APP_PORT:-3333}:3333'
     networks:

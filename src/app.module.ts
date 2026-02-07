@@ -5,7 +5,6 @@ import {
   Module,
   NestModule,
 } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { RedisStore } from 'connect-redis';
 import * as session from 'express-session';
@@ -16,6 +15,9 @@ import { RedisClientType } from 'redis';
 import { AgentModule } from './agent/agent.module';
 import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
+import { AppConfigModule, AppConfigService } from './config/app';
+import { PostgresConfigModule } from './config/postgres';
+import { RedisConfigModule } from './config/redis';
 import { MemoriesModule } from './memories/memories.module';
 import { MessagesModule } from './messages/messages.module';
 import { REDIS, RedisModule } from './providers/cache/redis';
@@ -23,11 +25,11 @@ import { PrismaModule } from './providers/database/postgres';
 import { QueueModule } from './providers/queue/bullmq';
 import { UserModule } from './user/user.module';
 
-const TWO_WEEKS_IN_HOURS = 14 * 24;
-
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, expandVariables: true }),
+    AppConfigModule,
+    RedisConfigModule,
+    PostgresConfigModule,
     QueueModule,
     PrismaModule,
     RedisModule,
@@ -60,7 +62,7 @@ const TWO_WEEKS_IN_HOURS = 14 * 24;
 export class AppModule implements NestModule {
   constructor(
     @Inject(REDIS) private readonly redis: RedisClientType,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
   ) {}
 
   configure(consumer: MiddlewareConsumer) {
@@ -73,20 +75,13 @@ export class AppModule implements NestModule {
             client: this.redis,
           }),
           saveUninitialized: false,
-          secret: this.configService.getOrThrow<string>('SESSION_SECRET'),
+          secret: this.appConfig.sessionSecret,
           resave: false,
           rolling: true,
           cookie: {
             sameSite: true,
             httpOnly: false,
-            maxAge:
-              this.configService.get<number>(
-                'SESSION_EXPIRY_HOURS',
-                TWO_WEEKS_IN_HOURS,
-              ) *
-              60 *
-              60 *
-              1000,
+            maxAge: this.appConfig.sessionExpiryHours * 60 * 60 * 1000,
           },
         }),
         passport.initialize(),

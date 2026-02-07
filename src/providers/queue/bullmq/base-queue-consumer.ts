@@ -2,6 +2,8 @@ import { WorkerHost } from '@nestjs/bullmq';
 import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
+import { Environment } from '@/config/app/configuration';
+
 /**
  * Abstract base class for BullMQ queue consumers with test-aware cleanup.
  * Provides:
@@ -14,8 +16,7 @@ export abstract class BaseQueueConsumer
   implements OnModuleDestroy
 {
   protected readonly logger: Logger;
-  protected readonly isTest =
-    process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
+  protected readonly isTest = process.env.NODE_ENV === Environment.Test;
 
   constructor(
     loggerContext: string,

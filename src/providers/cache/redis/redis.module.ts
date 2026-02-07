@@ -1,24 +1,25 @@
 import { Module, OnModuleDestroy } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import * as Redis from 'redis';
 import { RedisClientType } from 'redis';
 
+import { RedisConfigModule, RedisConfigService } from '@/config/redis';
+
 import { REDIS } from './redis.constants';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [RedisConfigModule],
   providers: [
     {
       provide: REDIS,
-      useFactory: async (configService: ConfigService) => {
+      useFactory: async (redisConfig: RedisConfigService) => {
         const client = Redis.createClient({
-          url: configService.getOrThrow<string>('REDIS_URL'),
+          url: redisConfig.url,
         });
         await client.connect();
         return client;
       },
-      inject: [ConfigService],
+      inject: [RedisConfigService],
     },
   ],
   exports: [REDIS],
