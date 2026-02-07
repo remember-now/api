@@ -576,12 +576,12 @@
   "components": {
     "schemas": {
       "Role_Output": {
-        "id": "Role_Output",
         "type": "string",
         "enum": [
           "USER",
           "ADMIN"
-        ]
+        ],
+        "id": "Role_Output"
       },
       "UserWithoutPasswordDto_Output": {
         "type": "object",
@@ -666,12 +666,12 @@
         "id": "DeleteSelf"
       },
       "Role": {
-        "id": "Role",
         "type": "string",
         "enum": [
           "USER",
           "ADMIN"
-        ]
+        ],
+        "id": "Role"
       },
       "CreateUser": {
         "type": "object",
@@ -876,63 +876,6 @@
         ],
         "id": "Auth"
       },
-      "LoginResponse": {
-        "id": "LoginResponse",
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string"
-          },
-          "user": {
-            "type": "object",
-            "properties": {
-              "email": {
-                "type": "string",
-                "maxLength": 254,
-                "format": "email",
-                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-              },
-              "role": {
-                "default": "USER",
-                "$ref": "#/components/schemas/Role"
-              },
-              "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "agentId": {
-                "type": "string",
-                "nullable": true
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "updatedAt": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "email",
-              "role",
-              "id",
-              "agentId",
-              "createdAt",
-              "updatedAt"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "message",
-          "user"
-        ],
-        "additionalProperties": false
-      },
-      "SignupResponseDto_Output": {
-        "id": "SignupResponse_Output",
-        "$ref": "#/components/schemas/LoginResponse"
-      },
       "LoginResponse_Output": {
         "type": "object",
         "properties": {
@@ -985,6 +928,10 @@
         ],
         "id": "LoginResponse_Output",
         "additionalProperties": false
+      },
+      "SignupResponseDto_Output": {
+        "id": "SignupResponse_Output",
+        "$ref": "#/components/schemas/LoginResponse_Output"
       },
       "LogoutResponse_Output": {
         "type": "object",
