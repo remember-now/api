@@ -16,8 +16,10 @@ import { AgentModule } from './agent/agent.module';
 import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter, SilentExceptionFilter } from './common';
 import { AppConfigModule, AppConfigService } from './config/app';
+import { LlmConfigModule } from './config/llm';
 import { PostgresConfigModule } from './config/postgres';
 import { RedisConfigModule } from './config/redis';
+// import { LlmModule } from './llm/llm.module';
 import { MemoriesModule } from './memories/memories.module';
 import { MessagesModule } from './messages/messages.module';
 import { REDIS, RedisModule } from './providers/cache/redis';
@@ -28,6 +30,7 @@ import { UserModule } from './user/user.module';
 @Module({
   imports: [
     AppConfigModule,
+    LlmConfigModule,
     RedisConfigModule,
     PostgresConfigModule,
     QueueModule,
@@ -38,6 +41,7 @@ import { UserModule } from './user/user.module';
     AgentModule,
     MessagesModule,
     MemoriesModule,
+    // LlmModule,
   ],
   providers: [
     Logger,

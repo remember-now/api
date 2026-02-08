@@ -23,7 +23,6 @@ const envSchema = z.object({
   APP_FRONTEND_URL: z.url().default('http://localhost:5173'),
   APP_SESSION_SECRET: z.string().min(1, 'APP_SESSION_SECRET is required'),
   APP_SESSION_EXPIRY_HOURS: z.coerce.number().default(336),
-  GEMINI_API_KEY: z.string().optional(),
 });
 
 export default registerAs('app', () => {
@@ -34,6 +33,5 @@ export default registerAs('app', () => {
     frontendUrl: env.APP_FRONTEND_URL,
     sessionSecret: env.APP_SESSION_SECRET,
     sessionExpiryHours: env.APP_SESSION_EXPIRY_HOURS,
-    geminiApiKey: env.GEMINI_API_KEY,
   };
 });

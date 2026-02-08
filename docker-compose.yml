@@ -42,6 +42,9 @@ services:
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
       - APP_SESSION_SECRET=${APP_SESSION_SECRET:-super_secret_value}
       - APP_SESSION_EXPIRY_HOURS=${APP_SESSION_EXPIRY_HOURS:-336}
+      - PLATFORM_MODEL_ENABLED=${PLATFORM_MODEL_ENABLED:-false}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - LLM_PLATFORM_MODEL=${LLM_PLATFORM_MODEL:-gemini-2.5-flash}
     ports:
       - '${APP_PORT:-3333}:3333'
     networks:

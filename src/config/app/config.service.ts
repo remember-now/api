@@ -26,8 +26,4 @@ export class AppConfigService {
   get sessionExpiryHours(): number {
     return this.configService.get<number>('app.sessionExpiryHours')!;
   }
-
-  get geminiApiKey(): string | undefined {
-    return this.configService.get<string>('app.geminiApiKey');
-  }
 }
