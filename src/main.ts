@@ -27,9 +27,10 @@ async function bootstrap() {
     .setTitle('RememberNow API')
     .setDescription('Epic memory augmentation app!')
     .setVersion('1.0')
+    .setOpenAPIVersion('3.1.0')
     .build();
   const openApiDoc = SwaggerModule.createDocument(app, config);
-  const cleanedDoc = cleanupOpenApiDoc(openApiDoc);
+  const cleanedDoc = cleanupOpenApiDoc(openApiDoc, { version: '3.1' });
 
   if (appConfig.env === Environment.Development) {
     writeFileSync('./openapi.json', JSON.stringify(cleanedDoc, null, 2));

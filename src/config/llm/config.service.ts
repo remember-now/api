@@ -16,8 +16,4 @@ export class LlmConfigService {
   get platformModel(): string {
     return this.configService.get<string>('llm.platformModel')!;
   }
-
-  get platformMaxOutputTokens(): number | undefined {
-    return this.configService.get<number>('llm.platformMaxOutputTokens');
-  }
 }

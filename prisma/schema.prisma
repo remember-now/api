@@ -21,6 +21,12 @@ enum Role {
   ADMIN
 }
 
+enum LlmProvider {
+  ANTHROPIC
+  GOOGLE_GEMINI
+  PLATFORM
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   role      Role     @default(USER)
@@ -31,5 +37,22 @@ model User {
   passwordHash String
   agentId      String? @unique
 
+  activeLlmProvider LlmProvider?
+  llmConfigs        LlmConfig[]
+
   @@map("users")
+}
+
+model LlmConfig {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  provider  LlmProvider
+  config    Json
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("llm_configs")
 }

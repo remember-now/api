@@ -5,10 +5,9 @@ const envSchema = z.object({
   PLATFORM_MODEL_ENABLED: z
     .string()
     .default('false')
-    .transform((val) => val === 'true'),
+    .transform((val) => val === 'true' || val === 'TRUE'),
   GEMINI_API_KEY: z.string().optional(),
   LLM_PLATFORM_MODEL: z.string().default('gemini-2.5-flash'),
-  LLM_PLATFORM_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().optional(),
 });
 
 export default registerAs('llm', () => {
@@ -17,6 +16,5 @@ export default registerAs('llm', () => {
     platformModelEnabled: env.PLATFORM_MODEL_ENABLED,
     geminiApiKey: env.GEMINI_API_KEY,
     platformModel: env.LLM_PLATFORM_MODEL,
-    platformMaxOutputTokens: env.LLM_PLATFORM_MAX_OUTPUT_TOKENS,
   };
 });
