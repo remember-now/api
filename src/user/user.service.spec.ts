@@ -3,7 +3,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep, mockReset } from 'jest-mock-extended';
 
 import { Prisma } from '@generated/prisma/client';
-import { User } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
 import { PrismaService } from '@/providers/database/postgres';
@@ -26,7 +25,6 @@ describe('UserService', () => {
   let passwordService: DeepMockProxy<PasswordService>;
 
   const mockUser = UserFactory.createPrismaUser();
-  const mockUserWithoutPassword = UserFactory.createPrismaUserWithoutPassword();
 
   // Create matching DTO expectations with same data but string dates
   const expectedUser = UserFactory.createUser({
@@ -178,9 +176,7 @@ describe('UserService', () => {
         limit: 10,
       };
       prismaService.user.count.mockResolvedValueOnce(1);
-      prismaService.user.findMany.mockResolvedValueOnce([
-        mockUserWithoutPassword,
-      ] as User[]);
+      prismaService.user.findMany.mockResolvedValueOnce([mockUser]);
 
       const result = await userService.getAllUsers(query);
 
@@ -189,14 +185,6 @@ describe('UserService', () => {
         where: {},
         skip: 0,
         take: 10,
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
         orderBy: {
           createdAt: 'desc',
         },
@@ -219,9 +207,7 @@ describe('UserService', () => {
       };
 
       prismaService.user.count.mockResolvedValueOnce(1);
-      prismaService.user.findMany.mockResolvedValueOnce([
-        mockUserWithoutPassword,
-      ] as User[]);
+      prismaService.user.findMany.mockResolvedValueOnce([mockUser]);
 
       const result = await userService.getAllUsers(query);
 
@@ -232,14 +218,6 @@ describe('UserService', () => {
         where: expectedWhere,
         skip: 0,
         take: 10,
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
         orderBy: {
           createdAt: 'desc',
         },
@@ -333,14 +311,6 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { email: 'updated@example.com' },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
       expect(result.email).toBe('updated@example.com');
     });
@@ -360,14 +330,6 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { passwordHash: hashedPassword },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
     });
 
@@ -386,14 +348,6 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { role: RoleSchema.enum.ADMIN },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
     });
 
@@ -459,14 +413,6 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { email: 'newemail@example.com' },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
       expect(result.email).toBe('newemail@example.com');
     });
@@ -489,14 +435,6 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { passwordHash: hashedNewPassword },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
     });
 

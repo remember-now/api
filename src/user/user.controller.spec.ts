@@ -135,14 +135,10 @@ describe('UserController', () => {
   describe('createUser ( only)', () => {
     it('should call userService.createUserWithDto with correct parameters', async () => {
       const createUserDto = UserDtoFactory.createCreateUserDto();
-      const createUserResult = {
-        id: 1,
-        email: 'admin@example.com',
-        role: RoleSchema.enum.ADMIN,
-        agentId: null,
-        createdAt: new Date('2025-01-01').toISOString(),
-        updatedAt: new Date('2025-01-01').toISOString(),
-      };
+      const createUserResult = UserFactory.createUserWithoutPassword({
+        email: createUserDto.email,
+        role: createUserDto.role,
+      });
       userService.createUserWithDto.mockResolvedValueOnce(createUserResult);
 
       const result = await userController.createUser(createUserDto);

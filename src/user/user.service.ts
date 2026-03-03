@@ -59,14 +59,9 @@ export class UserService {
         },
       });
 
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        agentId: null,
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-      };
+      const { passwordHash: _, ...userWithoutPassword } =
+        this.transformUserDates(user);
+      return userWithoutPassword;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -101,14 +96,6 @@ export class UserService {
       where,
       skip,
       take: limit,
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-        agentId: true,
-      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -116,7 +103,10 @@ export class UserService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      users: users.map((user) => this.transformUserDates(user)),
+      users: users.map((user) => {
+        const { passwordHash: _, ...rest } = this.transformUserDates(user);
+        return rest;
+      }),
       pagination: {
         page,
         limit,
@@ -168,16 +158,10 @@ export class UserService {
       const updatedUser = await this.prisma.user.update({
         where: { id },
         data: updateData,
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
-      return this.transformUserDates(updatedUser);
+      const { passwordHash: _, ...userWithoutPassword } =
+        this.transformUserDates(updatedUser);
+      return userWithoutPassword;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -217,16 +201,10 @@ export class UserService {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
         data: updateData,
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          agentId: true,
-        },
       });
-      return this.transformUserDates(updatedUser);
+      const { passwordHash: _, ...userWithoutPassword } =
+        this.transformUserDates(updatedUser);
+      return userWithoutPassword;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {

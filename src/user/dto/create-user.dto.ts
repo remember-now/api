@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Role as PrismaRole } from '@generated/prisma/client';
 
 import { PasswordSchema } from '@/common/schemas';
+import { LlmProviderSchema } from '@/llm/dto';
 
 // Schemas
 export const RoleSchema = z.enum(PrismaRole).meta({ id: 'Role' });
@@ -26,6 +27,7 @@ export const UserSchema = CreateUserSchema.omit({ password: true })
     id: z.coerce.number().int().positive(),
     passwordHash: z.string(),
     agentId: z.string().nullable(),
+    activeLlmProvider: LlmProviderSchema.nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
