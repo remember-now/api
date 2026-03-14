@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { EdgeExtractionService, NodeExtractionService } from './extraction';
 import { Neo4jModule } from './neo4j/neo4j.module';
 import {
   CommunityEdgeRepository,
@@ -25,9 +26,11 @@ const repositories = [
   NextEpisodeEdgeRepository,
 ];
 
+const extractionServices = [NodeExtractionService, EdgeExtractionService];
+
 @Module({
   imports: [Neo4jModule],
-  providers: [...repositories],
-  exports: [...repositories],
+  providers: [...repositories, ...extractionServices],
+  exports: [...repositories, ...extractionServices],
 })
 export class KnowledgeGraphModule {}
