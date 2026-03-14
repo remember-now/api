@@ -19,6 +19,7 @@ import { AppConfigModule, AppConfigService } from './config/app';
 import { CryptoConfigModule } from './config/crypto';
 import { PostgresConfigModule } from './config/postgres';
 import { RedisConfigModule } from './config/redis';
+import { KnowledgeGraphModule } from './knowledge-graph/knowledge-graph.module';
 import { LlmModule } from './llm/llm.module';
 import { MemoriesModule } from './memories/memories.module';
 import { MessagesModule } from './messages/messages.module';
@@ -42,6 +43,7 @@ import { UserModule } from './user/user.module';
     MessagesModule,
     MemoriesModule,
     LlmModule,
+    KnowledgeGraphModule,
   ],
   providers: [
     Logger,
