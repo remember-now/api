@@ -29,6 +29,7 @@
       "Bash(npm ls:*)",
       "Bash(npm list:*)",
       "Bash(npx tsc:*)",
+      "Bash(npx install:*)",
       "Bash(du:*)",
       "Bash(df:*)",
       "mcp__ide__getDiagnostics"
