@@ -3,18 +3,16 @@ import { Injectable } from '@nestjs/common';
 
 import { EntityEdge } from '../models/edges';
 import { EpisodicNode } from '../models/nodes';
+import { EntityEdgeRepository } from '../neo4j/repositories';
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 import {
   cosineSimilarity,
   FACT_SIMILARITY_THRESHOLD,
   MAX_CANDIDATES,
+  MAX_KEYWORD_CANDIDATES,
   normalizeString,
 } from './resolution-utils';
-import {
-  EdgeDedupe,
-  edgeDedupeJsonSchema,
-  EdgeDedupeSchema,
-} from './resolution.types';
+import { edgeDedupeJsonSchema } from './resolution.types';
 
 export interface EdgeResolutionResult {
   resolvedEdges: EntityEdge[];
@@ -23,6 +21,8 @@ export interface EdgeResolutionResult {
 
 @Injectable()
 export class EdgeResolutionService {
+  constructor(private readonly edgeRepo: EntityEdgeRepository) {}
+
   async resolveEdges(
     model: BaseChatModel,
     episode: EpisodicNode,
@@ -64,7 +64,6 @@ export class EdgeResolutionService {
 
     const resolvedEdges: EntityEdge[] = [];
     const invalidatedEdgesMap = new Map<string, EntityEdge>();
-    const existingByUuid = new Map(existingEdges.map((e) => [e.uuid, e]));
 
     for (const edge of deduped) {
       // Find same-endpoint existing edges
@@ -78,7 +77,9 @@ export class EdgeResolutionService {
 
       // Find similar-fact edges (cosine) excluding same-endpoint already found
       const endpointUuids = new Set(endpointEdges.map((e) => e.uuid));
-      const similarEdges =
+
+      // Cosine candidates (in-memory)
+      const cosineEdges: EntityEdge[] =
         edge.factEmbedding !== null
           ? existingEdges
               .filter(
@@ -94,22 +95,51 @@ export class EdgeResolutionService {
               .map((s) => s.edge)
           : [];
 
+      // Keyword candidates (BM25 via Neo4j fulltext)
+      const keywordEdges = await this.edgeRepo.searchByFact(
+        edge.fact,
+        [edge.groupId],
+        MAX_KEYWORD_CANDIDATES,
+      );
+
+      // Merge: cosine-first, then keyword-only additions (deduped, endpoint-excluded)
+      const cosineUuids = new Set(cosineEdges.map((e) => e.uuid));
+      const keywordOnly = keywordEdges.filter(
+        (e) => !endpointUuids.has(e.uuid) && !cosineUuids.has(e.uuid),
+      );
+      const similarEdges: EntityEdge[] = [...cosineEdges, ...keywordOnly];
+
       if (endpointEdges.length === 0 && similarEdges.length === 0) {
         resolvedEdges.push(edge);
         continue;
       }
 
+      // Assign integer indices: endpoint edges first, then similar edges
+      const endpointWithIdx = endpointEdges.map((e, i) => ({
+        idx: i,
+        edge: e,
+      }));
+      const similarOffset = endpointEdges.length;
+      const similarWithIdx = similarEdges.map((e, i) => ({
+        idx: similarOffset + i,
+        edge: e,
+      }));
+
+      const idxToEdge = new Map<number, EntityEdge>();
+      for (const { idx, edge: e } of endpointWithIdx) idxToEdge.set(idx, e);
+      for (const { idx, edge: e } of similarWithIdx) idxToEdge.set(idx, e);
+
       const messages = buildDedupeEdgesMessages({
         episode,
         previousEpisodes,
-        newEdge: { uuid: edge.uuid, name: edge.name, fact: edge.fact },
-        existingEndpointEdges: endpointEdges.map((e) => ({
-          uuid: e.uuid,
+        newEdge: { name: edge.name, fact: edge.fact },
+        existingEndpointEdges: endpointWithIdx.map(({ idx, edge: e }) => ({
+          idx,
           name: e.name,
           fact: e.fact,
         })),
-        similarEdges: similarEdges.map((e) => ({
-          uuid: e.uuid,
+        similarEdges: similarWithIdx.map(({ idx, edge: e }) => ({
+          idx,
           name: e.name,
           fact: e.fact,
         })),
@@ -117,27 +147,26 @@ export class EdgeResolutionService {
         customInstructions,
       });
 
-      const raw = await model
+      const dedupe = await model
         .withStructuredOutput(edgeDedupeJsonSchema)
         .invoke(messages);
 
-      const parsed = EdgeDedupeSchema.safeParse(raw);
-      const dedupe: EdgeDedupe = parsed.success
-        ? parsed.data
-        : { duplicate_fact_uuids: [], contradicted_fact_uuids: [] };
-
-      const isDuplicate = dedupe.duplicate_fact_uuids.length > 0;
+      // A fact is duplicate only if it matches an endpoint-range index
+      const isDuplicate = dedupe.duplicate_facts.some(
+        (idx) => idx < endpointEdges.length,
+      );
 
       if (!isDuplicate) {
         resolvedEdges.push(edge);
       }
 
-      for (const contradictedUuid of dedupe.contradicted_fact_uuids) {
-        const existing = existingByUuid.get(contradictedUuid);
-        if (existing && !invalidatedEdgesMap.has(contradictedUuid)) {
-          invalidatedEdgesMap.set(contradictedUuid, {
+      for (const idx of dedupe.contradicted_facts) {
+        const existing = idxToEdge.get(idx);
+        if (existing && !invalidatedEdgesMap.has(existing.uuid)) {
+          invalidatedEdgesMap.set(existing.uuid, {
             ...existing,
             invalidAt: referenceTime,
+            expiredAt: new Date(),
           });
         }
       }

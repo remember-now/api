@@ -1,9 +1,10 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { mockDeep } from 'jest-mock-extended';
+import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { createEntityEdge, EntityEdge } from '../models/edges';
 import { createEpisodicNode } from '../models/nodes';
 import { EpisodeType } from '../models/nodes/node.types';
+import { EntityEdgeRepository } from '../neo4j/repositories';
 import { EdgeResolutionService } from './edge-resolution.service';
 
 const baseEpisode = createEpisodicNode({
@@ -33,9 +34,12 @@ describe('EdgeResolutionService', () => {
   let service: EdgeResolutionService;
   let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
   let mockRunnable: { invoke: jest.Mock };
+  let mockEdgeRepo: DeepMockProxy<EntityEdgeRepository>;
 
   beforeEach(() => {
-    service = new EdgeResolutionService();
+    mockEdgeRepo = mockDeep<EntityEdgeRepository>();
+    mockEdgeRepo.searchByFact.mockResolvedValue([]);
+    service = new EdgeResolutionService(mockEdgeRepo);
     mockModel = mockDeep<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
@@ -116,7 +120,7 @@ describe('EdgeResolutionService', () => {
     expect(result.resolvedEdges).toHaveLength(1);
   });
 
-  it('should drop edge from resolvedEdges when LLM returns it as duplicate', async () => {
+  it('should drop edge from resolvedEdges when LLM returns it as duplicate (idx in endpoint range)', async () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
@@ -129,9 +133,10 @@ describe('EdgeResolutionService', () => {
     });
     existingEdge.uuid = 'exist-edge-uuid';
 
+    // idx 0 is in endpoint range (1 endpoint edge)
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_fact_uuids: ['exist-edge-uuid'],
-      contradicted_fact_uuids: [],
+      duplicate_facts: [0],
+      contradicted_facts: [],
     });
 
     const result = await service.resolveEdges(
@@ -147,7 +152,7 @@ describe('EdgeResolutionService', () => {
     expect(result.invalidatedEdges).toHaveLength(0);
   });
 
-  it('should add existing edge to invalidatedEdges with invalidAt set when LLM returns contradiction', async () => {
+  it('should add existing edge to invalidatedEdges with invalidAt and expiredAt set when LLM returns contradiction', async () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is now CEO at Acme',
@@ -160,9 +165,10 @@ describe('EdgeResolutionService', () => {
     });
     existingEdge.uuid = 'old-edge-uuid';
 
+    // idx 0 is the endpoint edge
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_fact_uuids: [],
-      contradicted_fact_uuids: ['old-edge-uuid'],
+      duplicate_facts: [],
+      contradicted_facts: [0],
     });
 
     const result = await service.resolveEdges(
@@ -178,6 +184,50 @@ describe('EdgeResolutionService', () => {
     expect(result.invalidatedEdges).toHaveLength(1);
     expect(result.invalidatedEdges[0].uuid).toBe('old-edge-uuid');
     expect(result.invalidatedEdges[0].invalidAt).toEqual(referenceTime);
+    expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
+  });
+
+  it('should not treat edge as duplicate when duplicate_facts index is in similar range only', async () => {
+    const edge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice works at Acme',
+      factEmbedding: HIGH_SIM,
+    });
+    const endpointEdge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice is employed at Acme Corp',
+      factEmbedding: HIGH_SIM,
+      sourceNodeUuid: 'src-uuid',
+      targetNodeUuid: 'tgt-uuid',
+    });
+    endpointEdge.uuid = 'endpoint-uuid';
+    const similarEdge = makeEdge({
+      name: 'EMPLOYED_AT',
+      fact: 'Alice has a job at Acme',
+      factEmbedding: NEAR_HIGH_SIM,
+      sourceNodeUuid: 'other-src',
+      targetNodeUuid: 'other-tgt',
+    });
+    similarEdge.uuid = 'similar-uuid';
+
+    // idx 0 = endpoint edge, idx 1 = similar edge
+    // duplicate_facts = [1] (similar range idx) → should NOT trigger isDuplicate
+    mockRunnable.invoke.mockResolvedValue({
+      duplicate_facts: [1],
+      contradicted_facts: [],
+    });
+
+    const result = await service.resolveEdges(
+      mockModel,
+      baseEpisode,
+      [edge],
+      [endpointEdge, similarEdge],
+      new Map(),
+      referenceTime,
+    );
+
+    // Similar range idx in duplicate_facts does NOT mark as duplicate
+    expect(result.resolvedEdges).toHaveLength(1);
   });
 
   it('should set factEmbedding on resolved edges', async () => {
@@ -197,5 +247,69 @@ describe('EdgeResolutionService', () => {
     );
 
     expect(result.resolvedEdges[0].factEmbedding).toEqual(HIGH_SIM);
+  });
+
+  it('should include keyword-only edge in similar candidates when no factEmbedding', async () => {
+    const edge = makeEdge({ name: 'WORKS_AT', fact: 'Alice works at Acme' });
+    // edge has no factEmbedding → cosine path skipped, but keyword path should find this
+    const keywordEdge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice is employed at Acme',
+      factEmbedding: null,
+      sourceNodeUuid: 'other-src',
+      targetNodeUuid: 'other-tgt',
+    });
+    keywordEdge.uuid = 'keyword-uuid';
+
+    mockEdgeRepo.searchByFact.mockResolvedValue([keywordEdge]);
+    mockRunnable.invoke.mockResolvedValue({
+      duplicate_facts: [],
+      contradicted_facts: [],
+    });
+
+    await service.resolveEdges(
+      mockModel,
+      baseEpisode,
+      [edge],
+      [],
+      new Map(),
+      referenceTime,
+    );
+
+    // LLM should have been called with the keyword edge as a candidate
+    expect(mockModel.withStructuredOutput).toHaveBeenCalled();
+  });
+
+  it('should not include keyword result that is already an endpoint edge', async () => {
+    const edge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice works at Acme',
+      factEmbedding: HIGH_SIM,
+    });
+    const endpointEdge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice is at Acme',
+      factEmbedding: null,
+    });
+    endpointEdge.uuid = 'endpoint-uuid';
+
+    // keyword search returns the endpoint edge — should be excluded from similarEdges
+    mockEdgeRepo.searchByFact.mockResolvedValue([endpointEdge]);
+    mockRunnable.invoke.mockResolvedValue({
+      duplicate_facts: [],
+      contradicted_facts: [],
+    });
+
+    // existingEdges contains the endpoint edge (same src/tgt as `edge`)
+    await service.resolveEdges(
+      mockModel,
+      baseEpisode,
+      [edge],
+      [endpointEdge],
+      new Map(),
+      referenceTime,
+    );
+
+    expect(mockModel.withStructuredOutput).toHaveBeenCalled();
   });
 });

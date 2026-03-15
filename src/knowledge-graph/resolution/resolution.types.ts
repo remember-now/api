@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 export const NodeResolutionSchema = z.object({
-  uuid: z.string(),
-  duplicate_of: z.string().nullable(),
+  id: z.number(),
+  name: z.string(),
+  duplicate_name: z.string(),
 });
 
 export const NodeResolutionsSchema = z.object({
@@ -13,8 +14,8 @@ export type NodeResolutions = z.infer<typeof NodeResolutionsSchema>;
 export const nodeResolutionsJsonSchema = z.toJSONSchema(NodeResolutionsSchema);
 
 export const EdgeDedupeSchema = z.object({
-  duplicate_fact_uuids: z.array(z.string()),
-  contradicted_fact_uuids: z.array(z.string()),
+  duplicate_facts: z.array(z.number()),
+  contradicted_facts: z.array(z.number()),
 });
 
 export type EdgeDedupe = z.infer<typeof EdgeDedupeSchema>;

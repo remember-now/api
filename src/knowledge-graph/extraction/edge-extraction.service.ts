@@ -13,6 +13,7 @@ export class EdgeExtractionService {
     episode: EpisodicNode,
     nodes: EntityNode[],
     previousEpisodes: EpisodicNode[],
+    referenceTime: Date,
     customInstructions?: string,
   ): Promise<EntityEdge[]> {
     const nameToNode = new Map<string, EntityNode>(
@@ -23,6 +24,7 @@ export class EdgeExtractionService {
       episode,
       nodes,
       previousEpisodes,
+      referenceTime,
       customInstructions,
     });
 
@@ -45,6 +47,9 @@ export class EdgeExtractionService {
           groupId: episode.groupId,
           sourceNodeUuid: sourceNode.uuid,
           targetNodeUuid: targetNode.uuid,
+          validAt: typeof e.validAt === 'string' ? new Date(e.validAt) : null,
+          invalidAt:
+            typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,
         });
       });
   }

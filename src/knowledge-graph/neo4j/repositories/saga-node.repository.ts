@@ -76,12 +76,12 @@ export class SagaNodeRepository {
     uuidCursor?: string,
   ): Promise<SagaNode[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND n.uuid > $uuidCursor' : '';
+    const cursorClause = uuidCursor ? 'AND n.uuid < $uuidCursor' : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
       `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at
-       ${limitClause}`,
+       ORDER BY n.uuid DESC ${limitClause}`,
       { groupIds, uuidCursor: uuidCursor ?? null },
     );
     return results.map((r) => this.mapRow(r));
@@ -92,10 +92,7 @@ export class SagaNodeRepository {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
     };
   }
 }

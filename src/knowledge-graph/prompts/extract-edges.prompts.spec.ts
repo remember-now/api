@@ -16,12 +16,15 @@ const nodes = [
   createEntityNode({ name: 'Acme Corp', groupId: 'group-1' }),
 ];
 
+const referenceTime = new Date('2024-01-01T00:00:00Z');
+
 describe('buildExtractEdgesMessages', () => {
   it('should return system and human messages', () => {
     const messages = buildExtractEdgesMessages({
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
     });
     expect(messages).toHaveLength(2);
     expect(messages[0].getType()).toBe('system');
@@ -33,6 +36,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain(baseEpisode.content);
@@ -43,6 +47,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('Alice');
@@ -61,6 +66,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [prev],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('Alice joined Acme in 2020.');
@@ -71,6 +77,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('PREVIOUS EPISODES:\nNone');
@@ -81,6 +88,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
       customInstructions: 'Only extract employment relationships.',
     });
     const human = messages.find((m) => m.getType() === 'human');
@@ -92,6 +100,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('ENTITIES:');
@@ -102,6 +111,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes: [],
       previousEpisodes: [],
+      referenceTime,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('ENTITIES:');

@@ -13,6 +13,8 @@ const baseEpisode = createEpisodicNode({
   groupId: 'group-1',
 });
 
+const referenceTime = new Date('2024-01-01T00:00:00Z');
+
 const aliceNode = createEntityNode({ name: 'Alice', groupId: 'group-1' });
 const bobNode = createEntityNode({ name: 'Bob', groupId: 'group-1' });
 const acmeNode = createEntityNode({ name: 'Acme Corp', groupId: 'group-1' });
@@ -42,7 +44,13 @@ describe('EdgeExtractionService', () => {
       ],
     });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toHaveLength(1);
     expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
@@ -50,6 +58,56 @@ describe('EdgeExtractionService', () => {
     expect(edges[0].name).toBe('WORKS_AT');
     expect(edges[0].fact).toBe('Alice works at Acme Corp.');
     expect(edges[0].groupId).toBe('group-1');
+  });
+
+  it('should pass validAt/invalidAt from LLM response to edge', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      edges: [
+        {
+          source: 'Alice',
+          target: 'Acme Corp',
+          name: 'WORKS_AT',
+          description: 'Alice works at Acme Corp.',
+          validAt: '2024-01-01T00:00:00.000Z',
+          invalidAt: '2024-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
+
+    expect(edges[0].validAt).toEqual(new Date('2024-01-01T00:00:00.000Z'));
+    expect(edges[0].invalidAt).toEqual(new Date('2024-06-01T00:00:00.000Z'));
+  });
+
+  it('should set validAt/invalidAt to null when not provided', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      edges: [
+        {
+          source: 'Alice',
+          target: 'Acme Corp',
+          name: 'WORKS_AT',
+          description: 'Alice works at Acme Corp.',
+        },
+      ],
+    });
+
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
+
+    expect(edges[0].validAt).toBeNull();
+    expect(edges[0].invalidAt).toBeNull();
   });
 
   it('should filter edges with unrecognized source names', async () => {
@@ -70,7 +128,13 @@ describe('EdgeExtractionService', () => {
       ],
     });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toHaveLength(1);
     expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
@@ -94,7 +158,13 @@ describe('EdgeExtractionService', () => {
       ],
     });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toHaveLength(1);
     expect(edges[0].sourceNodeUuid).toBe(bobNode.uuid);
@@ -113,7 +183,13 @@ describe('EdgeExtractionService', () => {
       ],
     });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toHaveLength(1);
     expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
@@ -123,7 +199,13 @@ describe('EdgeExtractionService', () => {
   it('should return empty array when no edges extracted', async () => {
     mockRunnable.invoke.mockResolvedValue({ edges: [] });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toEqual([]);
   });
@@ -146,7 +228,13 @@ describe('EdgeExtractionService', () => {
       ],
     });
 
-    const edges = await service.extractEdges(mockModel, baseEpisode, nodes, []);
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
 
     expect(edges).toHaveLength(2);
     edges.forEach((e) => expect(e.uuid).toBeTruthy());

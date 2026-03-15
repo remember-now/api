@@ -4,25 +4,12 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
+import { EntityTypeMap } from '../episode/episode.types';
 import { EpisodicNode } from '../models/nodes';
 import { EpisodeType } from '../models/nodes/node.types';
 import { episodeToContext } from './prompts.types';
 
-function getSourceLabel(source: EpisodeType): string {
-  switch (source) {
-    case EpisodeType.message:
-      return 'conversational message';
-    case EpisodeType.json:
-      return 'structured JSON data';
-    case EpisodeType.text:
-    default:
-      return 'text document';
-  }
-}
-
-function buildSystemPrompt(source: EpisodeType): string {
-  const sourceLabel = getSourceLabel(source);
-  return `You are an expert knowledge graph builder. Your task is to extract named entities from a ${sourceLabel}.
+const MESSAGE_SYSTEM_PROMPT = `You are an expert knowledge graph builder. Your task is to extract and classify the speaker and other significant entities from conversational messages.
 
 Extract only clearly mentioned named entities such as people, organizations, places, concepts, and events.
 
@@ -33,6 +20,40 @@ Rules:
 - Do not infer or hallucinate entities not present in the text
 - If entity types are provided, classify each entity with the appropriate entityTypeId
 - If no entity type fits, omit entityTypeId`;
+
+const TEXT_SYSTEM_PROMPT = `You are an expert knowledge graph builder. Your task is to extract named entities from a text document — people, organizations, places, concepts, events.
+
+Extract only clearly mentioned named entities.
+
+Rules:
+- Prefer specific names over generic terms
+- Do not extract relationships or adjectives
+- Only extract entities that are clearly mentioned in the content
+- Do not infer or hallucinate entities not present in the text
+- If entity types are provided, classify each entity with the appropriate entityTypeId
+- If no entity type fits, omit entityTypeId`;
+
+const JSON_SYSTEM_PROMPT = `You are an expert knowledge graph builder. Your task is to extract named entities from structured JSON data — use key names and values as context.
+
+Extract only clearly mentioned named entities such as people, organizations, places, concepts, and events.
+
+Rules:
+- Prefer specific names over generic terms
+- Do not extract relationships or adjectives
+- Only extract entities that are clearly mentioned in the content
+- Do not infer or hallucinate entities not present in the text
+- If entity types are provided, classify each entity with the appropriate entityTypeId
+- If no entity type fits, omit entityTypeId`;
+
+function buildSystemPrompt(source: EpisodeType): string {
+  switch (source) {
+    case EpisodeType.message:
+      return MESSAGE_SYSTEM_PROMPT;
+    case EpisodeType.json:
+      return JSON_SYSTEM_PROMPT;
+    default:
+      return TEXT_SYSTEM_PROMPT;
+  }
 }
 
 function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
@@ -50,7 +71,7 @@ function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
 export function buildExtractNodesMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
-  entityTypes?: Record<string, string>;
+  entityTypes?: EntityTypeMap;
   customInstructions?: string;
 }): BaseMessage[] {
   const { episode, previousEpisodes, entityTypes, customInstructions } = ctx;
@@ -68,7 +89,7 @@ export function buildExtractNodesMessages(ctx: {
   if (entityTypes && Object.keys(entityTypes).length > 0) {
     const entityTypesText = Object.entries(entityTypes)
       .map(
-        ([label, description], index) =>
+        ([label, { description }], index) =>
           `{id: ${index}, label: "${label}", description: "${description}"}`,
       )
       .join('\n');

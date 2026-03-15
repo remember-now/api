@@ -69,17 +69,15 @@ export class CommunityEdgeRepository {
   async getByGroupIds(
     groupIds: string[],
     limit?: number,
-    uuidCursor?: string,
   ): Promise<CommunityEdge[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND e.uuid > $uuidCursor' : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
       `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
-       WHERE e.group_id IN $groupIds ${cursorClause}
+       WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid
        ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      { groupIds },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -88,10 +86,7 @@ export class CommunityEdgeRepository {
     return {
       uuid: row['uuid'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
       sourceNodeUuid: row['source_node_uuid'] as string,
       targetNodeUuid: row['target_node_uuid'] as string,
     };

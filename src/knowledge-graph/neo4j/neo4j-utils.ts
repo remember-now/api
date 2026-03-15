@@ -1,11 +1,4 @@
-import neo4j, {
-  DateTime,
-  Integer,
-  isDateTime,
-  isInt,
-  isNode,
-  isRelationship,
-} from 'neo4j-driver';
+import neo4j, { DateTime, Integer, isDateTime, isInt } from 'neo4j-driver';
 
 export function toNeo4jDateTime(date: Date): DateTime<number> {
   return neo4j.types.DateTime.fromStandardDate(date);
@@ -23,10 +16,6 @@ export function convertValue(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (isInt(value)) return fromNeo4jInt(value);
   if (isDateTime(value)) return fromNeo4jDateTime(value);
-  if (isNode(value))
-    return convertRecord(value.properties as Record<string, unknown>);
-  if (isRelationship(value))
-    return convertRecord(value.properties as Record<string, unknown>);
   if (Array.isArray(value)) return value.map(convertValue);
   if (typeof value === 'object')
     return convertRecord(value as Record<string, unknown>);

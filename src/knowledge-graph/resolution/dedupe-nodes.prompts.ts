@@ -15,9 +15,8 @@ Rules:
 - Two entities are duplicates only if they refer to the same real-world entity
 - Never merge merely-similar or related but distinct entities
 - Every extracted entity must appear in entity_resolutions exactly once
-- If an extracted entity is a duplicate, set duplicate_of to the uuid of the existing candidate it duplicates
-- If an extracted entity is not a duplicate, set duplicate_of to null
-- Only use candidate uuids from the provided existing candidate list`;
+- For each entity, return its integer id, the best canonical name, and the name of the matching existing entity (duplicate_name) or an empty string if it is not a duplicate
+- Only use names from the provided existing candidate list for duplicate_name`;
 
 function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
   if (episodes.length === 0) return 'None';
@@ -29,18 +28,23 @@ function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
     .join('\n');
 }
 
-function formatEntities(
-  entities: Array<{ uuid: string; name: string }>,
+function formatExtractedEntities(
+  entities: Array<{ id: number; name: string }>,
 ): string {
   if (entities.length === 0) return 'None';
-  return entities.map((e) => `- uuid: ${e.uuid}, name: "${e.name}"`).join('\n');
+  return entities.map((e) => `- id: ${e.id}, name: "${e.name}"`).join('\n');
+}
+
+function formatCandidateEntities(entities: Array<{ name: string }>): string {
+  if (entities.length === 0) return 'None';
+  return entities.map((e) => `- name: "${e.name}"`).join('\n');
 }
 
 export function buildDedupeNodesMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
-  extractedNodes: Array<{ uuid: string; name: string }>;
-  candidateNodes: Array<{ uuid: string; name: string }>;
+  extractedNodes: Array<{ id: number; name: string }>;
+  candidateNodes: Array<{ name: string }>;
   customInstructions?: string;
 }): BaseMessage[] {
   const {
@@ -52,8 +56,8 @@ export function buildDedupeNodesMessages(ctx: {
   } = ctx;
 
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
-  const extractedText = formatEntities(extractedNodes);
-  const candidatesText = formatEntities(candidateNodes);
+  const extractedText = formatExtractedEntities(extractedNodes);
+  const candidatesText = formatCandidateEntities(candidateNodes);
 
   let humanContent =
     `PREVIOUS EPISODES:\n${previousEpisodesText}\n\n` +

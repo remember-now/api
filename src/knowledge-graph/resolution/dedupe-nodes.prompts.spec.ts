@@ -11,11 +11,11 @@ const baseEpisode = createEpisodicNode({
 });
 
 const extractedNodes = [
-  { uuid: 'ext-uuid-1', name: 'Alice' },
-  { uuid: 'ext-uuid-2', name: 'Acme Corp' },
+  { id: 0, name: 'Alice' },
+  { id: 1, name: 'Acme Corp' },
 ];
 
-const candidateNodes = [{ uuid: 'cand-uuid-1', name: 'Alice Smith' }];
+const candidateNodes = [{ name: 'Alice Smith' }];
 
 describe('buildDedupeNodesMessages', () => {
   it('should return system and human messages', () => {
@@ -30,7 +30,7 @@ describe('buildDedupeNodesMessages', () => {
     expect(messages[1].getType()).toBe('human');
   });
 
-  it('should include extracted entity uuid and name in human message', () => {
+  it('should include extracted entity id and name in human message', () => {
     const messages = buildDedupeNodesMessages({
       episode: baseEpisode,
       previousEpisodes: [],
@@ -38,13 +38,13 @@ describe('buildDedupeNodesMessages', () => {
       candidateNodes: [],
     });
     const human = messages[1];
-    expect(human.content).toContain('ext-uuid-1');
+    expect(human.content).toContain('id: 0');
     expect(human.content).toContain('Alice');
-    expect(human.content).toContain('ext-uuid-2');
+    expect(human.content).toContain('id: 1');
     expect(human.content).toContain('Acme Corp');
   });
 
-  it('should include candidate entity uuid and name in human message', () => {
+  it('should include candidate entity name in human message', () => {
     const messages = buildDedupeNodesMessages({
       episode: baseEpisode,
       previousEpisodes: [],
@@ -52,7 +52,6 @@ describe('buildDedupeNodesMessages', () => {
       candidateNodes,
     });
     const human = messages[1];
-    expect(human.content).toContain('cand-uuid-1');
     expect(human.content).toContain('Alice Smith');
   });
 

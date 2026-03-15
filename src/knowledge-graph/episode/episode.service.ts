@@ -29,11 +29,10 @@ import {
   AddEpisodeOptions,
   AddEpisodeResult,
   nodeSummaryJsonSchema,
-  NodeSummarySchema,
 } from './episode.types';
 import { buildNodeSummaryMessages } from './node-summary.prompts';
 
-const PREVIOUS_EPISODES_WINDOW = 5;
+const PREVIOUS_EPISODES_WINDOW = 20;
 
 @Injectable()
 export class EpisodeService {
@@ -126,6 +125,7 @@ export class EpisodeService {
       episode,
       canonicalNodes,
       previousEpisodes,
+      referenceTime,
       customInstructions,
     );
 
@@ -171,16 +171,13 @@ export class EpisodeService {
         .withStructuredOutput(nodeSummaryJsonSchema)
         .invoke(summaryMessages);
 
-      const parsed = NodeSummarySchema.safeParse(summaryResult);
-      if (parsed.success) {
-        const summaryMap = new Map(
-          parsed.data.summaries.map((s) => [s.uuid, s.summary]),
-        );
-        for (const node of resolvedNodes) {
-          const summary = summaryMap.get(node.uuid);
-          if (summary !== undefined) {
-            node.summary = summary;
-          }
+      const summaryMap = new Map(
+        summaryResult.summaries.map((s) => [s.uuid, s.summary]),
+      );
+      for (const node of resolvedNodes) {
+        const summary = summaryMap.get(node.uuid);
+        if (summary !== undefined) {
+          node.summary = summary;
         }
       }
     }
@@ -233,8 +230,10 @@ export class EpisodeService {
       }
     }
 
-    // 14. Build communities
-    await this.communityService.buildCommunities(userId, groupId);
+    // 14. Build communities (opt-in)
+    if (options.updateCommunities) {
+      await this.communityService.buildCommunities(userId, groupId);
+    }
 
     return {
       episode,

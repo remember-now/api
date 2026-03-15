@@ -1,12 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
-export class EntityEdgeRepository {
+export class EntityEdgeRepository implements OnModuleInit {
   constructor(private readonly neo4j: Neo4jService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.neo4j.runQuery(
+      `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
+       FOR ()-[r:RELATES_TO]-()
+       ON EACH [r.fact]`,
+      {},
+    );
+  }
 
   async save(edge: EntityEdge): Promise<string> {
     const props: Record<string, unknown> = {
@@ -107,13 +116,13 @@ export class EntityEdgeRepository {
   async getByGroupIds(
     groupIds: string[],
     limit?: number,
-    uuidCursor?: string,
   ): Promise<EntityEdge[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND e.uuid > $uuidCursor' : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
+    const params: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
       `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
-       WHERE e.group_id IN $groupIds ${cursorClause}
+       WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
               e.fact_embedding AS fact_embedding, e.episodes AS episodes,
@@ -121,7 +130,7 @@ export class EntityEdgeRepository {
               e.invalid_at AS invalid_at, e.attributes AS attributes,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -158,35 +167,43 @@ export class EntityEdgeRepository {
     return results.map((r) => this.mapRow(r));
   }
 
+  async searchByFact(
+    query: string,
+    groupIds: string[],
+    limit: number,
+  ): Promise<EntityEdge[]> {
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      `CALL db.index.fulltext.queryRelationships('edge_facts', $query)
+       YIELD relationship AS e, score
+       WHERE e.group_id IN $groupIds
+       MATCH (source:Entity)-[e]->(target:Entity)
+       RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
+              e.created_at AS created_at, e.fact AS fact,
+              e.fact_embedding AS fact_embedding, e.episodes AS episodes,
+              e.expired_at AS expired_at, e.valid_at AS valid_at,
+              e.invalid_at AS invalid_at, e.attributes AS attributes,
+              source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
+       ORDER BY score DESC
+       LIMIT $limit`,
+      { query, groupIds, limit },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
   private mapRow(row: Record<string, unknown>): EntityEdge {
     return {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
       sourceNodeUuid: row['source_node_uuid'] as string,
       targetNodeUuid: row['target_node_uuid'] as string,
       fact: (row['fact'] as string) ?? '',
       factEmbedding: (row['fact_embedding'] as number[] | null) ?? null,
       episodes: (row['episodes'] as string[]) ?? [],
-      expiredAt: row['expired_at']
-        ? row['expired_at'] instanceof Date
-          ? row['expired_at']
-          : new Date(row['expired_at'] as string)
-        : null,
-      validAt: row['valid_at']
-        ? row['valid_at'] instanceof Date
-          ? row['valid_at']
-          : new Date(row['valid_at'] as string)
-        : null,
-      invalidAt: row['invalid_at']
-        ? row['invalid_at'] instanceof Date
-          ? row['invalid_at']
-          : new Date(row['invalid_at'] as string)
-        : null,
+      expiredAt: (row['expired_at'] as Date | null) ?? null,
+      validAt: (row['valid_at'] as Date | null) ?? null,
+      invalidAt: (row['invalid_at'] as Date | null) ?? null,
       attributes: row['attributes']
         ? (JSON.parse(row['attributes'] as string) as Record<string, unknown>)
         : {},

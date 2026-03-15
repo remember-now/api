@@ -14,6 +14,8 @@ export const ExtractedEdgeSchema = z.object({
   target: z.string(),
   name: z.string(),
   description: z.string(),
+  validAt: z.string().nullable().optional(),
+  invalidAt: z.string().nullable().optional(),
 });
 
 export const ExtractedEdgesSchema = z.object({

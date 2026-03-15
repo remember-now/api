@@ -62,7 +62,7 @@ describe('CryptoService', () => {
       const encrypted = cryptoService.encrypt('some-secret');
       const tampered =
         encrypted.slice(0, -2) +
-        (encrypted.slice(-1) === 'A' ? 'B' : 'A') +
+        (encrypted.slice(-2, -1) === 'A' ? 'B' : 'A') +
         encrypted.slice(-1);
 
       expect(() => cryptoService.decrypt(tampered)).toThrow();

@@ -190,5 +190,15 @@ describe('CommunityService', () => {
         mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
       expect(deleteOrder).toBeLessThan(saveOrder);
     });
+
+    it('should save community nodes before community edges', async () => {
+      await service.buildCommunities(USER_ID, GROUP_ID);
+
+      const nodeOrder =
+        mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+      const edgeOrder =
+        mockCommunityEdgeRepository.saveBulk.mock.invocationCallOrder[0];
+      expect(nodeOrder).toBeLessThan(edgeOrder);
+    });
   });
 });

@@ -87,17 +87,15 @@ export class CommunityNodeRepository {
   async getByGroupIds(
     groupIds: string[],
     limit?: number,
-    uuidCursor?: string,
   ): Promise<CommunityNode[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND n.uuid > $uuidCursor' : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Community) WHERE n.group_id IN $groupIds ${cursorClause}
+      `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding
        ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      { groupIds },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -107,10 +105,7 @@ export class CommunityNodeRepository {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string) ?? '',
       nameEmbedding: (row['name_embedding'] as number[] | null) ?? null,
     };

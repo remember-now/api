@@ -4,6 +4,14 @@ import { EntityEdge, EpisodicEdge } from '../models/edges';
 import { EntityNode, EpisodicNode } from '../models/nodes';
 import { EpisodeType } from '../models/nodes/node.types';
 
+export type EntityTypeMap = Record<
+  string,
+  {
+    description: string;
+    schema?: z.ZodTypeAny;
+  }
+>;
+
 export interface AddEpisodeOptions {
   userId: number;
   name: string;
@@ -13,8 +21,9 @@ export interface AddEpisodeOptions {
   groupId: string;
   referenceTime?: Date;
   sagaUuid?: string;
-  entityTypes?: Record<string, string>;
+  entityTypes?: EntityTypeMap;
   customInstructions?: string;
+  updateCommunities?: boolean;
 }
 
 export interface AddEpisodeResult {

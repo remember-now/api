@@ -65,8 +65,8 @@ describe('buildExtractNodesMessages', () => {
 
   it('should include entity types when provided', () => {
     const entityTypes = {
-      Person: 'A human individual',
-      Organization: 'A company or group',
+      Person: { description: 'A human individual' },
+      Organization: { description: 'A company or group' },
     };
     const messages = buildExtractNodesMessages({
       episode: baseEpisode,
