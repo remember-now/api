@@ -60,7 +60,7 @@ export class CommunityService {
       { groupId, graphName },
     );
 
-    let communityMap: Map<number, string[]>;
+    let communityMap!: Map<number, string[]>;
 
     try {
       // 4. Run Leiden
@@ -102,13 +102,16 @@ export class CommunityService {
 
       const messages = buildCommunitySummaryMessages({ nodes: memberNodes });
 
-      const result = await model
+      const raw = await model
         .withStructuredOutput(communitySummaryJsonSchema)
         .invoke(messages);
 
+      const parsed = CommunitySummarySchema.safeParse(raw);
+      if (!parsed.success) continue;
+
       const community = createCommunityNode({
-        name: result.name,
-        summary: result.summary,
+        name: parsed.data.name,
+        summary: parsed.data.summary,
         groupId,
       });
       communityNodes.push(community);
@@ -123,10 +126,8 @@ export class CommunityService {
       communityEdges.push(...edges);
     }
 
-    // 9. Persist all in parallel
-    await Promise.all([
-      this.communityNodeRepository.saveBulk(communityNodes),
-      this.communityEdgeRepository.saveBulk(communityEdges),
-    ]);
+    // 9. Persist nodes first, then edges (edges require community nodes to exist)
+    await this.communityNodeRepository.saveBulk(communityNodes);
+    await this.communityEdgeRepository.saveBulk(communityEdges);
   }
 }

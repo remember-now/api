@@ -1,5 +1,6 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
+import { z } from 'zod';
 
 import { createEpisodicNode } from '../models/nodes';
 import { EpisodeType } from '../models/nodes/node.types';
@@ -69,8 +70,8 @@ describe('NodeExtractionService', () => {
 
   it('should assign correct labels from entityTypes map', async () => {
     const entityTypes = {
-      Person: 'A human individual',
-      Organization: 'A company or group',
+      Person: { description: 'A human individual' },
+      Organization: { description: 'A company or group' },
     };
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [
@@ -86,12 +87,12 @@ describe('NodeExtractionService', () => {
       entityTypes,
     );
 
-    expect(nodes[0].labels).toEqual(['Person']);
-    expect(nodes[1].labels).toEqual(['Organization']);
+    expect(nodes[0].labels).toEqual(['Entity', 'Person']);
+    expect(nodes[1].labels).toEqual(['Entity', 'Organization']);
   });
 
   it('should fall back to Entity label for unknown entityTypeId', async () => {
-    const entityTypes = { Person: 'A human individual' };
+    const entityTypes = { Person: { description: 'A human individual' } };
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [{ name: 'Alice', entityTypeId: 99 }],
     });
@@ -123,5 +124,45 @@ describe('NodeExtractionService', () => {
     const nodes = await service.extractNodes(mockModel, baseEpisode, []);
 
     expect(nodes).toEqual([]);
+  });
+
+  it('should call attribute extraction LLM when entity type has a schema', async () => {
+    const entityTypes = {
+      Person: {
+        description: 'A human individual',
+        schema: z.object({ age: z.number().optional() }),
+      },
+    };
+    // First invoke: entity extraction
+    // Second invoke: attribute extraction for the Person node
+    mockRunnable.invoke
+      .mockResolvedValueOnce({
+        extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],
+      })
+      .mockResolvedValueOnce({ age: 30 });
+
+    const nodes = await service.extractNodes(
+      mockModel,
+      baseEpisode,
+      [],
+      entityTypes,
+    );
+
+    // withStructuredOutput called twice: once for extraction, once for attributes
+    expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(2);
+    expect(nodes[0].attributes).toMatchObject({ age: 30 });
+  });
+
+  it('should not call attribute extraction LLM when entity type has no schema', async () => {
+    const entityTypes = {
+      Person: { description: 'A human individual' },
+    };
+    mockRunnable.invoke.mockResolvedValue({
+      extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],
+    });
+
+    await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
+
+    expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(1);
   });
 });

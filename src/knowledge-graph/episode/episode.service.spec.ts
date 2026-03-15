@@ -143,6 +143,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       uuidMap: new Map(),
+      duplicatePairs: [],
     });
     mockEdgeExtractionService.extractEdges.mockResolvedValue([]);
     mockEntityEdgeRepository.getByGroupIds.mockResolvedValue([]);
@@ -224,6 +225,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [resolvedNode],
       uuidMap,
+      duplicatePairs: [],
     });
     mockEntityNodeRepository.getByGroupIds.mockResolvedValue([existingNode]);
 
@@ -234,6 +236,7 @@ describe('EpisodeService', () => {
       expect.anything(),
       expect.arrayContaining([resolvedNode, existingNode]),
       [],
+      REFERENCE_TIME,
       undefined,
     );
   });
@@ -259,6 +262,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       uuidMap,
+      duplicatePairs: [],
     });
 
     await service.addEpisode(baseOptions);
@@ -280,6 +284,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
       uuidMap: new Map(),
+      duplicatePairs: [],
     });
     mockRunnable.invoke.mockResolvedValue({
       summaries: [{ uuid: node.uuid, summary: 'Alice is an engineer' }],
@@ -295,6 +300,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
       uuidMap: new Map(),
+      duplicatePairs: [],
     });
     mockRunnable.invoke.mockResolvedValue({
       summaries: [{ uuid: node.uuid, summary: 'Alice is an engineer' }],
@@ -330,6 +336,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [resolvedNode],
       uuidMap,
+      duplicatePairs: [],
     });
     mockEntityNodeRepository.getByGroupIds.mockResolvedValue([existingNode]);
 
@@ -402,6 +409,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
       uuidMap: new Map(),
+      duplicatePairs: [],
     });
     mockEdgeResolutionService.resolveEdges.mockResolvedValue({
       resolvedEdges: [edge],
@@ -423,6 +431,7 @@ describe('EpisodeService', () => {
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       uuidMap: new Map(),
+      duplicatePairs: [],
     });
 
     await service.addEpisode(baseOptions);
@@ -430,13 +439,23 @@ describe('EpisodeService', () => {
     expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
   });
 
-  it('should call communityService.buildCommunities with userId and groupId after persist', async () => {
+  it('should not call communityService.buildCommunities by default', async () => {
     await service.addEpisode(baseOptions);
+
+    expect(mockCommunityService.buildCommunities).not.toHaveBeenCalled();
+  });
+
+  it('should call communityService.buildCommunities when updateCommunities is true', async () => {
+    await service.addEpisode({ ...baseOptions, updateCommunities: true });
 
     expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
       USER_ID,
       GROUP_ID,
     );
+  });
+
+  it('should call communityService.buildCommunities after persist when updateCommunities is true', async () => {
+    await service.addEpisode({ ...baseOptions, updateCommunities: true });
 
     const persistOrder =
       mockEntityNodeRepository.saveBulk.mock.invocationCallOrder[0];

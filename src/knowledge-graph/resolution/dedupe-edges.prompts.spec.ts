@@ -11,14 +11,13 @@ const baseEpisode = createEpisodicNode({
 });
 
 const newEdge = {
-  uuid: 'new-edge-uuid',
   name: 'WORKS_AT',
   fact: 'Alice is the CEO of Acme Corp',
 };
 
 const endpointEdges = [
   {
-    uuid: 'exist-edge-1',
+    idx: 0,
     name: 'WORKS_AT',
     fact: 'Alice was an engineer at Acme Corp',
   },
@@ -26,7 +25,7 @@ const endpointEdges = [
 
 const similarEdges = [
   {
-    uuid: 'similar-edge-1',
+    idx: 1,
     name: 'WORKS_AT',
     fact: 'Alice leads the engineering team at Acme Corp',
   },
@@ -49,7 +48,7 @@ describe('buildDedupeEdgesMessages', () => {
     expect(messages[1].getType()).toBe('human');
   });
 
-  it('should include new fact in human message', () => {
+  it('should include new fact name and content in human message', () => {
     const messages = buildDedupeEdgesMessages({
       episode: baseEpisode,
       previousEpisodes: [],
@@ -59,7 +58,7 @@ describe('buildDedupeEdgesMessages', () => {
       referenceTime,
     });
     const human = messages[1];
-    expect(human.content).toContain('new-edge-uuid');
+    expect(human.content).toContain('WORKS_AT');
     expect(human.content).toContain('Alice is the CEO of Acme Corp');
   });
 
@@ -76,7 +75,7 @@ describe('buildDedupeEdgesMessages', () => {
     expect(human.content).toContain(referenceTime.toISOString());
   });
 
-  it('should list existing endpoint edges in human message', () => {
+  it('should list existing endpoint edges with idx in human message', () => {
     const messages = buildDedupeEdgesMessages({
       episode: baseEpisode,
       previousEpisodes: [],
@@ -86,7 +85,7 @@ describe('buildDedupeEdgesMessages', () => {
       referenceTime,
     });
     const human = messages[1];
-    expect(human.content).toContain('exist-edge-1');
+    expect(human.content).toContain('idx: 0');
     expect(human.content).toContain('Alice was an engineer at Acme Corp');
   });
 
@@ -103,7 +102,7 @@ describe('buildDedupeEdgesMessages', () => {
     expect(human.content).toContain('None');
   });
 
-  it('should list similar edges in human message', () => {
+  it('should list similar edges with idx in human message', () => {
     const messages = buildDedupeEdgesMessages({
       episode: baseEpisode,
       previousEpisodes: [],
@@ -113,7 +112,7 @@ describe('buildDedupeEdgesMessages', () => {
       referenceTime,
     });
     const human = messages[1];
-    expect(human.content).toContain('similar-edge-1');
+    expect(human.content).toContain('idx: 1');
     expect(human.content).toContain(
       'Alice leads the engineering team at Acme Corp',
     );

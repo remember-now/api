@@ -155,4 +155,63 @@ describe('EntityEdgeRepository', () => {
       );
     });
   });
+
+  describe('onModuleInit', () => {
+    it('should create the edge_facts fulltext index', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      await repo.onModuleInit();
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.stringContaining('edge_facts'),
+        {},
+      );
+    });
+  });
+
+  describe('searchByFact', () => {
+    it('should use fulltext queryRelationships procedure', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      await repo.searchByFact('Alice works', ['group-1'], 10);
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.stringContaining('db.index.fulltext.queryRelationships'),
+        expect.objectContaining({
+          query: 'Alice works',
+          groupIds: ['group-1'],
+        }),
+      );
+    });
+
+    it('should return mapped entity edges', async () => {
+      const edge = createEntityEdge({
+        name: 'WORKS_AT',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      neo4j.runQuery.mockResolvedValue([
+        {
+          uuid: edge.uuid,
+          name: edge.name,
+          group_id: edge.groupId,
+          created_at: edge.createdAt,
+          fact: 'Alice works at Acme',
+          fact_embedding: null,
+          episodes: [],
+          expired_at: null,
+          valid_at: null,
+          invalid_at: null,
+          attributes: JSON.stringify({}),
+          source_node_uuid: sourceNodeUuid,
+          target_node_uuid: targetNodeUuid,
+        },
+      ]);
+      const results = await repo.searchByFact('Alice works', ['group-1'], 10);
+      expect(results).toHaveLength(1);
+      expect(results[0].fact).toBe('Alice works at Acme');
+    });
+
+    it('should return empty array when no results', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      const results = await repo.searchByFact('nonexistent', ['group-1'], 10);
+      expect(results).toEqual([]);
+    });
+  });
 });

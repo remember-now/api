@@ -190,5 +190,27 @@ describe('CommunityService', () => {
         mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
       expect(deleteOrder).toBeLessThan(saveOrder);
     });
+
+    it('should save community nodes before community edges', async () => {
+      await service.buildCommunities(USER_ID, GROUP_ID);
+
+      const nodeOrder =
+        mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+      const edgeOrder =
+        mockCommunityEdgeRepository.saveBulk.mock.invocationCallOrder[0];
+      expect(nodeOrder).toBeLessThan(edgeOrder);
+    });
+
+    it('should skip community when LLM returns invalid shape', async () => {
+      mockRunnable.invoke
+        .mockResolvedValueOnce({ invalid: 'shape' }) // community 0 — invalid
+        .mockResolvedValueOnce({ name: 'Valid', summary: 'ok' }); // community 1 — valid
+
+      await service.buildCommunities(USER_ID, GROUP_ID);
+
+      const savedNodes = mockCommunityNodeRepository.saveBulk.mock.calls[0][0];
+      expect(savedNodes).toHaveLength(1);
+      expect(savedNodes[0].name).toBe('Valid');
+    });
   });
 });

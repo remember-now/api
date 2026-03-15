@@ -85,5 +85,32 @@ describe('SagaNodeRepository', () => {
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
     });
+
+    it('should apply uuid less-than cursor clause when uuidCursor is provided', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.stringContaining('n.uuid < $uuidCursor'),
+        expect.objectContaining({ uuidCursor: 'cursor-uuid' }),
+      );
+    });
+
+    it('should include ORDER BY n.uuid DESC', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY n.uuid DESC'),
+        expect.anything(),
+      );
+    });
+
+    it('should not include cursor clause when uuidCursor is omitted', async () => {
+      neo4j.runQuery.mockResolvedValue([]);
+      await repo.getByGroupIds(['group-1']);
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.not.stringContaining('$uuidCursor'),
+        expect.anything(),
+      );
+    });
   });
 });

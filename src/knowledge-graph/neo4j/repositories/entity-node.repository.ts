@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { EntityNode } from '@/knowledge-graph/models/nodes/entity-node';
+import { validateNodeLabels } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
@@ -9,6 +10,9 @@ export class EntityNodeRepository {
   constructor(private readonly neo4j: Neo4jService) {}
 
   async save(node: EntityNode): Promise<string> {
+    validateNodeLabels(node.labels);
+    const labelStr = [...new Set(node.labels)].join(':');
+
     const props: Record<string, unknown> = {
       name: node.name,
       group_id: node.groupId,
@@ -19,7 +23,8 @@ export class EntityNodeRepository {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
-        `MERGE (n:Entity {uuid: $uuid})
+        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
          RETURN n.uuid AS uuid`,
@@ -28,7 +33,8 @@ export class EntityNodeRepository {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
-        `MERGE (n:Entity {uuid: $uuid})
+        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
         { uuid: node.uuid, props },
@@ -90,18 +96,18 @@ export class EntityNodeRepository {
   async getByGroupIds(
     groupIds: string[],
     limit?: number,
-    uuidCursor?: string,
   ): Promise<EntityNode[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND n.uuid > $uuidCursor' : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
+    const params: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Entity) WHERE n.group_id IN $groupIds ${cursorClause}
+      `MATCH (n:Entity) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,
               labels(n) AS labels
        ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -111,10 +117,7 @@ export class EntityNodeRepository {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string) ?? '',
       attributes: row['attributes']
         ? (JSON.parse(row['attributes'] as string) as Record<string, unknown>)

@@ -55,6 +55,25 @@ describe('NodeResolutionService', () => {
     expect(result.resolvedNodes).toHaveLength(0);
   });
 
+  it('should add duplicate pair for exact name match', async () => {
+    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    existing[0].uuid = 'existing-uuid';
+
+    const result = await service.resolveNodes(
+      mockModel,
+      baseEpisode,
+      extracted,
+      existing,
+    );
+
+    expect(result.duplicatePairs).toHaveLength(1);
+    expect(result.duplicatePairs[0]).toEqual({
+      extractedUuid: extracted[0].uuid,
+      canonicalUuid: 'existing-uuid',
+    });
+  });
+
   it('should resolve single cosine match above threshold without LLM call', async () => {
     const extracted = [makeNode('Alice Johnson', HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('Alice J.', NEAR_SAME_EMBEDDING)];
@@ -81,7 +100,7 @@ describe('NodeResolutionService', () => {
 
     mockRunnable.invoke.mockResolvedValue({
       entity_resolutions: [
-        { uuid: extracted[0].uuid, duplicate_of: 'exist-1' },
+        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
       ],
     });
 
@@ -96,7 +115,7 @@ describe('NodeResolutionService', () => {
     expect(result.uuidMap.get(extracted[0].uuid)).toBe('exist-1');
   });
 
-  it('should add node to resolvedNodes when LLM returns duplicate_of null', async () => {
+  it('should add duplicate pair when LLM returns a duplicate_name match', async () => {
     const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
     const existing = [
       { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
@@ -104,7 +123,34 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ uuid: extracted[0].uuid, duplicate_of: null }],
+      entity_resolutions: [
+        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
+      ],
+    });
+
+    const result = await service.resolveNodes(
+      mockModel,
+      baseEpisode,
+      extracted,
+      existing,
+    );
+
+    expect(result.duplicatePairs).toHaveLength(1);
+    expect(result.duplicatePairs[0]).toEqual({
+      extractedUuid: extracted[0].uuid,
+      canonicalUuid: 'exist-1',
+    });
+  });
+
+  it('should add node to resolvedNodes when LLM returns empty duplicate_name', async () => {
+    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const existing = [
+      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+    ];
+
+    mockRunnable.invoke.mockResolvedValue({
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: '' }],
     });
 
     const result = await service.resolveNodes(
@@ -118,9 +164,10 @@ describe('NodeResolutionService', () => {
     expect(result.resolvedNodes).toContainEqual(
       expect.objectContaining({ uuid: extracted[0].uuid }),
     );
+    expect(result.duplicatePairs).toHaveLength(0);
   });
 
-  it('should map uuid when LLM returns duplicate_of existing uuid', async () => {
+  it('should map uuid when LLM returns duplicate_name matching an existing node', async () => {
     const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
     const existing = [
       { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
@@ -129,7 +176,7 @@ describe('NodeResolutionService', () => {
 
     mockRunnable.invoke.mockResolvedValue({
       entity_resolutions: [
-        { uuid: extracted[0].uuid, duplicate_of: 'exist-1' },
+        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
       ],
     });
 
@@ -141,6 +188,27 @@ describe('NodeResolutionService', () => {
     );
 
     expect(result.uuidMap.get(extracted[0].uuid)).toBe('exist-1');
+  });
+
+  it('should apply canonical name from LLM when different from extracted name', async () => {
+    const extracted = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    const existing = [
+      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+    ];
+
+    mockRunnable.invoke.mockResolvedValue({
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: '' }],
+    });
+
+    const result = await service.resolveNodes(
+      mockModel,
+      baseEpisode,
+      extracted,
+      existing,
+    );
+
+    expect(result.resolvedNodes[0].name).toBe('Alice');
   });
 
   it('should bypass cosine for low-entropy names and go to LLM', async () => {
@@ -155,7 +223,7 @@ describe('NodeResolutionService', () => {
 
     mockRunnable.invoke.mockResolvedValue({
       entity_resolutions: [
-        { uuid: extracted[0].uuid, duplicate_of: 'nyc-exist' },
+        { id: 0, name: 'NYC', duplicate_name: 'New York City' },
       ],
     });
 
@@ -186,5 +254,6 @@ describe('NodeResolutionService', () => {
     expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
     expect(result.resolvedNodes).toHaveLength(2);
     expect(result.uuidMap.size).toBe(0);
+    expect(result.duplicatePairs).toHaveLength(0);
   });
 });

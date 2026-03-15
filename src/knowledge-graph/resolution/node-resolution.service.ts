@@ -21,6 +21,7 @@ import {
 export interface NodeResolutionResult {
   resolvedNodes: EntityNode[];
   uuidMap: Map<string, string>;
+  duplicatePairs: Array<{ extractedUuid: string; canonicalUuid: string }>;
 }
 
 @Injectable()
@@ -34,6 +35,10 @@ export class NodeResolutionService {
     customInstructions?: string,
   ): Promise<NodeResolutionResult> {
     const uuidMap = new Map<string, string>();
+    const duplicatePairs: Array<{
+      extractedUuid: string;
+      canonicalUuid: string;
+    }> = [];
     const llmCandidates = new Map<string, EntityNode[]>();
 
     for (const extracted of extractedNodes) {
@@ -45,6 +50,10 @@ export class NodeResolutionService {
       );
       if (exactMatch) {
         uuidMap.set(extracted.uuid, exactMatch.uuid);
+        duplicatePairs.push({
+          extractedUuid: extracted.uuid,
+          canonicalUuid: exactMatch.uuid,
+        });
         continue;
       }
 
@@ -75,6 +84,10 @@ export class NodeResolutionService {
         if (scored.length === 1) {
           // Deterministic single match
           uuidMap.set(extracted.uuid, scored[0].node.uuid);
+          duplicatePairs.push({
+            extractedUuid: extracted.uuid,
+            canonicalUuid: scored[0].node.uuid,
+          });
           continue;
         } else if (scored.length > 1) {
           llmCandidates.set(
@@ -89,9 +102,11 @@ export class NodeResolutionService {
 
     // Batch LLM call for all ambiguous nodes
     if (llmCandidates.size > 0) {
-      const llmExtracted = extractedNodes
+      const llmExtractedWithIdx = extractedNodes
         .filter((n) => llmCandidates.has(n.uuid))
-        .map((n) => ({ uuid: n.uuid, name: n.name }));
+        .map((n, idx) => ({ id: idx, name: n.name, uuid: n.uuid }));
+
+      const idxToUuid = new Map(llmExtractedWithIdx.map((e) => [e.id, e.uuid]));
 
       // Collect unique candidate nodes across all batches
       const candidateSet = new Map<string, EntityNode>();
@@ -101,14 +116,20 @@ export class NodeResolutionService {
         }
       }
       const allCandidates = Array.from(candidateSet.values()).map((n) => ({
-        uuid: n.uuid,
         name: n.name,
       }));
+
+      const existingByName = new Map(
+        existingNodes.map((n) => [n.name.toLowerCase(), n]),
+      );
 
       const messages = buildDedupeNodesMessages({
         episode,
         previousEpisodes,
-        extractedNodes: llmExtracted,
+        extractedNodes: llmExtractedWithIdx.map(({ id, name }) => ({
+          id,
+          name,
+        })),
         candidateNodes: allCandidates,
         customInstructions,
       });
@@ -122,20 +143,36 @@ export class NodeResolutionService {
         ? parsed.data.entity_resolutions
         : [];
 
-      const existingByUuid = new Map(existingNodes.map((n) => [n.uuid, n]));
-
       for (const resolution of resolutions) {
-        if (
-          resolution.duplicate_of !== null &&
-          existingByUuid.has(resolution.duplicate_of)
-        ) {
-          uuidMap.set(resolution.uuid, resolution.duplicate_of);
+        const extractedUuid = idxToUuid.get(resolution.id);
+        if (!extractedUuid) continue;
+
+        if (resolution.duplicate_name && resolution.duplicate_name !== '') {
+          const canonical = existingByName.get(
+            resolution.duplicate_name.toLowerCase(),
+          );
+          if (canonical) {
+            uuidMap.set(extractedUuid, canonical.uuid);
+            duplicatePairs.push({
+              extractedUuid,
+              canonicalUuid: canonical.uuid,
+            });
+            continue;
+          }
+        }
+
+        // Apply canonical name if LLM returned a better one
+        if (resolution.name) {
+          const node = extractedNodes.find((n) => n.uuid === extractedUuid);
+          if (node && resolution.name !== node.name) {
+            node.name = resolution.name;
+          }
         }
       }
     }
 
     const resolvedNodes = extractedNodes.filter((n) => !uuidMap.has(n.uuid));
 
-    return { resolvedNodes, uuidMap };
+    return { resolvedNodes, uuidMap, duplicatePairs };
   }
 }

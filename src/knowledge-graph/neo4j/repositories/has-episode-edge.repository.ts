@@ -72,13 +72,13 @@ export class HasEpisodeEdgeRepository {
     uuidCursor?: string,
   ): Promise<HasEpisodeEdge[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    const cursorClause = uuidCursor ? 'AND e.uuid > $uuidCursor' : '';
+    const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
       `MATCH (saga:Saga)-[e:HAS_EPISODE]->(episode:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               saga.uuid AS source_node_uuid, episode.uuid AS target_node_uuid
-       ${limitClause}`,
+       ORDER BY e.uuid DESC ${limitClause}`,
       { groupIds, uuidCursor: uuidCursor ?? null },
     );
     return results.map((r) => this.mapRow(r));
@@ -88,10 +88,7 @@ export class HasEpisodeEdgeRepository {
     return {
       uuid: row['uuid'] as string,
       groupId: row['group_id'] as string,
-      createdAt:
-        row['created_at'] instanceof Date
-          ? row['created_at']
-          : new Date(row['created_at'] as string),
+      createdAt: row['created_at'] as Date,
       sourceNodeUuid: row['source_node_uuid'] as string,
       targetNodeUuid: row['target_node_uuid'] as string,
     };

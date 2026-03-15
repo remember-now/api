@@ -72,7 +72,6 @@ describe('EpisodicNodeRepository', () => {
           source_description: '',
           content: 'content',
           valid_at: validAt,
-          entity_edges: [],
         },
       ]);
       const result = await repo.getByUuid(node.uuid);

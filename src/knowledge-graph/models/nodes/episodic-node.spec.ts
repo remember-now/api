@@ -16,7 +16,6 @@ describe('EpisodicNode', () => {
       expect(node.validAt).toBe(validAt);
       expect(node.source).toBe(EpisodeType.text);
       expect(node.sourceDescription).toBe('');
-      expect(node.entityEdges).toEqual([]);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.groupId).toBe('');
@@ -30,16 +29,6 @@ describe('EpisodicNode', () => {
         source: EpisodeType.message,
       });
       expect(node.source).toBe(EpisodeType.message);
-    });
-
-    it('should allow overriding entityEdges', () => {
-      const node = createEpisodicNode({
-        name: 'Episode',
-        content: 'content',
-        validAt,
-        entityEdges: ['edge-uuid-1', 'edge-uuid-2'],
-      });
-      expect(node.entityEdges).toEqual(['edge-uuid-1', 'edge-uuid-2']);
     });
   });
 

@@ -33,7 +33,7 @@ import {
 } from './episode.types';
 import { buildNodeSummaryMessages } from './node-summary.prompts';
 
-const PREVIOUS_EPISODES_WINDOW = 5;
+const PREVIOUS_EPISODES_WINDOW = 20;
 
 @Injectable()
 export class EpisodeService {
@@ -126,6 +126,7 @@ export class EpisodeService {
       episode,
       canonicalNodes,
       previousEpisodes,
+      referenceTime,
       customInstructions,
     );
 
@@ -233,8 +234,10 @@ export class EpisodeService {
       }
     }
 
-    // 14. Build communities
-    await this.communityService.buildCommunities(userId, groupId);
+    // 14. Build communities (opt-in)
+    if (options.updateCommunities) {
+      await this.communityService.buildCommunities(userId, groupId);
+    }
 
     return {
       episode,

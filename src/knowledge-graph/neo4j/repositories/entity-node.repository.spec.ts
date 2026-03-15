@@ -1,6 +1,7 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { createEntityNode } from '@/knowledge-graph/models/nodes/entity-node';
+import { NodeLabelValidationError } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 import { EntityNodeRepository } from './entity-node.repository';
@@ -28,6 +29,30 @@ describe('EntityNodeRepository', () => {
         expect.objectContaining({ uuid: node.uuid }),
       );
       expect(result).toBe(node.uuid);
+    });
+
+    it('should include all labels in MERGE when node has multiple labels', async () => {
+      const node = createEntityNode({
+        name: 'Test',
+        labels: ['Entity', 'Person'],
+      });
+      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      await repo.save(node);
+      expect(neo4j.runQuery).toHaveBeenCalledWith(
+        expect.stringContaining('MERGE (n:Entity:Person'),
+        expect.anything(),
+      );
+    });
+
+    it('should throw NodeLabelValidationError for unsafe label', async () => {
+      const node = createEntityNode({
+        name: 'Test',
+        labels: ['Entity) WITH n MATCH (x'],
+      });
+      await expect(repo.save(node)).rejects.toBeInstanceOf(
+        NodeLabelValidationError,
+      );
+      expect(neo4j.runQuery).not.toHaveBeenCalled();
     });
 
     it('should use vector property call when nameEmbedding is present', async () => {
@@ -174,21 +199,12 @@ describe('EntityNodeRepository', () => {
       );
     });
 
-    it('should include LIMIT clause when limit is provided', async () => {
+    it('should include LIMIT $limit clause and pass limit as parameter', async () => {
       neo4j.runQuery.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1'], 10);
       expect(neo4j.runQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT 10'),
-        expect.anything(),
-      );
-    });
-
-    it('should include cursor clause when uuidCursor is provided', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1'], undefined, 'cursor-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
-        expect.stringContaining('uuid > $uuidCursor'),
-        expect.objectContaining({ uuidCursor: 'cursor-uuid' }),
+        expect.stringContaining('LIMIT $limit'),
+        expect.objectContaining({ limit: 10 }),
       );
     });
   });
