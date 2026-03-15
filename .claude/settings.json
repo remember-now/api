@@ -32,7 +32,9 @@
       "Bash(npx install:*)",
       "Bash(du:*)",
       "Bash(df:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs"
     ],
     "deny": ["Read(./.env)", "Read(~/.aws/**)"]
   },

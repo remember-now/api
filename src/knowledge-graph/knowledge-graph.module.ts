@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 
+import { EmbeddingConfigModule } from '@/config/embedding';
+
+import { EmbeddingService } from './embedding';
 import { EdgeExtractionService, NodeExtractionService } from './extraction';
 import { Neo4jModule } from './neo4j/neo4j.module';
 import {
@@ -13,6 +16,7 @@ import {
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
 } from './neo4j/repositories';
+import { EdgeResolutionService, NodeResolutionService } from './resolution';
 
 const repositories = [
   EntityNodeRepository,
@@ -28,9 +32,21 @@ const repositories = [
 
 const extractionServices = [NodeExtractionService, EdgeExtractionService];
 
+const resolutionServices = [NodeResolutionService, EdgeResolutionService];
+
 @Module({
-  imports: [Neo4jModule],
-  providers: [...repositories, ...extractionServices],
-  exports: [...repositories, ...extractionServices],
+  imports: [Neo4jModule, EmbeddingConfigModule],
+  providers: [
+    ...repositories,
+    ...extractionServices,
+    EmbeddingService,
+    ...resolutionServices,
+  ],
+  exports: [
+    ...repositories,
+    ...extractionServices,
+    EmbeddingService,
+    ...resolutionServices,
+  ],
 })
 export class KnowledgeGraphModule {}
