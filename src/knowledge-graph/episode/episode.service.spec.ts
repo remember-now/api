@@ -3,6 +3,7 @@ import { mockDeep } from 'jest-mock-extended';
 
 import { LlmService } from '@/llm/llm.service';
 
+import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { createEntityEdge } from '../models/edges';
@@ -58,6 +59,7 @@ describe('EpisodeService', () => {
   let service: EpisodeService;
 
   let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
+  let mockCommunityService: ReturnType<typeof mockDeep<CommunityService>>;
   let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
   let mockNodeExtractionService: ReturnType<
     typeof mockDeep<NodeExtractionService>
@@ -96,6 +98,7 @@ describe('EpisodeService', () => {
 
   beforeEach(() => {
     mockLlmService = mockDeep<LlmService>();
+    mockCommunityService = mockDeep<CommunityService>();
     mockEmbeddingService = mockDeep<EmbeddingService>();
     mockNodeExtractionService = mockDeep<NodeExtractionService>();
     mockEdgeExtractionService = mockDeep<EdgeExtractionService>();
@@ -115,6 +118,7 @@ describe('EpisodeService', () => {
 
     service = new EpisodeService(
       mockLlmService,
+      mockCommunityService,
       mockEmbeddingService,
       mockNodeExtractionService,
       mockEdgeExtractionService,
@@ -151,6 +155,7 @@ describe('EpisodeService', () => {
     mockEntityNodeRepository.saveBulk.mockResolvedValue(undefined);
     mockEntityEdgeRepository.saveBulk.mockResolvedValue(undefined);
     mockRunnable.invoke.mockResolvedValue({ summaries: [] });
+    mockCommunityService.buildCommunities.mockResolvedValue(undefined);
   });
 
   it('should save episode node before extraction', async () => {
@@ -423,5 +428,20 @@ describe('EpisodeService', () => {
     await service.addEpisode(baseOptions);
 
     expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+  });
+
+  it('should call communityService.buildCommunities with userId and groupId after persist', async () => {
+    await service.addEpisode(baseOptions);
+
+    expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
+      USER_ID,
+      GROUP_ID,
+    );
+
+    const persistOrder =
+      mockEntityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+    const communityOrder =
+      mockCommunityService.buildCommunities.mock.invocationCallOrder[0];
+    expect(persistOrder).toBeLessThan(communityOrder);
   });
 });

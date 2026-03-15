@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { LlmService } from '@/llm/llm.service';
 
+import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import {
@@ -38,6 +39,7 @@ const PREVIOUS_EPISODES_WINDOW = 5;
 export class EpisodeService {
   constructor(
     private readonly llmService: LlmService,
+    private readonly communityService: CommunityService,
     private readonly embeddingService: EmbeddingService,
     private readonly nodeExtractionService: NodeExtractionService,
     private readonly edgeExtractionService: EdgeExtractionService,
@@ -230,6 +232,9 @@ export class EpisodeService {
         );
       }
     }
+
+    // 14. Build communities
+    await this.communityService.buildCommunities(userId, groupId);
 
     return {
       episode,

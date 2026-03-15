@@ -1,0 +1,132 @@
+import { randomUUID } from 'crypto';
+
+import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
+
+import { LlmService } from '@/llm/llm.service';
+
+import { createCommunityEdge } from '../models/edges/community-edge';
+import { createCommunityNode } from '../models/nodes/community-node';
+import { Neo4jService } from '../neo4j/neo4j.service';
+import {
+  CommunityEdgeRepository,
+  CommunityNodeRepository,
+  EntityNodeRepository,
+} from '../neo4j/repositories';
+import { buildCommunitySummaryMessages } from './community-summary.prompts';
+
+export const CommunitySummarySchema = z.object({
+  name: z.string(),
+  summary: z.string(),
+});
+
+export const communitySummaryJsonSchema = z.toJSONSchema(
+  CommunitySummarySchema,
+);
+
+@Injectable()
+export class CommunityService {
+  constructor(
+    private readonly llmService: LlmService,
+    private readonly neo4jService: Neo4jService,
+    private readonly entityNodeRepository: EntityNodeRepository,
+    private readonly communityNodeRepository: CommunityNodeRepository,
+    private readonly communityEdgeRepository: CommunityEdgeRepository,
+  ) {}
+
+  async buildCommunities(userId: number, groupId: string): Promise<void> {
+    // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
+    const guardResult = await this.neo4jService.runQuery<{
+      hasEdges: boolean;
+    }>(
+      `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
+      { groupId },
+    );
+
+    if (!guardResult[0]?.hasEdges) {
+      await this.communityNodeRepository.deleteByGroupId(groupId);
+      return;
+    }
+
+    // 2. Get active model
+    const model = await this.llmService.getActiveModel(userId);
+
+    // 3. Project GDS graph
+    const graphName = `community-${randomUUID()}`;
+    await this.neo4jService.runQuery(
+      `MATCH (source:Entity {group_id: $groupId})-[r:RELATES_TO]-(target:Entity {group_id: $groupId})
+       WITH gds.graph.project($graphName, source, target) AS g
+       RETURN g.graphName, g.nodeCount, g.relationshipCount`,
+      { groupId, graphName },
+    );
+
+    let communityMap: Map<number, string[]>;
+
+    try {
+      // 4. Run Leiden
+      const leidenResults = await this.neo4jService.runQuery<{
+        uuid: string;
+        communityId: number;
+      }>(
+        `CALL gds.leiden.stream($graphName, { randomSeed: 42 })
+         YIELD nodeId, communityId
+         RETURN gds.util.asNode(nodeId).uuid AS uuid, communityId`,
+        { graphName },
+      );
+
+      // 6. Group entity UUIDs by communityId
+      communityMap = new Map<number, string[]>();
+      for (const row of leidenResults) {
+        const existing = communityMap.get(row.communityId) ?? [];
+        existing.push(row.uuid);
+        communityMap.set(row.communityId, existing);
+      }
+    } finally {
+      // 5. Drop projection (always)
+      await this.neo4jService.runQuery(
+        `CALL gds.graph.drop($graphName, false)`,
+        { graphName },
+      );
+    }
+
+    // 7. Delete old communities for this group
+    await this.communityNodeRepository.deleteByGroupId(groupId);
+
+    // 8. For each community, generate LLM summary
+    const communityNodes = [];
+    const communityEdges = [];
+
+    for (const [, memberUuids] of communityMap) {
+      const memberNodes =
+        await this.entityNodeRepository.getByUuids(memberUuids);
+
+      const messages = buildCommunitySummaryMessages({ nodes: memberNodes });
+
+      const result = await model
+        .withStructuredOutput(communitySummaryJsonSchema)
+        .invoke(messages);
+
+      const community = createCommunityNode({
+        name: result.name,
+        summary: result.summary,
+        groupId,
+      });
+      communityNodes.push(community);
+
+      const edges = memberUuids.map((uuid) =>
+        createCommunityEdge({
+          sourceNodeUuid: community.uuid,
+          targetNodeUuid: uuid,
+          groupId,
+        }),
+      );
+      communityEdges.push(...edges);
+    }
+
+    // 9. Persist all in parallel
+    await Promise.all([
+      this.communityNodeRepository.saveBulk(communityNodes),
+      this.communityEdgeRepository.saveBulk(communityEdges),
+    ]);
+  }
+}

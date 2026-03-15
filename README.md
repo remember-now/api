@@ -102,6 +102,15 @@ Check out a few resources that may come in handy when working with NestJS:
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
+## Acknowledgements
+
+The knowledge graph pipeline in this project is a TypeScript port of [Graphiti](https://github.com/getzep/graphiti) by Zep AI, adapted for this codebase for the following reasons:
+
+- Graphiti couples tightly to specific providers. This port integrates with [LangChain](https://js.langchain.com/) so any supported model can be swapped in without changing pipeline code.
+- Graphiti maintains provider abstractions for its graph layer. Since Neo4j is a first-class dependency here, those abstractions are unnecessary and have been replaced with direct Cypher and Neo4j GDS calls (e.g. Leiden community detection via `gds.leiden.stream`).
+- RememberNow is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
+- I am working on a Graph Versioning system to prevent data loss due to agent misbehavior.
+
 ## License
 
 RememberNow is licensed under [Apache-2.0](https://github.com/remember-now/api/blob/main/LICENSE).

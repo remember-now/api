@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { EmbeddingConfigModule } from '@/config/embedding';
 import { LlmModule } from '@/llm/llm.module';
 
+import { CommunityService } from './community';
 import { EmbeddingService } from './embedding';
 import { EpisodeService } from './episode';
 import { EdgeExtractionService, NodeExtractionService } from './extraction';
@@ -44,6 +45,7 @@ const resolutionServices = [NodeResolutionService, EdgeResolutionService];
     EmbeddingService,
     ...resolutionServices,
     EpisodeService,
+    CommunityService,
   ],
   exports: [
     ...repositories,
@@ -51,6 +53,7 @@ const resolutionServices = [NodeResolutionService, EdgeResolutionService];
     EmbeddingService,
     ...resolutionServices,
     EpisodeService,
+    CommunityService,
   ],
 })
 export class KnowledgeGraphModule {}
