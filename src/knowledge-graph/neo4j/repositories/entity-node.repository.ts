@@ -24,7 +24,7 @@ export class EntityNodeRepository {
     if (node.nameEmbedding) {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
         // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
-        `MERGE (n:${labelStr} {uuid: $uuid})
+        /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
          RETURN n.uuid AS uuid`,
@@ -34,7 +34,7 @@ export class EntityNodeRepository {
     } else {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
         // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
-        `MERGE (n:${labelStr} {uuid: $uuid})
+        /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
         { uuid: node.uuid, props },
@@ -49,28 +49,28 @@ export class EntityNodeRepository {
 
   async delete(uuid: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<EntityNode | null> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Entity {uuid: $uuid})
+      /* cypher */ `MATCH (n:Entity {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,
@@ -83,7 +83,7 @@ export class EntityNodeRepository {
 
   async getByUuids(uuids: string[]): Promise<EntityNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Entity) WHERE n.uuid IN $uuids
+      /* cypher */ `MATCH (n:Entity) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,
@@ -101,7 +101,7 @@ export class EntityNodeRepository {
     const params: Record<string, unknown> = { groupIds };
     if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Entity) WHERE n.group_id IN $groupIds
+      /* cypher */ `MATCH (n:Entity) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,

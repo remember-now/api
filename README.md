@@ -89,6 +89,14 @@ $ ./anti-flaky-test.sh 30
 
 The runner will exit immediately on first failure and display the failing test output. Test infrastructure is set up once and torn down automatically on completion or interruption.
 
+## Recommended VS Code Extensions
+
+- **Neo4j for VS Code** — Cypher syntax highlighting, linting, autocompletion, and query execution. Install via VS Code Quick Open (`Ctrl+P`):
+  ```
+  ext install neo4j-extensions.neo4j-for-vscode
+  ```
+  All Cypher queries in this codebase are tagged with `/* cypher */` (template literals) or `/*cypher*/` (single-line strings) to enable embedded syntax highlighting directly in TypeScript files.
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:

@@ -10,7 +10,7 @@ export class CommunityEdgeRepository {
 
   async save(edge: CommunityEdge): Promise<string> {
     const results = await this.neo4j.runQuery<{ uuid: string }>(
-      `MATCH (community:Community {uuid: $sourceNodeUuid})
+      /* cypher */ `MATCH (community:Community {uuid: $sourceNodeUuid})
        MATCH (entity:Entity {uuid: $targetNodeUuid})
        MERGE (community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity)
        SET e.group_id = $groupId, e.created_at = $createdAt
@@ -32,21 +32,21 @@ export class CommunityEdgeRepository {
 
   async delete(uuid: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH ()-[e:HAS_MEMBER {uuid: $uuid}]->() DELETE e',
+      '/*cypher*/ MATCH ()-[e:HAS_MEMBER {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH ()-[e:HAS_MEMBER]->() WHERE e.uuid IN $uuids DELETE e',
+      '/*cypher*/ MATCH ()-[e:HAS_MEMBER]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
   }
 
   async getByUuid(uuid: string): Promise<CommunityEdge | null> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (community:Community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity:Entity)
+      /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity:Entity)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid`,
       { uuid },
@@ -57,7 +57,7 @@ export class CommunityEdgeRepository {
 
   async getByUuids(uuids: string[]): Promise<CommunityEdge[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
+      /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.uuid IN $uuids
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid`,
@@ -72,7 +72,7 @@ export class CommunityEdgeRepository {
   ): Promise<CommunityEdge[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
+      /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid

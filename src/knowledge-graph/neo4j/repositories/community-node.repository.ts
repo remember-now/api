@@ -18,7 +18,7 @@ export class CommunityNodeRepository {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
-        `MERGE (n:Community {uuid: $uuid})
+        /* cypher */ `MERGE (n:Community {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
          RETURN n.uuid AS uuid`,
@@ -27,7 +27,7 @@ export class CommunityNodeRepository {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.runQuery<{ uuid: string }>(
-        `MERGE (n:Community {uuid: $uuid})
+        /* cypher */ `MERGE (n:Community {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
         { uuid: node.uuid, props },
@@ -42,28 +42,28 @@ export class CommunityNodeRepository {
 
   async delete(uuid: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Community {uuid: $uuid}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Community {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Community) WHERE n.uuid IN $uuids DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Community) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Community {group_id: $groupId}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Community {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<CommunityNode | null> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Community {uuid: $uuid})
+      /* cypher */ `MATCH (n:Community {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding`,
@@ -75,7 +75,7 @@ export class CommunityNodeRepository {
 
   async getByUuids(uuids: string[]): Promise<CommunityNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Community) WHERE n.uuid IN $uuids
+      /* cypher */ `MATCH (n:Community) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding`,
@@ -90,7 +90,7 @@ export class CommunityNodeRepository {
   ): Promise<CommunityNode[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Community) WHERE n.group_id IN $groupIds
+      /* cypher */ `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding

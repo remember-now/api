@@ -11,7 +11,7 @@ export class EpisodicNodeRepository {
 
   async save(node: EpisodicNode): Promise<string> {
     const results = await this.neo4j.runQuery<{ uuid: string }>(
-      `MERGE (n:Episodic {uuid: $uuid})
+      /* cypher */ `MERGE (n:Episodic {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
       {
@@ -36,28 +36,28 @@ export class EpisodicNodeRepository {
 
   async delete(uuid: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Episodic) WHERE n.uuid IN $uuids DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Episodic) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Episodic {group_id: $groupId}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Episodic {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<EpisodicNode | null> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Episodic {uuid: $uuid})
+      /* cypher */ `MATCH (n:Episodic {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
@@ -70,7 +70,7 @@ export class EpisodicNodeRepository {
 
   async getByUuids(uuids: string[]): Promise<EpisodicNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Episodic) WHERE n.uuid IN $uuids
+      /* cypher */ `MATCH (n:Episodic) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
@@ -88,7 +88,7 @@ export class EpisodicNodeRepository {
     const params: Record<string, unknown> = { groupIds };
     if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Episodic) WHERE n.group_id IN $groupIds
+      /* cypher */ `MATCH (n:Episodic) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
@@ -101,7 +101,7 @@ export class EpisodicNodeRepository {
 
   async getByEntityNodeUuid(entityNodeUuid: string): Promise<EpisodicNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (e:Episodic)-[:MENTIONS]->(:Entity {uuid: $entityNodeUuid})
+      /* cypher */ `MATCH (e:Episodic)-[:MENTIONS]->(:Entity {uuid: $entityNodeUuid})
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
               e.source_description AS source_description, e.content AS content,
@@ -119,7 +119,7 @@ export class EpisodicNodeRepository {
     sagaUuid?: string,
   ): Promise<EpisodicNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (e:Episodic)
+      /* cypher */ `MATCH (e:Episodic)
        WHERE e.valid_at <= $referenceTime
        AND ($groupIds IS NULL OR e.group_id IN $groupIds)
        AND ($source IS NULL OR e.source = $source)

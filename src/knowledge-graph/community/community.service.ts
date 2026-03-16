@@ -39,7 +39,7 @@ export class CommunityService {
     const guardResult = await this.neo4jService.runQuery<{
       hasEdges: boolean;
     }>(
-      `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
+      /* cypher */ `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
       { groupId },
     );
 
@@ -54,7 +54,7 @@ export class CommunityService {
     // 3. Project GDS graph
     const graphName = `community-${randomUUID()}`;
     await this.neo4jService.runQuery(
-      `MATCH (source:Entity {group_id: $groupId})-[r:RELATES_TO]-(target:Entity {group_id: $groupId})
+      /* cypher */ `MATCH (source:Entity {group_id: $groupId})-[r:RELATES_TO]-(target:Entity {group_id: $groupId})
        WITH gds.graph.project($graphName, source, target) AS g
        RETURN g.graphName, g.nodeCount, g.relationshipCount`,
       { groupId, graphName },
@@ -68,7 +68,7 @@ export class CommunityService {
         uuid: string;
         communityId: number;
       }>(
-        `CALL gds.leiden.stream($graphName, { randomSeed: 42 })
+        /* cypher */ `CALL gds.leiden.stream($graphName, { randomSeed: 42 })
          YIELD nodeId, communityId
          RETURN gds.util.asNode(nodeId).uuid AS uuid, communityId`,
         { graphName },
@@ -84,7 +84,7 @@ export class CommunityService {
     } finally {
       // 5. Drop projection (always)
       await this.neo4jService.runQuery(
-        `CALL gds.graph.drop($graphName, false)`,
+        /* cypher */ `CALL gds.graph.drop($graphName, false)`,
         { graphName },
       );
     }

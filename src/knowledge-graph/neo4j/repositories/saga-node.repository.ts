@@ -10,7 +10,7 @@ export class SagaNodeRepository {
 
   async save(node: SagaNode): Promise<string> {
     const results = await this.neo4j.runQuery<{ uuid: string }>(
-      `MERGE (n:Saga {uuid: $uuid})
+      /* cypher */ `MERGE (n:Saga {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
       {
@@ -30,28 +30,29 @@ export class SagaNodeRepository {
   }
 
   async delete(uuid: string): Promise<void> {
-    await this.neo4j.runQuery('MATCH (n:Saga {uuid: $uuid}) DETACH DELETE n', {
-      uuid,
-    });
+    await this.neo4j.runQuery(
+      '/*cypher*/ MATCH (n:Saga {uuid: $uuid}) DETACH DELETE n',
+      { uuid },
+    );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Saga) WHERE n.uuid IN $uuids DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Saga) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
     await this.neo4j.runQuery(
-      'MATCH (n:Saga {group_id: $groupId}) DETACH DELETE n',
+      '/*cypher*/ MATCH (n:Saga {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<SagaNode | null> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Saga {uuid: $uuid})
+      /* cypher */ `MATCH (n:Saga {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at`,
       { uuid },
@@ -62,7 +63,7 @@ export class SagaNodeRepository {
 
   async getByUuids(uuids: string[]): Promise<SagaNode[]> {
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Saga) WHERE n.uuid IN $uuids
+      /* cypher */ `MATCH (n:Saga) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at`,
       { uuids },
@@ -78,7 +79,7 @@ export class SagaNodeRepository {
     const limitClause = limit ? `LIMIT ${limit}` : '';
     const cursorClause = uuidCursor ? 'AND n.uuid < $uuidCursor' : '';
     const results = await this.neo4j.runQuery<Record<string, unknown>>(
-      `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
+      /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at
        ORDER BY n.uuid DESC ${limitClause}`,
