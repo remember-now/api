@@ -1,10 +1,17 @@
 services:
   postgres:
+    # Volume needed for test run (prisma migrations)
+    # infra:test:rm destroys all volumes on test suite end
     restart: 'no'
 
   redis:
     volumes: []
     restart: 'no'
 
+  neo4j:
+    volumes: []
+    restart: 'no'
+
   app:
+    # App runs on host for e2e tests
     profiles: [disabled]
