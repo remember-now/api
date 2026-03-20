@@ -8,16 +8,29 @@ import { EntityNode } from '../models/nodes';
 
 @Injectable()
 export class EmbeddingService {
-  private readonly model: GoogleGenerativeAIEmbeddings;
+  private readonly model: GoogleGenerativeAIEmbeddings | null;
 
   constructor(embeddingConfig: EmbeddingConfigService) {
+    if (!embeddingConfig.embeddingEnabled) {
+      this.model = null;
+      return;
+    }
+    const apiKey = embeddingConfig.apiKey;
+    if (!apiKey) {
+      throw new Error(
+        'EMBEDDING_API_KEY is required when EMBEDDING_ENABLED is true',
+      );
+    }
+
     this.model = new GoogleGenerativeAIEmbeddings({
-      apiKey: embeddingConfig.apiKey,
+      apiKey,
       model: embeddingConfig.model,
     });
   }
 
   async embedNodes(nodes: EntityNode[]): Promise<EntityNode[]> {
+    if (this.model === null) return nodes;
+
     const toEmbed = nodes.filter((n) => n.nameEmbedding === null);
     if (toEmbed.length === 0) return nodes;
 
@@ -31,6 +44,8 @@ export class EmbeddingService {
   }
 
   async embedEdges(edges: EntityEdge[]): Promise<EntityEdge[]> {
+    if (this.model === null) return edges;
+
     const toEmbed = edges.filter((e) => e.factEmbedding === null);
     if (toEmbed.length === 0) return edges;
 

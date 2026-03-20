@@ -5,8 +5,12 @@ import { ConfigService } from '@nestjs/config';
 export class EmbeddingConfigService {
   constructor(private readonly configService: ConfigService) {}
 
-  get apiKey(): string {
-    return this.configService.get<string>('embedding.apiKey')!;
+  get embeddingEnabled(): boolean {
+    return this.configService.get<boolean>('embedding.embeddingEnabled')!;
+  }
+
+  get apiKey(): string | undefined {
+    return this.configService.get<string>('embedding.apiKey');
   }
 
   get model(): string {
