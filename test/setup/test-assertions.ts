@@ -2,9 +2,13 @@ import { handler, spec } from 'pactum';
 import { ExpectHandlerContext } from 'pactum/src/exports/handler';
 
 import {
+  LlmConfigResponse,
+  LlmConfigResponseSchema,
+  LlmProvidersListSchema,
   LoginResponseSchema,
   LogoutResponseSchema,
   SignupResponseSchema,
+  TestConfigResponseSchema,
   UserWithoutPassword,
   UserWithoutPasswordSchema,
 } from '@test/types';
@@ -163,6 +167,90 @@ export class TestAssertions {
         throw new Error(`Expected status 403 but got ${ctx.res.statusCode}`);
       }
     });
+
+    handler.addExpectHandler(
+      'validLlmConfigResponse',
+      (ctx: ExpectHandlerContext) => {
+        if (ctx.res.statusCode !== 200) {
+          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+        }
+
+        const result = LlmConfigResponseSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid LlmConfigResponse: ${result.error.message}`,
+          );
+        }
+        const body = result.data as Record<string, unknown>;
+        const assertions = ctx.data as Partial<LlmConfigResponse> | undefined;
+
+        if (assertions) {
+          for (const [key, value] of Object.entries(assertions)) {
+            if (body[key] !== value) {
+              throw new Error(
+                `Expected ${key} to be ${String(value)} but got ${String(body[key])}`,
+              );
+            }
+          }
+        }
+      },
+    );
+
+    handler.addExpectHandler(
+      'validProvidersList',
+      (ctx: ExpectHandlerContext) => {
+        if (ctx.res.statusCode !== 200) {
+          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+        }
+
+        const result = LlmProvidersListSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid LlmProvidersList: ${result.error.message}`,
+          );
+        }
+        const body = result.data;
+
+        const assertions = ctx.data as
+          | { activeProvider?: string | null }
+          | undefined;
+
+        if (assertions?.activeProvider !== undefined) {
+          if (body.activeProvider !== assertions.activeProvider) {
+            throw new Error(
+              `Expected activeProvider to be ${String(assertions.activeProvider)} but got ${String(body.activeProvider)}`,
+            );
+          }
+        }
+      },
+    );
+
+    handler.addExpectHandler(
+      'validTestConfigResponse',
+      (ctx: ExpectHandlerContext) => {
+        if (ctx.res.statusCode !== 200) {
+          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+        }
+
+        const result = TestConfigResponseSchema.safeParse(ctx.res.json);
+        if (!result.success) {
+          throw new Error(
+            `Response is not a valid TestConfigResponse: ${result.error.message}`,
+          );
+        }
+        const body = result.data;
+        const assertions = ctx.data as { success?: boolean } | undefined;
+
+        if (
+          assertions?.success !== undefined &&
+          body.success !== assertions.success
+        ) {
+          throw new Error(
+            `Expected success to be ${String(assertions.success)} but got ${String(body.success)}`,
+          );
+        }
+      },
+    );
 
     handler.addExpectHandler(
       'successfulLogout',
