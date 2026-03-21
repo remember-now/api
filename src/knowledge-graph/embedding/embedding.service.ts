@@ -6,11 +6,19 @@ import { EmbeddingConfigService } from '@/config/embedding';
 import { EntityEdge } from '../models/edges';
 import { EntityNode } from '../models/nodes';
 
+/** Output dimensions for known Google embedding models. */
+const MODEL_DIMENSIONS: Record<string, number> = {
+  'text-embedding-004': 768,
+};
+
 @Injectable()
 export class EmbeddingService {
   private readonly model: GoogleGenerativeAIEmbeddings | null;
+  private readonly modelName: string;
 
   constructor(embeddingConfig: EmbeddingConfigService) {
+    this.modelName = embeddingConfig.model;
+
     if (!embeddingConfig.embeddingEnabled) {
       this.model = null;
       return;
@@ -24,8 +32,19 @@ export class EmbeddingService {
 
     this.model = new GoogleGenerativeAIEmbeddings({
       apiKey,
-      model: embeddingConfig.model,
+      model: this.modelName,
     });
+  }
+
+  /** Output dimension of the configured embedding model. */
+  get dimensions(): number {
+    const dim = MODEL_DIMENSIONS[this.modelName];
+    if (dim === undefined) {
+      throw new Error(
+        `Unknown embedding model "${this.modelName}". Add it to MODEL_DIMENSIONS in embedding.service.ts.`,
+      );
+    }
+    return dim;
   }
 
   async embedNodes(nodes: EntityNode[]): Promise<EntityNode[]> {

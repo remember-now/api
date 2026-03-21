@@ -1,12 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { CommunityNode } from '@/knowledge-graph/models/nodes/community-node';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { luceneSanitize } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
-export class CommunityNodeRepository {
-  constructor(private readonly neo4j: Neo4jService) {}
+export class CommunityNodeRepository implements OnModuleInit {
+  constructor(
+    private readonly neo4j: Neo4jService,
+    private readonly embeddingService: EmbeddingService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await Promise.all([
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE FULLTEXT INDEX community_names IF NOT EXISTS
+         FOR (n:Community) ON EACH [n.name, n.summary]`,
+        {},
+      ),
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
+         FOR (n:Community) ON n.name_embedding
+         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+        { dims: this.embeddingService.dimensions },
+      ),
+    ]);
+  }
 
   async save(node: CommunityNode): Promise<string> {
     const props: Record<string, unknown> = {
@@ -96,6 +117,42 @@ export class CommunityNodeRepository {
               n.name_embedding AS name_embedding
        ${limitClause}`,
       { groupIds },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchByName(
+    query: string,
+    groupIds: string[],
+    limit: number,
+  ): Promise<CommunityNode[]> {
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.fulltext.queryNodes('community_names', $query)
+       YIELD node AS n, score
+       WHERE n.group_id IN $groupIds
+       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+              n.created_at AS created_at, n.summary AS summary,
+              n.name_embedding AS name_embedding
+       ORDER BY score DESC
+       LIMIT $limit`,
+      { query: luceneSanitize(query), groupIds, limit },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchBySimilarity(
+    embedding: number[],
+    groupIds: string[],
+    limit: number,
+  ): Promise<CommunityNode[]> {
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.vector.queryNodes('community_names_embedding', $limit, $embedding)
+       YIELD node AS n, score
+       WHERE n.group_id IN $groupIds
+       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+              n.created_at AS created_at, n.summary AS summary,
+              n.name_embedding AS name_embedding`,
+      { embedding, groupIds, limit },
     );
     return results.map((r) => this.mapRow(r));
   }

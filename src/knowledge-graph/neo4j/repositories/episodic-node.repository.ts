@@ -1,13 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { luceneSanitize } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
-export class EpisodicNodeRepository {
+export class EpisodicNodeRepository implements OnModuleInit {
   constructor(private readonly neo4j: Neo4jService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.neo4j.runQuery(
+      /* cypher */ `CREATE FULLTEXT INDEX episode_content IF NOT EXISTS
+       FOR (n:Episodic) ON EACH [n.content]`,
+      {},
+    );
+  }
 
   async save(node: EpisodicNode): Promise<string> {
     const results = await this.neo4j.runQuery<{ uuid: string }>(
@@ -137,6 +146,26 @@ export class EpisodicNodeRepository {
         sagaUuid: sagaUuid ?? null,
         lastN,
       },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchByContent(
+    query: string,
+    groupIds: string[],
+    limit: number,
+  ): Promise<EpisodicNode[]> {
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.fulltext.queryNodes('episode_content', $query)
+       YIELD node AS n, score
+       WHERE n.group_id IN $groupIds
+       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+              n.created_at AS created_at, n.source AS source,
+              n.source_description AS source_description, n.content AS content,
+              n.valid_at AS valid_at
+       ORDER BY score DESC
+       LIMIT $limit`,
+      { query: luceneSanitize(query), groupIds, limit },
     );
     return results.map((r) => this.mapRow(r));
   }

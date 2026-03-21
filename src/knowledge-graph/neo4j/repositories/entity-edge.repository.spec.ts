@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { createEntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
@@ -16,7 +17,7 @@ describe('EntityEdgeRepository', () => {
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
-    repo = new EntityEdgeRepository(neo4j);
+    repo = new EntityEdgeRepository(neo4j, mockDeep<EmbeddingService>());
   });
 
   afterEach(() => {

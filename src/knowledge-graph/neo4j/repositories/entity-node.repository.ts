@@ -1,13 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityNode } from '@/knowledge-graph/models/nodes/entity-node';
 import { validateNodeLabels } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import {
+  buildNodeFilterClause,
+  luceneSanitize,
+} from '@/knowledge-graph/search/search-filters';
+import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
-export class EntityNodeRepository {
-  constructor(private readonly neo4j: Neo4jService) {}
+export class EntityNodeRepository implements OnModuleInit {
+  constructor(
+    private readonly neo4j: Neo4jService,
+    private readonly embeddingService: EmbeddingService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await Promise.all([
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
+         FOR (n:Entity) ON EACH [n.name, n.summary]`,
+        {},
+      ),
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
+         FOR (n:Entity) ON n.name_embedding
+         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+        { dims: this.embeddingService.dimensions },
+      ),
+    ]);
+  }
 
   async save(node: EntityNode): Promise<string> {
     validateNodeLabels(node.labels);
@@ -108,6 +133,86 @@ export class EntityNodeRepository {
               labels(n) AS labels
        ${limitClause}`,
       params,
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchByName(
+    query: string,
+    groupIds: string[],
+    limit: number,
+    filters?: SearchFilters,
+  ): Promise<EntityNode[]> {
+    const { clause, params: filterParams } = filters
+      ? buildNodeFilterClause(filters, 'n')
+      : { clause: '', params: {} };
+    const whereExtra = clause ? ` AND ${clause}` : '';
+
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.fulltext.queryNodes('entity_names', $query)
+       YIELD node AS n, score
+       WHERE n.group_id IN $groupIds${whereExtra}
+       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+              n.created_at AS created_at, n.summary AS summary,
+              n.attributes AS attributes, n.name_embedding AS name_embedding,
+              labels(n) AS labels
+       ORDER BY score DESC
+       LIMIT $limit`,
+      { query: luceneSanitize(query), groupIds, limit, ...filterParams },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchBySimilarity(
+    embedding: number[],
+    groupIds: string[],
+    limit: number,
+    filters?: SearchFilters,
+  ): Promise<EntityNode[]> {
+    const { clause, params: filterParams } = filters
+      ? buildNodeFilterClause(filters, 'n')
+      : { clause: '', params: {} };
+    const whereExtra = clause ? ` AND ${clause}` : '';
+
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.vector.queryNodes('entity_names_embedding', $limit, $embedding)
+       YIELD node AS n, score
+       WHERE n.group_id IN $groupIds${whereExtra}
+       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+              n.created_at AS created_at, n.summary AS summary,
+              n.attributes AS attributes, n.name_embedding AS name_embedding,
+              labels(n) AS labels`,
+      { embedding, groupIds, limit, ...filterParams },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchByBfs(
+    originNodeUuids: string[],
+    groupIds: string[],
+    limit: number,
+    filters?: SearchFilters,
+  ): Promise<EntityNode[]> {
+    if (originNodeUuids.length === 0) return [];
+
+    const { clause, params: filterParams } = filters
+      ? buildNodeFilterClause(filters, 'reachable')
+      : { clause: '', params: {} };
+    const whereExtra = clause ? ` AND ${clause}` : '';
+
+    // Variable-length paths cannot use a parameter for depth in Cypher — depth
+    // is hardcoded to MAX_SEARCH_DEPTH (3) to match the Python Graphiti default.
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `MATCH (origin:Entity)
+       WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
+       MATCH (origin)-[:RELATES_TO*1..3]-(reachable:Entity)
+       WHERE reachable.group_id IN $groupIds${whereExtra}
+       RETURN DISTINCT reachable.uuid AS uuid, reachable.name AS name,
+              reachable.group_id AS group_id, reachable.created_at AS created_at,
+              reachable.summary AS summary, reachable.attributes AS attributes,
+              reachable.name_embedding AS name_embedding, labels(reachable) AS labels
+       LIMIT $limit`,
+      { originNodeUuids, groupIds, limit, ...filterParams },
     );
     return results.map((r) => this.mapRow(r));
   }

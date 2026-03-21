@@ -1,5 +1,6 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { createCommunityNode } from '@/knowledge-graph/models/nodes/community-node';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
@@ -11,7 +12,7 @@ describe('CommunityNodeRepository', () => {
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
-    repo = new CommunityNodeRepository(neo4j);
+    repo = new CommunityNodeRepository(neo4j, mockDeep<EmbeddingService>());
   });
 
   afterEach(() => {

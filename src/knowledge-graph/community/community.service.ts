@@ -106,6 +106,8 @@ export class CommunityService {
         .withStructuredOutput(communitySummaryJsonSchema)
         .invoke(messages);
 
+      // TODO: embed community name via EmbeddingService so that community
+      // similarity search (community_names_embedding vector index) returns results.
       const community = createCommunityNode({
         name: communitySummary.name,
         summary: communitySummary.summary,

@@ -1,20 +1,34 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { buildEdgeFilterClause } from '@/knowledge-graph/search/search-filters';
+import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
 export class EntityEdgeRepository implements OnModuleInit {
-  constructor(private readonly neo4j: Neo4jService) {}
+  constructor(
+    private readonly neo4j: Neo4jService,
+    private readonly embeddingService: EmbeddingService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.neo4j.runQuery(
-      /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
-       FOR ()-[r:RELATES_TO]-()
-       ON EACH [r.fact]`,
-      {},
-    );
+    await Promise.all([
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
+         FOR ()-[r:RELATES_TO]-()
+         ON EACH [r.fact]`,
+        {},
+      ),
+      this.neo4j.runQuery(
+        /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
+         FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
+         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+        { dims: this.embeddingService.dimensions },
+      ),
+    ]);
   }
 
   async save(edge: EntityEdge): Promise<string> {
@@ -186,6 +200,70 @@ export class EntityEdgeRepository implements OnModuleInit {
        ORDER BY score DESC
        LIMIT $limit`,
       { query, groupIds, limit },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchBySimilarity(
+    embedding: number[],
+    groupIds: string[],
+    limit: number,
+    filters?: SearchFilters,
+  ): Promise<EntityEdge[]> {
+    const { clause, params: filterParams } = filters
+      ? buildEdgeFilterClause(filters, 'e')
+      : { clause: '', params: {} };
+    const whereExtra = clause ? ` AND ${clause}` : '';
+
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `CALL db.index.vector.queryRelationships('edge_facts_embedding', $limit, $embedding)
+       YIELD relationship AS e, score
+       WHERE e.group_id IN $groupIds${whereExtra}
+       MATCH (source:Entity)-[e]->(target:Entity)
+       RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
+              e.created_at AS created_at, e.fact AS fact,
+              e.fact_embedding AS fact_embedding, e.episodes AS episodes,
+              e.expired_at AS expired_at, e.valid_at AS valid_at,
+              e.invalid_at AS invalid_at, e.attributes AS attributes,
+              source.uuid AS source_node_uuid, target.uuid AS target_node_uuid`,
+      { embedding, groupIds, limit, ...filterParams },
+    );
+    return results.map((r) => this.mapRow(r));
+  }
+
+  async searchByBfs(
+    originNodeUuids: string[],
+    groupIds: string[],
+    limit: number,
+    filters?: SearchFilters,
+  ): Promise<EntityEdge[]> {
+    if (originNodeUuids.length === 0) return [];
+
+    const { clause, params: filterParams } = filters
+      ? buildEdgeFilterClause(filters, 'e')
+      : { clause: '', params: {} };
+    const whereExtra = clause ? ` AND ${clause}` : '';
+
+    // Variable-length paths cannot use a parameter for depth in Cypher — depth
+    // is hardcoded to MAX_SEARCH_DEPTH (3) to match the Python Graphiti default.
+    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+      /* cypher */ `MATCH (origin:Entity)
+       WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
+       MATCH (origin)-[:RELATES_TO*0..3]-(connected:Entity)
+       WHERE connected.group_id IN $groupIds
+       WITH collect(DISTINCT connected.uuid) AS reachableUuids
+       MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
+       WHERE e.group_id IN $groupIds
+         AND source.uuid IN reachableUuids
+         AND target.uuid IN reachableUuids${whereExtra}
+       RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
+              e.created_at AS created_at, e.fact AS fact,
+              e.fact_embedding AS fact_embedding, e.episodes AS episodes,
+              e.expired_at AS expired_at, e.valid_at AS valid_at,
+              e.invalid_at AS invalid_at, e.attributes AS attributes,
+              source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
+       LIMIT $limit`,
+      { originNodeUuids, groupIds, limit, ...filterParams },
     );
     return results.map((r) => this.mapRow(r));
   }

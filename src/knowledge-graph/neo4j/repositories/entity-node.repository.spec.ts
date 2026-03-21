@@ -1,5 +1,6 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
+import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { createEntityNode } from '@/knowledge-graph/models/nodes/entity-node';
 import { NodeLabelValidationError } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
@@ -12,7 +13,7 @@ describe('EntityNodeRepository', () => {
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
-    repo = new EntityNodeRepository(neo4j);
+    repo = new EntityNodeRepository(neo4j, mockDeep<EmbeddingService>());
   });
 
   afterEach(() => {
