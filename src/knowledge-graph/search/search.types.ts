@@ -17,7 +17,7 @@ export interface SearchResults {
 }
 
 export interface SearchOptions {
-  userId: string;
+  userId: number;
   query: string;
   groupIds: string[];
   config: SearchConfig;

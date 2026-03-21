@@ -62,6 +62,12 @@ export class EmbeddingService {
     });
   }
 
+  async embedText(text: string): Promise<number[] | null> {
+    if (this.model === null) return null;
+    const [vector] = await this.model.embedDocuments([text]);
+    return vector;
+  }
+
   async embedEdges(edges: EntityEdge[]): Promise<EntityEdge[]> {
     if (this.model === null) return edges;
 

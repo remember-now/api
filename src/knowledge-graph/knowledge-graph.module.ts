@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { EmbeddingConfigModule } from '@/config/embedding';
 import { LlmModule } from '@/llm/llm.module';
 
+import { BulkEpisodeService } from './bulk';
 import { CommunityService } from './community';
 import { EmbeddingService } from './embedding';
 import { EpisodeService } from './episode';
@@ -20,6 +21,7 @@ import {
   SagaNodeRepository,
 } from './neo4j/repositories';
 import { EdgeResolutionService, NodeResolutionService } from './resolution';
+import { SearchService } from './search';
 
 const repositories = [
   EntityNodeRepository,
@@ -46,6 +48,8 @@ const resolutionServices = [NodeResolutionService, EdgeResolutionService];
     ...resolutionServices,
     EpisodeService,
     CommunityService,
+    SearchService,
+    BulkEpisodeService,
   ],
   exports: [
     ...repositories,
@@ -54,6 +58,8 @@ const resolutionServices = [NodeResolutionService, EdgeResolutionService];
     ...resolutionServices,
     EpisodeService,
     CommunityService,
+    SearchService,
+    BulkEpisodeService,
   ],
 })
 export class KnowledgeGraphModule {}
