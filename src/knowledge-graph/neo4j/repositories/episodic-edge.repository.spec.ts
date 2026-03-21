@@ -26,9 +26,9 @@ describe('EpisodicEdgeRepository', () => {
   describe('save', () => {
     it('should call MERGE on MENTIONS and return uuid', async () => {
       const edge = createEpisodicEdge({ sourceNodeUuid, targetNodeUuid });
-      neo4j.runQuery.mockResolvedValue([{ uuid: edge.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),
         expect.objectContaining({ uuid: edge.uuid }),
       );
@@ -38,9 +38,9 @@ describe('EpisodicEdgeRepository', () => {
 
   describe('delete', () => {
     it('should call DELETE on MENTIONS', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -49,14 +49,14 @@ describe('EpisodicEdgeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
 
     it('should return mapped episodic edge when found', async () => {
       const edge = createEpisodicEdge({ sourceNodeUuid, targetNodeUuid });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,
           group_id: edge.groupId,
@@ -73,36 +73,36 @@ describe('EpisodicEdgeRepository', () => {
 
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
     });
 
     it('should apply uuid less-than cursor clause when uuidCursor is provided', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('e.uuid < $uuidCursor'),
         expect.objectContaining({ uuidCursor: 'cursor-uuid' }),
       );
     });
 
     it('should include ORDER BY e.uuid DESC', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('ORDER BY e.uuid DESC'),
         expect.anything(),
       );
     });
 
     it('should not include cursor clause when uuidCursor is omitted', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.not.stringContaining('$uuidCursor'),
         expect.anything(),
       );

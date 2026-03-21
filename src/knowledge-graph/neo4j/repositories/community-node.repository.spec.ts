@@ -22,9 +22,9 @@ describe('CommunityNodeRepository', () => {
   describe('save', () => {
     it('should call MERGE on Community and return uuid', async () => {
       const node = createCommunityNode({ name: 'Community 1' });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MERGE (n:Community'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -36,9 +36,9 @@ describe('CommunityNodeRepository', () => {
         name: 'Community',
         nameEmbedding: [0.1, 0.2],
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -46,9 +46,9 @@ describe('CommunityNodeRepository', () => {
 
     it('should not use vector property when nameEmbedding is null', async () => {
       const node = createCommunityNode({ name: 'Community' });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.not.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -57,9 +57,9 @@ describe('CommunityNodeRepository', () => {
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -68,14 +68,14 @@ describe('CommunityNodeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
 
     it('should return mapped community node when found', async () => {
       const node = createCommunityNode({ name: 'Test Community' });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
           name: node.name,
@@ -93,9 +93,9 @@ describe('CommunityNodeRepository', () => {
 
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );

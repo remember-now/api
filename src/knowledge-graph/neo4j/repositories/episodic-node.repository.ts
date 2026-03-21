@@ -11,7 +11,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   constructor(private readonly neo4j: Neo4jService) {}
 
   async onModuleInit(): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       /* cypher */ `CREATE FULLTEXT INDEX episode_content IF NOT EXISTS
        FOR (n:Episodic) ON EACH [n.content]`,
       {},
@@ -19,7 +19,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async save(node: EpisodicNode): Promise<string> {
-    const results = await this.neo4j.runQuery<{ uuid: string }>(
+    const results = await this.neo4j.executeWrite<{ uuid: string }>(
       /* cypher */ `MERGE (n:Episodic {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
@@ -44,28 +44,28 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async delete(uuid: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<EpisodicNode | null> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
@@ -78,7 +78,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async getByUuids(uuids: string[]): Promise<EpisodicNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
@@ -96,7 +96,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const params: Record<string, unknown> = { groupIds };
     if (limit !== undefined) params['limit'] = limit;
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
@@ -109,7 +109,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async getByEntityNodeUuid(entityNodeUuid: string): Promise<EpisodicNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (e:Episodic)-[:MENTIONS]->(:Entity {uuid: $entityNodeUuid})
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
@@ -127,7 +127,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     source?: EpisodeType,
     sagaUuid?: string,
   ): Promise<EpisodicNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (e:Episodic)
        WHERE e.valid_at <= $referenceTime
        AND ($groupIds IS NULL OR e.group_id IN $groupIds)
@@ -155,7 +155,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
   ): Promise<EpisodicNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryNodes('episode_content', $query)
        YIELD node AS n, score
        WHERE n.group_id IN $groupIds

@@ -31,9 +31,9 @@ describe('EntityEdgeRepository', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: edge.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({ uuid: edge.uuid }),
       );
@@ -47,9 +47,9 @@ describe('EntityEdgeRepository', () => {
         targetNodeUuid,
         factEmbedding: [0.1, 0.2],
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: edge.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       await repo.save(edge);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('setRelationshipVectorProperty'),
         expect.anything(),
       );
@@ -61,9 +61,9 @@ describe('EntityEdgeRepository', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: edge.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       await repo.save(edge);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.not.stringContaining('setRelationshipVectorProperty'),
         expect.anything(),
       );
@@ -72,9 +72,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('delete', () => {
     it('should call DELETE on RELATES_TO', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -83,7 +83,7 @@ describe('EntityEdgeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
@@ -94,7 +94,7 @@ describe('EntityEdgeRepository', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,
           name: edge.name,
@@ -121,9 +121,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('getBetweenNodes', () => {
     it('should query between source and target', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getBetweenNodes(sourceNodeUuid, targetNodeUuid);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({
           sourceUuid: sourceNodeUuid,
@@ -135,9 +135,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('getByNodeUuid', () => {
     it('should query edges where node is source or target', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByNodeUuid(sourceNodeUuid);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining(
           'source.uuid = $nodeUuid OR target.uuid = $nodeUuid',
         ),
@@ -148,9 +148,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
@@ -159,9 +159,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('onModuleInit', () => {
     it('should create the edge_facts fulltext index', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.onModuleInit();
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('edge_facts'),
         {},
       );
@@ -170,9 +170,9 @@ describe('EntityEdgeRepository', () => {
 
   describe('searchByFact', () => {
     it('should use fulltext queryRelationships procedure', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.searchByFact('Alice works', ['group-1'], 10);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('db.index.fulltext.queryRelationships'),
         expect.objectContaining({
           query: 'Alice works',
@@ -187,7 +187,7 @@ describe('EntityEdgeRepository', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,
           name: edge.name,
@@ -210,7 +210,7 @@ describe('EntityEdgeRepository', () => {
     });
 
     it('should return empty array when no results', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const results = await repo.searchByFact('nonexistent', ['group-1'], 10);
       expect(results).toEqual([]);
     });

@@ -26,9 +26,9 @@ describe('CommunityEdgeRepository', () => {
   describe('save', () => {
     it('should call MERGE on HAS_MEMBER and return uuid', async () => {
       const edge = createCommunityEdge({ sourceNodeUuid, targetNodeUuid });
-      neo4j.runQuery.mockResolvedValue([{ uuid: edge.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('HAS_MEMBER'),
         expect.objectContaining({ uuid: edge.uuid }),
       );
@@ -38,9 +38,9 @@ describe('CommunityEdgeRepository', () => {
 
   describe('delete', () => {
     it('should call DELETE on HAS_MEMBER', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('HAS_MEMBER'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -49,14 +49,14 @@ describe('CommunityEdgeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
 
     it('should return mapped community edge when found', async () => {
       const edge = createCommunityEdge({ sourceNodeUuid, targetNodeUuid });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,
           group_id: edge.groupId,

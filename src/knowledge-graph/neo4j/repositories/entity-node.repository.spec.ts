@@ -23,9 +23,9 @@ describe('EntityNodeRepository', () => {
   describe('save', () => {
     it('should call MERGE on Entity and return uuid', async () => {
       const node = createEntityNode({ name: 'Test' });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MERGE (n:Entity'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -37,9 +37,9 @@ describe('EntityNodeRepository', () => {
         name: 'Test',
         labels: ['Entity', 'Person'],
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MERGE (n:Entity:Person'),
         expect.anything(),
       );
@@ -53,7 +53,7 @@ describe('EntityNodeRepository', () => {
       await expect(repo.save(node)).rejects.toBeInstanceOf(
         NodeLabelValidationError,
       );
-      expect(neo4j.runQuery).not.toHaveBeenCalled();
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
     });
 
     it('should use vector property call when nameEmbedding is present', async () => {
@@ -61,9 +61,9 @@ describe('EntityNodeRepository', () => {
         name: 'Test',
         nameEmbedding: [0.1, 0.2],
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -71,9 +71,9 @@ describe('EntityNodeRepository', () => {
 
     it('should not use vector property call when nameEmbedding is null', async () => {
       const node = createEntityNode({ name: 'Test', nameEmbedding: null });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.not.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -86,17 +86,17 @@ describe('EntityNodeRepository', () => {
         createEntityNode({ name: 'Test1' }),
         createEntityNode({ name: 'Test2' }),
       ];
-      neo4j.runQuery.mockResolvedValue([{ uuid: 'some-uuid' }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: 'some-uuid' }]);
       await repo.saveBulk(nodes);
-      expect(neo4j.runQuery).toHaveBeenCalledTimes(2);
+      expect(neo4j.executeWrite).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -105,9 +105,9 @@ describe('EntityNodeRepository', () => {
 
   describe('deleteByUuids', () => {
     it('should call DETACH DELETE with array of uuids', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.deleteByUuids(['uuid-1', 'uuid-2']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuids: ['uuid-1', 'uuid-2'] }),
       );
@@ -116,9 +116,9 @@ describe('EntityNodeRepository', () => {
 
   describe('deleteByGroupId', () => {
     it('should call DETACH DELETE with groupId', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.deleteByGroupId('group-1');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ groupId: 'group-1' }),
       );
@@ -127,14 +127,14 @@ describe('EntityNodeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
 
     it('should return mapped entity when found', async () => {
       const node = createEntityNode({ name: 'Test' });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
           name: node.name,
@@ -154,9 +154,9 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should query by uuid', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByUuid('some-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('uuid: $uuid'),
         expect.objectContaining({ uuid: 'some-uuid' }),
       );
@@ -165,14 +165,14 @@ describe('EntityNodeRepository', () => {
 
   describe('getByUuids', () => {
     it('should return empty array when no results', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuids(['uuid-1']);
       expect(result).toEqual([]);
     });
 
     it('should return mapped entities when found', async () => {
       const node = createEntityNode({ name: 'Test' });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
           name: node.name,
@@ -192,18 +192,18 @@ describe('EntityNodeRepository', () => {
 
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1', 'group-2']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1', 'group-2'] }),
       );
     });
 
     it('should include LIMIT $limit clause and pass limit as parameter', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByGroupIds(['group-1'], 10);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('LIMIT $limit'),
         expect.objectContaining({ limit: 10 }),
       );

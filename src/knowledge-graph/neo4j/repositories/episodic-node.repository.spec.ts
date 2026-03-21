@@ -28,9 +28,9 @@ describe('EpisodicNodeRepository', () => {
         content: 'content',
         validAt,
       });
-      neo4j.runQuery.mockResolvedValue([{ uuid: node.uuid }]);
+      neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MERGE (n:Episodic'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -40,9 +40,9 @@ describe('EpisodicNodeRepository', () => {
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete('test-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid: 'test-uuid' }),
       );
@@ -51,7 +51,7 @@ describe('EpisodicNodeRepository', () => {
 
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       const result = await repo.getByUuid('missing');
       expect(result).toBeNull();
     });
@@ -62,7 +62,7 @@ describe('EpisodicNodeRepository', () => {
         content: 'content',
         validAt,
       });
-      neo4j.runQuery.mockResolvedValue([
+      neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
           name: node.name,
@@ -83,9 +83,9 @@ describe('EpisodicNodeRepository', () => {
 
   describe('getByEntityNodeUuid', () => {
     it('should query with MENTIONS relationship', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.getByEntityNodeUuid('entity-uuid');
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),
         expect.objectContaining({ entityNodeUuid: 'entity-uuid' }),
       );
@@ -94,27 +94,27 @@ describe('EpisodicNodeRepository', () => {
 
   describe('retrieveEpisodes', () => {
     it('should query with referenceTime and lastN', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.retrieveEpisodes(new Date(), 10);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('ORDER BY e.valid_at DESC'),
         expect.objectContaining({ lastN: 10 }),
       );
     });
 
     it('should pass groupIds when provided', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.retrieveEpisodes(new Date(), 5, ['group-1']);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
     });
 
     it('should pass null groupIds when not provided', async () => {
-      neo4j.runQuery.mockResolvedValue([]);
+      neo4j.executeRead.mockResolvedValue([]);
       await repo.retrieveEpisodes(new Date(), 5);
-      expect(neo4j.runQuery).toHaveBeenCalledWith(
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ groupIds: null }),
       );

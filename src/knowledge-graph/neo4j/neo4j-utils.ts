@@ -17,6 +17,10 @@ export function convertValue(value: unknown): unknown {
   if (isInt(value)) return fromNeo4jInt(value);
   if (isDateTime(value)) return fromNeo4jDateTime(value);
   if (Array.isArray(value)) return value.map(convertValue);
+  // TODO: add explicit isNode/isRelationship guards here — currently Node/Relationship objects
+  // fall through to the object branch and only their .properties are preserved
+  // (elementId, labels, type, startNodeElementId, endNodeElementId are silently dropped).
+  // Not currently a bug since all RETURN clauses use flat property projections.
   if (typeof value === 'object')
     return convertRecord(value as Record<string, unknown>);
   return value;

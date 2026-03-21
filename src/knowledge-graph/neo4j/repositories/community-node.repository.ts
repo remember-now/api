@@ -15,12 +15,12 @@ export class CommunityNodeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await Promise.all([
-      this.neo4j.runQuery(
+      this.neo4j.executeWrite(
         /* cypher */ `CREATE FULLTEXT INDEX community_names IF NOT EXISTS
          FOR (n:Community) ON EACH [n.name, n.summary]`,
         {},
       ),
-      this.neo4j.runQuery(
+      this.neo4j.executeWrite(
         /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
          FOR (n:Community) ON n.name_embedding
          OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
@@ -38,7 +38,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     };
 
     if (node.nameEmbedding) {
-      const results = await this.neo4j.runQuery<{ uuid: string }>(
+      const results = await this.neo4j.executeWrite<{ uuid: string }>(
         /* cypher */ `MERGE (n:Community {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
@@ -47,7 +47,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       );
       return results[0].uuid;
     } else {
-      const results = await this.neo4j.runQuery<{ uuid: string }>(
+      const results = await this.neo4j.executeWrite<{ uuid: string }>(
         /* cypher */ `MERGE (n:Community {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
@@ -62,28 +62,28 @@ export class CommunityNodeRepository implements OnModuleInit {
   }
 
   async delete(uuid: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<CommunityNode | null> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -95,7 +95,7 @@ export class CommunityNodeRepository implements OnModuleInit {
   }
 
   async getByUuids(uuids: string[]): Promise<CommunityNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -110,7 +110,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     limit?: number,
   ): Promise<CommunityNode[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -126,7 +126,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
   ): Promise<CommunityNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryNodes('community_names', $query)
        YIELD node AS n, score
        WHERE n.group_id IN $groupIds
@@ -145,7 +145,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
   ): Promise<CommunityNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.vector.queryNodes('community_names_embedding', $limit, $embedding)
        YIELD node AS n, score
        WHERE n.group_id IN $groupIds

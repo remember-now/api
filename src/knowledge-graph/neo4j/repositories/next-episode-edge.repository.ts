@@ -9,7 +9,7 @@ export class NextEpisodeEdgeRepository {
   constructor(private readonly neo4j: Neo4jService) {}
 
   async save(edge: NextEpisodeEdge): Promise<string> {
-    const results = await this.neo4j.runQuery<{ uuid: string }>(
+    const results = await this.neo4j.executeWrite<{ uuid: string }>(
       /* cypher */ `MATCH (source:Episodic {uuid: $sourceNodeUuid})
        MATCH (target:Episodic {uuid: $targetNodeUuid})
        MERGE (source)-[e:NEXT_EPISODE {uuid: $uuid}]->(target)
@@ -31,21 +31,21 @@ export class NextEpisodeEdgeRepository {
   }
 
   async delete(uuid: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
   }
 
   async getByUuid(uuid: string): Promise<NextEpisodeEdge | null> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE {uuid: $uuid}]->(target:Episodic)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid`,
@@ -56,7 +56,7 @@ export class NextEpisodeEdgeRepository {
   }
 
   async getByUuids(uuids: string[]): Promise<NextEpisodeEdge[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.uuid IN $uuids
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
@@ -73,7 +73,7 @@ export class NextEpisodeEdgeRepository {
   ): Promise<NextEpisodeEdge[]> {
     const limitClause = limit ? `LIMIT ${limit}` : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,

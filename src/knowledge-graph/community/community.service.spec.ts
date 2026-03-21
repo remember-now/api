@@ -67,14 +67,15 @@ describe('CommunityService', () => {
 
   describe('guard: no Entity edges exist', () => {
     beforeEach(() => {
-      mockNeo4jService.runQuery.mockResolvedValue([{ hasEdges: false }]);
+      mockNeo4jService.executeRead.mockResolvedValue([{ hasEdges: false }]);
     });
 
     it('should return early without projecting GDS graph', async () => {
       await service.buildCommunities(USER_ID, GROUP_ID);
 
       // Only the guard query should be called
-      expect(mockNeo4jService.runQuery).toHaveBeenCalledTimes(1);
+      expect(mockNeo4jService.executeRead).toHaveBeenCalledTimes(1);
+      expect(mockNeo4jService.executeWrite).not.toHaveBeenCalled();
       expect(mockLlmService.getActiveModel).not.toHaveBeenCalled();
     });
 
@@ -95,17 +96,20 @@ describe('CommunityService', () => {
     ];
 
     beforeEach(() => {
-      mockNeo4jService.runQuery
+      // guard + Leiden stream go through executeRead (calls[0] and calls[1])
+      mockNeo4jService.executeRead
         .mockResolvedValueOnce([{ hasEdges: true }]) // guard
+        .mockResolvedValueOnce(leidenResults); // Leiden stream
+      // GDS project + graph drop go through executeWrite (calls[0] and calls[1])
+      mockNeo4jService.executeWrite
         .mockResolvedValueOnce([]) // GDS project
-        .mockResolvedValueOnce(leidenResults) // Leiden stream
         .mockResolvedValueOnce([]); // graph drop
     });
 
     it('should call GDS graph project cypher', async () => {
       await service.buildCommunities(USER_ID, GROUP_ID);
 
-      const projectCall = mockNeo4jService.runQuery.mock.calls[1];
+      const projectCall = mockNeo4jService.executeWrite.mock.calls[0];
       expect(projectCall[0]).toContain('gds.graph.project');
       expect(projectCall[1]).toMatchObject({ groupId: GROUP_ID });
     });
@@ -113,30 +117,32 @@ describe('CommunityService', () => {
     it('should call Leiden stream cypher', async () => {
       await service.buildCommunities(USER_ID, GROUP_ID);
 
-      const leidenCall = mockNeo4jService.runQuery.mock.calls[2];
+      const leidenCall = mockNeo4jService.executeRead.mock.calls[1];
       expect(leidenCall[0]).toContain('gds.leiden.stream');
     });
 
     it('should call gds.graph.drop in finally', async () => {
       await service.buildCommunities(USER_ID, GROUP_ID);
 
-      const dropCall = mockNeo4jService.runQuery.mock.calls[3];
+      const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
       expect(dropCall[0]).toContain('gds.graph.drop');
     });
 
     it('should drop graph even if Leiden throws', async () => {
-      mockNeo4jService.runQuery.mockReset();
-      mockNeo4jService.runQuery
+      mockNeo4jService.executeRead.mockReset();
+      mockNeo4jService.executeWrite.mockReset();
+      mockNeo4jService.executeRead
         .mockResolvedValueOnce([{ hasEdges: true }])
-        .mockResolvedValueOnce([])
-        .mockRejectedValueOnce(new Error('Leiden failed'))
-        .mockResolvedValueOnce([]);
+        .mockRejectedValueOnce(new Error('Leiden failed'));
+      mockNeo4jService.executeWrite
+        .mockResolvedValueOnce([]) // GDS project
+        .mockResolvedValueOnce([]); // graph drop (in finally)
 
       await expect(service.buildCommunities(USER_ID, GROUP_ID)).rejects.toThrow(
         'Leiden failed',
       );
 
-      const dropCall = mockNeo4jService.runQuery.mock.calls[3];
+      const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
       expect(dropCall[0]).toContain('gds.graph.drop');
     });
 

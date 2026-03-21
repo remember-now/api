@@ -36,7 +36,7 @@ export class CommunityService {
 
   async buildCommunities(userId: number, groupId: string): Promise<void> {
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
-    const guardResult = await this.neo4jService.runQuery<{
+    const guardResult = await this.neo4jService.executeRead<{
       hasEdges: boolean;
     }>(
       /* cypher */ `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
@@ -53,7 +53,7 @@ export class CommunityService {
 
     // 3. Project GDS graph
     const graphName = `community-${randomUUID()}`;
-    await this.neo4jService.runQuery(
+    await this.neo4jService.executeWrite(
       /* cypher */ `MATCH (source:Entity {group_id: $groupId})-[r:RELATES_TO]-(target:Entity {group_id: $groupId})
        WITH gds.graph.project($graphName, source, target) AS g
        RETURN g.graphName, g.nodeCount, g.relationshipCount`,
@@ -64,7 +64,7 @@ export class CommunityService {
 
     try {
       // 4. Run Leiden
-      const leidenResults = await this.neo4jService.runQuery<{
+      const leidenResults = await this.neo4jService.executeRead<{
         uuid: string;
         communityId: number;
       }>(
@@ -83,7 +83,7 @@ export class CommunityService {
       }
     } finally {
       // 5. Drop projection (always)
-      await this.neo4jService.runQuery(
+      await this.neo4jService.executeWrite(
         /* cypher */ `CALL gds.graph.drop($graphName, false)`,
         { graphName },
       );

@@ -20,12 +20,12 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await Promise.all([
-      this.neo4j.runQuery(
+      this.neo4j.executeWrite(
         /* cypher */ `CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
          FOR (n:Entity) ON EACH [n.name, n.summary]`,
         {},
       ),
-      this.neo4j.runQuery(
+      this.neo4j.executeWrite(
         /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
          FOR (n:Entity) ON n.name_embedding
          OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
@@ -47,7 +47,7 @@ export class EntityNodeRepository implements OnModuleInit {
     };
 
     if (node.nameEmbedding) {
-      const results = await this.neo4j.runQuery<{ uuid: string }>(
+      const results = await this.neo4j.executeWrite<{ uuid: string }>(
         // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
@@ -57,7 +57,7 @@ export class EntityNodeRepository implements OnModuleInit {
       );
       return results[0].uuid;
     } else {
-      const results = await this.neo4j.runQuery<{ uuid: string }>(
+      const results = await this.neo4j.executeWrite<{ uuid: string }>(
         // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
@@ -73,28 +73,28 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async delete(uuid: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
   async deleteByUuids(uuids: string[]): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
   async deleteByGroupId(groupId: string): Promise<void> {
-    await this.neo4j.runQuery(
+    await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
   async getByUuid(uuid: string): Promise<EntityNode | null> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -107,7 +107,7 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async getByUuids(uuids: string[]): Promise<EntityNode[]> {
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -125,7 +125,7 @@ export class EntityNodeRepository implements OnModuleInit {
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const params: Record<string, unknown> = { groupIds };
     if (limit !== undefined) params['limit'] = limit;
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -148,7 +148,7 @@ export class EntityNodeRepository implements OnModuleInit {
       : { clause: '', params: {} };
     const whereExtra = clause ? ` AND ${clause}` : '';
 
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryNodes('entity_names', $query)
        YIELD node AS n, score
        WHERE n.group_id IN $groupIds${whereExtra}
@@ -174,7 +174,7 @@ export class EntityNodeRepository implements OnModuleInit {
       : { clause: '', params: {} };
     const whereExtra = clause ? ` AND ${clause}` : '';
 
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.vector.queryNodes('entity_names_embedding', $limit, $embedding)
        YIELD node AS n, score
        WHERE n.group_id IN $groupIds${whereExtra}
@@ -202,7 +202,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
     // Variable-length paths cannot use a parameter for depth in Cypher — depth
     // is hardcoded to MAX_SEARCH_DEPTH (3) to match the Python Graphiti default.
-    const results = await this.neo4j.runQuery<Record<string, unknown>>(
+    const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (origin:Entity)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
        MATCH (origin)-[:RELATES_TO*1..3]-(reachable:Entity)

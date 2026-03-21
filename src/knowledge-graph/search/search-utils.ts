@@ -108,7 +108,7 @@ export async function nodeDistanceReranker(
   const scores = new Map<string, number>();
 
   if (filteredUuids.length > 0) {
-    const results = await neo4j.runQuery<{ uuid: string; score: number }>(
+    const results = await neo4j.executeRead<{ uuid: string; score: number }>(
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (center:Entity {uuid: $centerUuid})-[:RELATES_TO]-(n:Entity {uuid: nodeUuid})
        RETURN 1 AS score, nodeUuid AS uuid`,
@@ -160,7 +160,7 @@ export async function episodeMentionsReranker(
   const scores = new Map<string, number>();
 
   if (sortedUuids.length > 0) {
-    const results = await neo4j.runQuery<{ uuid: string; score: number }>(
+    const results = await neo4j.executeRead<{ uuid: string; score: number }>(
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: nodeUuid})
        RETURN count(*) AS score, n.uuid AS uuid`,
