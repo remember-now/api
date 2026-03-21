@@ -2,7 +2,10 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
-import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  toNeo4jDateTime,
+  toNeo4jInt,
+} from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { buildEdgeFilterClause } from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
@@ -26,7 +29,7 @@ export class EntityEdgeRepository implements OnModuleInit {
         /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
          FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
          OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: this.embeddingService.dimensions },
+        { dims: toNeo4jInt(this.embeddingService.dimensions) },
       ),
     ]);
   }

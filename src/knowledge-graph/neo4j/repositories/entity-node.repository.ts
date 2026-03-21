@@ -3,7 +3,10 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityNode } from '@/knowledge-graph/models/nodes/entity-node';
 import { validateNodeLabels } from '@/knowledge-graph/neo4j/neo4j-label-validation';
-import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  toNeo4jDateTime,
+  toNeo4jInt,
+} from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   buildNodeFilterClause,
@@ -29,7 +32,7 @@ export class EntityNodeRepository implements OnModuleInit {
         /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
          FOR (n:Entity) ON n.name_embedding
          OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: this.embeddingService.dimensions },
+        { dims: toNeo4jInt(this.embeddingService.dimensions) },
       ),
     ]);
   }

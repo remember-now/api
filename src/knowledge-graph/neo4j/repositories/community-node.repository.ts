@@ -2,7 +2,10 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { CommunityNode } from '@/knowledge-graph/models/nodes/community-node';
-import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  toNeo4jDateTime,
+  toNeo4jInt,
+} from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { luceneSanitize } from '@/knowledge-graph/search/search-filters';
 
@@ -24,7 +27,7 @@ export class CommunityNodeRepository implements OnModuleInit {
         /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
          FOR (n:Community) ON n.name_embedding
          OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: this.embeddingService.dimensions },
+        { dims: toNeo4jInt(this.embeddingService.dimensions) },
       ),
     ]);
   }

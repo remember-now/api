@@ -8,6 +8,10 @@ export function fromNeo4jDateTime(dt: DateTime<number | Integer>): Date {
   return new Date(dt.toString());
 }
 
+export function toNeo4jInt(value: number): Integer {
+  return neo4j.int(value);
+}
+
 export function fromNeo4jInt(value: Integer): number {
   return neo4j.integer.toNumber(value);
 }
