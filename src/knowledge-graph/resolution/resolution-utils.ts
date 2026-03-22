@@ -1,3 +1,8 @@
+// NOTE: Python Graphiti uses MinHash + LSH (graphiti_core/utils/maintenance/dedup_helpers.py)
+// for O(n) approximate candidate detection before cosine similarity.
+// This port uses direct cosine similarity (O(n×d)) instead, which is simpler
+// and leverages embeddings already computed. For very large node sets, adding
+// MinHash pre-filtering would improve resolution performance.
 export const COSINE_SIMILARITY_THRESHOLD = 0.9;
 export const FACT_SIMILARITY_THRESHOLD = 0.85;
 export const LOW_ENTROPY_THRESHOLD = 3.0;

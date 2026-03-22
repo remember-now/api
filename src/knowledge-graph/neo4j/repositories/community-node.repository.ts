@@ -112,14 +112,16 @@ export class CommunityNodeRepository implements OnModuleInit {
     groupIds: string[],
     limit?: number,
   ): Promise<CommunityNode[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
+    const params: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding
        ${limitClause}`,
-      { groupIds },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }

@@ -55,7 +55,7 @@ export function mmr(
   queryVector: number[],
   uuidVectorPairs: Map<string, number[]>,
   lambda = DEFAULT_MMR_LAMBDA,
-  minScore = 0,
+  minScore = -2.0,
 ): [string[], number[]] {
   if (uuidVectorPairs.size === 0) return [[], []];
 
@@ -77,7 +77,7 @@ export function mmr(
   }
 
   const mmrScores = uuids.map((_, i) => {
-    const maxSim = Math.max(...simMatrix[i]);
+    const maxSim = simMatrix[i].reduce((m, v) => (v > m ? v : m), -Infinity);
     return (
       lambda * dotProduct(queryVector, normalized[i]) + (lambda - 1) * maxSim
     );
@@ -185,6 +185,10 @@ export async function episodeMentionsReranker(
 
 // ─── Cross-encoder reranker ───────────────────────────────────────────────────
 
+// TODO: This LLM-based scorer is a placeholder. Python Graphiti uses a real
+// neural cross-encoder model (graphiti_core/cross_encoder/) for higher-quality
+// relevance scoring at lower latency. Replace with a dedicated cross-encoder
+// inference endpoint when available.
 const CrossEncoderScoreSchema = z.object({
   score: z.number().min(0).max(100),
 });

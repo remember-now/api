@@ -8,6 +8,7 @@ import { EntityEdge } from '../models/edges/entity-edge';
 import { CommunityNode } from '../models/nodes/community-node';
 import { EntityNode } from '../models/nodes/entity-node';
 import { EpisodicNode } from '../models/nodes/episodic-node';
+import { validateGroupId } from '../neo4j/neo4j-label-validation';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityNodeRepository,
@@ -29,6 +30,7 @@ import {
   NodeReranker,
   NodeSearchConfig,
   NodeSearchMethod,
+  SearchConfig,
 } from './search-config.types';
 import { luceneSanitize } from './search-filters';
 import { SearchFilters } from './search-filters.types';
@@ -57,6 +59,25 @@ export class SearchService {
     private readonly communityNodeRepository: CommunityNodeRepository,
   ) {}
 
+  async searchFromNodes(options: {
+    nodeUuids: string[];
+    query: string;
+    groupIds: string[];
+    config: SearchConfig;
+    userId: number;
+    filters?: SearchFilters;
+  }): Promise<SearchResults> {
+    return this.search({
+      query: options.query,
+      groupIds: options.groupIds,
+      config: options.config,
+      userId: options.userId,
+      filters: options.filters,
+      originNodeUuids: options.nodeUuids,
+      centerNodeUuid: options.nodeUuids[0],
+    });
+  }
+
   async search(options: SearchOptions): Promise<SearchResults> {
     if (!options.query.trim()) return emptySearchResults();
 
@@ -68,6 +89,10 @@ export class SearchService {
       centerNodeUuid,
       originNodeUuids,
     } = options;
+
+    for (const groupId of groupIds) {
+      validateGroupId(groupId);
+    }
     const limit = config.limit ?? DEFAULT_SEARCH_LIMIT;
     const minScore = config.rerankerMinScore ?? 0;
 

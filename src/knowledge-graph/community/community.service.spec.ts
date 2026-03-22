@@ -3,6 +3,7 @@ import { mockDeep } from 'jest-mock-extended';
 
 import { LlmService } from '@/llm/llm.service';
 
+import { EmbeddingService } from '../embedding';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityEdgeRepository,
@@ -21,6 +22,7 @@ describe('CommunityService', () => {
   let service: CommunityService;
 
   let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
+  let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
   let mockNeo4jService: ReturnType<typeof mockDeep<Neo4jService>>;
   let mockEntityNodeRepository: ReturnType<
     typeof mockDeep<EntityNodeRepository>
@@ -37,6 +39,7 @@ describe('CommunityService', () => {
 
   beforeEach(() => {
     mockLlmService = mockDeep<LlmService>();
+    mockEmbeddingService = mockDeep<EmbeddingService>();
     mockNeo4jService = mockDeep<Neo4jService>();
     mockEntityNodeRepository = mockDeep<EntityNodeRepository>();
     mockCommunityNodeRepository = mockDeep<CommunityNodeRepository>();
@@ -45,9 +48,11 @@ describe('CommunityService', () => {
     mockModel = mockDeep<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
+    mockEmbeddingService.embedText.mockResolvedValue(null);
 
     service = new CommunityService(
       mockLlmService,
+      mockEmbeddingService,
       mockNeo4jService,
       mockEntityNodeRepository,
       mockCommunityNodeRepository,

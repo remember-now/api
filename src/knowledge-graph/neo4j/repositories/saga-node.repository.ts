@@ -76,14 +76,19 @@ export class SagaNodeRepository {
     limit?: number,
     uuidCursor?: string,
   ): Promise<SagaNode[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND n.uuid < $uuidCursor' : '';
+    const params: Record<string, unknown> = {
+      groupIds,
+      uuidCursor: uuidCursor ?? null,
+    };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at
        ORDER BY n.uuid DESC ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }

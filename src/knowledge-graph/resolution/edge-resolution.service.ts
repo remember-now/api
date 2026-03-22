@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityEdge } from '../models/edges';
 import { EpisodicNode } from '../models/nodes';
 import { EntityEdgeRepository } from '../neo4j/repositories';
+import { luceneSanitize } from '../search/search-filters';
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 import {
   cosineSimilarity,
@@ -97,7 +98,7 @@ export class EdgeResolutionService {
 
       // Keyword candidates (BM25 via Neo4j fulltext)
       const keywordEdges = await this.edgeRepo.searchByFact(
-        edge.fact,
+        luceneSanitize(edge.fact),
         [edge.groupId],
         MAX_KEYWORD_CANDIDATES,
       );

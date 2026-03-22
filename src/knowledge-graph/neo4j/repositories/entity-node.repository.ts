@@ -89,6 +89,16 @@ export class EntityNodeRepository implements OnModuleInit {
     );
   }
 
+  async deleteIfSoleMentioned(nodeUuid: string): Promise<void> {
+    await this.neo4j.executeWrite(
+      /* cypher */ `MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: $nodeUuid})
+       WITH n, count(ep) AS cnt
+       WHERE cnt = 1
+       DETACH DELETE n`,
+      { nodeUuid },
+    );
+  }
+
   async deleteByGroupId(groupId: string): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',

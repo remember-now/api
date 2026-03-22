@@ -66,20 +66,32 @@ export class EpisodicEdgeRepository {
     return results.map((r) => this.mapRow(r));
   }
 
+  async deleteBySourceUuid(episodeUuid: string): Promise<void> {
+    await this.neo4j.executeWrite(
+      '/*cypher*/ MATCH (ep:Episodic {uuid: $episodeUuid})-[e:MENTIONS]->() DELETE e',
+      { episodeUuid },
+    );
+  }
+
   async getByGroupIds(
     groupIds: string[],
     limit?: number,
     uuidCursor?: string,
   ): Promise<EpisodicEdge[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
+    const params: Record<string, unknown> = {
+      groupIds,
+      uuidCursor: uuidCursor ?? null,
+    };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (episode:Episodic)-[e:MENTIONS]->(node:Entity)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               episode.uuid AS source_node_uuid, node.uuid AS target_node_uuid
        ORDER BY e.uuid DESC ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }

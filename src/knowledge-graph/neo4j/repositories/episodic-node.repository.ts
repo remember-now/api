@@ -150,6 +150,15 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
+  async getMentionedEntityUuids(episodeUuid: string): Promise<string[]> {
+    const results = await this.neo4j.executeRead<{ uuid: string }>(
+      /* cypher */ `MATCH (ep:Episodic {uuid: $episodeUuid})-[:MENTIONS]->(n:Entity)
+       RETURN n.uuid AS uuid`,
+      { episodeUuid },
+    );
+    return results.map((r) => r.uuid);
+  }
+
   async searchByContent(
     query: string,
     groupIds: string[],

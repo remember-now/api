@@ -71,15 +71,20 @@ export class HasEpisodeEdgeRepository {
     limit?: number,
     uuidCursor?: string,
   ): Promise<HasEpisodeEdge[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
+    const params: Record<string, unknown> = {
+      groupIds,
+      uuidCursor: uuidCursor ?? null,
+    };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (saga:Saga)-[e:HAS_EPISODE]->(episode:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               saga.uuid AS source_node_uuid, episode.uuid AS target_node_uuid
        ORDER BY e.uuid DESC ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }

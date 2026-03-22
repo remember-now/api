@@ -115,7 +115,7 @@ export const EDGE_HYBRID_SEARCH_MMR: SearchConfig = {
 };
 
 export const EDGE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
-  limit: DEFAULT_SEARCH_LIMIT,
+  limit: 10,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
     searchMethods: [
@@ -166,7 +166,7 @@ export const NODE_HYBRID_SEARCH_MMR: SearchConfig = {
 };
 
 export const NODE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
-  limit: DEFAULT_SEARCH_LIMIT,
+  limit: 10,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
     searchMethods: [
@@ -223,7 +223,7 @@ export const COMMUNITY_HYBRID_SEARCH_MMR: SearchConfig = {
 };
 
 export const COMMUNITY_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
-  limit: DEFAULT_SEARCH_LIMIT,
+  limit: 3,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
     searchMethods: [

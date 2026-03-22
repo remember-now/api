@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { LlmService } from '@/llm/llm.service';
 
+import { EmbeddingService } from '../embedding';
 import { createCommunityEdge } from '../models/edges/community-edge';
 import { createCommunityNode } from '../models/nodes/community-node';
 import { Neo4jService } from '../neo4j/neo4j.service';
@@ -28,6 +29,7 @@ export const communitySummaryJsonSchema = z.toJSONSchema(
 export class CommunityService {
   constructor(
     private readonly llmService: LlmService,
+    private readonly embeddingService: EmbeddingService,
     private readonly neo4jService: Neo4jService,
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly communityNodeRepository: CommunityNodeRepository,
@@ -106,13 +108,15 @@ export class CommunityService {
         .withStructuredOutput(communitySummaryJsonSchema)
         .invoke(messages);
 
-      // TODO: embed community name via EmbeddingService so that community
-      // similarity search (community_names_embedding vector index) returns results.
-      const community = createCommunityNode({
+      const communityRaw = createCommunityNode({
         name: communitySummary.name,
         summary: communitySummary.summary,
         groupId,
       });
+      const nameEmbedding = await this.embeddingService.embedText(
+        communityRaw.name,
+      );
+      const community = { ...communityRaw, nameEmbedding };
       communityNodes.push(community);
 
       const edges = memberUuids.map((uuid) =>

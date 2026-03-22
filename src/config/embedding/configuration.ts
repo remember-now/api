@@ -6,15 +6,17 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((val) => val === 'true' || val === 'TRUE'),
-  EMBEDDING_API_KEY: z.string().optional(),
-  EMBEDDING_MODEL: z.string().default('text-embedding-004'),
+  GOOGLE_EMBEDDING_API_KEY: z.string().optional(),
+  GOOGLE_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
+  GOOGLE_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(768),
 });
 
 export default registerAs('embedding', () => {
   const env = envSchema.parse(process.env);
   return {
     embeddingEnabled: env.EMBEDDING_ENABLED,
-    apiKey: env.EMBEDDING_API_KEY,
-    model: env.EMBEDDING_MODEL,
+    googleApiKey: env.GOOGLE_EMBEDDING_API_KEY,
+    googleModel: env.GOOGLE_EMBEDDING_MODEL,
+    dimensions: env.GOOGLE_EMBEDDING_DIMENSIONS,
   };
 });

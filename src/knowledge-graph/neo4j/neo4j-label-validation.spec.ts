@@ -1,5 +1,6 @@
 import {
   NodeLabelValidationError,
+  validateGroupId,
   validateNodeLabels,
 } from './neo4j-label-validation';
 
@@ -49,5 +50,32 @@ describe('validateNodeLabels', () => {
     expect(err!.message).toContain('"bad-one"');
     expect(err!.message).toContain('"bad two"');
     expect(err!.message).not.toContain('"Entity"');
+  });
+});
+
+describe('validateGroupId', () => {
+  it('accepts valid alphanumeric ids', () => {
+    expect(() => validateGroupId('user123')).not.toThrow();
+  });
+
+  it('accepts ids with hyphens and underscores', () => {
+    expect(() => validateGroupId('user-123')).not.toThrow();
+    expect(() => validateGroupId('group_a')).not.toThrow();
+  });
+
+  it('accepts empty string (default group)', () => {
+    expect(() => validateGroupId('')).not.toThrow();
+  });
+
+  it('throws for id with space', () => {
+    expect(() => validateGroupId('group id')).toThrow();
+  });
+
+  it('throws for id with semicolon', () => {
+    expect(() => validateGroupId('group;id')).toThrow();
+  });
+
+  it('throws for id with newline', () => {
+    expect(() => validateGroupId('id\n')).toThrow();
   });
 });

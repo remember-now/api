@@ -130,6 +130,16 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
+  async getUuidsForEpisodeDeletion(episodeUuid: string): Promise<string[]> {
+    const results = await this.neo4j.executeRead<{ uuid: string }>(
+      /* cypher */ `MATCH ()-[e:RELATES_TO]->()
+       WHERE e.episodes[0] = $episodeUuid
+       RETURN e.uuid AS uuid`,
+      { episodeUuid },
+    );
+    return results.map((r) => r.uuid);
+  }
+
   async getByGroupIds(
     groupIds: string[],
     limit?: number,

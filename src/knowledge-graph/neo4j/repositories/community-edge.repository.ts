@@ -70,14 +70,16 @@ export class CommunityEdgeRepository {
     groupIds: string[],
     limit?: number,
   ): Promise<CommunityEdge[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
+    const params: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid
        ${limitClause}`,
-      { groupIds },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }

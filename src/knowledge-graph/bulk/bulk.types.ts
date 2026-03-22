@@ -28,5 +28,6 @@ export interface AddBulkEpisodeResult {
   episodes: EpisodicNode[];
   nodes: EntityNode[];
   edges: EntityEdge[];
+  invalidatedEdges: EntityEdge[];
   episodicEdges: EpisodicEdge[];
 }

@@ -9,6 +9,7 @@ import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { createEpisodicEdge } from '../models/edges';
 import { createEpisodicNode } from '../models/nodes';
+import { validateGroupId } from '../neo4j/neo4j-label-validation';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -22,8 +23,10 @@ import {
 } from '../resolution/resolution-utils';
 import { buildDirectedUuidMap, resolveEdgePointers } from './bulk-utils';
 import { AddBulkEpisodeOptions, AddBulkEpisodeResult } from './bulk.types';
+import { chunkContent, shouldChunk } from './content-chunking';
 
 const PREVIOUS_EPISODES_WINDOW = 20;
+const MAX_NODES_PER_SUMMARY_BATCH = 30;
 
 function reassembleByOffsets<T>(flat: T[], lengths: number[]): T[][] {
   let offset = 0;
@@ -63,7 +66,16 @@ export class BulkEpisodeService {
 
     // 1. Guard
     if (episodes.length === 0) {
-      return { episodes: [], nodes: [], edges: [], episodicEdges: [] };
+      return {
+        episodes: [],
+        nodes: [],
+        edges: [],
+        invalidatedEdges: [],
+        episodicEdges: [],
+      };
+    }
+    for (const ep of episodes) {
+      validateGroupId(ep.groupId);
     }
 
     // 2. Get model
@@ -97,6 +109,14 @@ export class BulkEpisodeService {
     );
 
     // 6. Extract nodes in parallel
+    // TODO: When shouldChunk(ep.content), split into chunks via chunkContent() and
+    // run extraction per chunk, then merge. The episode node is saved once.
+    for (const ep of episodicNodes) {
+      if (shouldChunk(ep.content)) {
+        const _chunks = chunkContent(ep.content, ep.source);
+        void _chunks; // chunked extraction not yet implemented — fall through
+      }
+    }
     const extractedNodesPerEpisode = await Promise.all(
       episodicNodes.map((ep, i) =>
         this.nodeExtractionService.extractNodes(
@@ -119,6 +139,8 @@ export class BulkEpisodeService {
     );
 
     // 8. Get all existing nodes once
+    // TODO: scalability — loads ALL entity nodes into memory. For large graphs this
+    // should be replaced with a candidate pre-filter (e.g., vector index or BFS).
     const groupIds = [...new Set(episodes.map((e) => e.groupId))];
     const existingNodes =
       await this.entityNodeRepository.getByGroupIds(groupIds);
@@ -252,32 +274,38 @@ export class BulkEpisodeService {
     );
 
     if (newNodesOnly.length > 0) {
-      // Use the first episode as context for the summary prompt (best effort)
-      const summaryMessages = buildNodeSummaryMessages({
-        episode: episodicNodes[0],
-        previousEpisodes: prevEpisodesPerEpisode[0],
-        nodes: newNodesOnly.map((n) => ({
-          uuid: n.uuid,
-          name: n.name,
-          summary: n.summary,
-          facts: allResolvedEdges
-            .filter(
-              (e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid,
-            )
-            .map((e) => e.fact),
-        })),
-      });
+      const nodesInput = newNodesOnly.map((n) => ({
+        uuid: n.uuid,
+        name: n.name,
+        summary: n.summary,
+        facts: allResolvedEdges
+          .filter(
+            (e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid,
+          )
+          .map((e) => e.fact),
+      }));
 
-      const summaryResult = await model
-        .withStructuredOutput(nodeSummaryJsonSchema)
-        .invoke(summaryMessages);
+      const summaryMap = new Map<string, string>();
+      for (let i = 0; i < nodesInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
+        const batch = nodesInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
+        // Use the first episode as context for the summary prompt (best effort)
+        const summaryMessages = buildNodeSummaryMessages({
+          episode: episodicNodes[0],
+          previousEpisodes: prevEpisodesPerEpisode[0],
+          nodes: batch,
+        });
 
-      const summaryMap = new Map(
-        summaryResult.summaries.map((s: { uuid: string; summary: string }) => [
-          s.uuid,
-          s.summary,
-        ]),
-      );
+        const summaryResult = await model
+          .withStructuredOutput(nodeSummaryJsonSchema)
+          .invoke(summaryMessages);
+
+        for (const s of summaryResult.summaries as {
+          uuid: string;
+          summary: string;
+        }[]) {
+          summaryMap.set(s.uuid, s.summary);
+        }
+      }
 
       for (const node of newNodesOnly) {
         const summary = summaryMap.get(node.uuid);
@@ -317,6 +345,7 @@ export class BulkEpisodeService {
       episodes: episodicNodes,
       nodes: allCanonicalNodes,
       edges: allResolvedEdges,
+      invalidatedEdges: allInvalidatedEdges,
       episodicEdges: allEpisodicEdges,
     };
   }

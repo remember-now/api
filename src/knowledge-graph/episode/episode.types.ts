@@ -30,6 +30,7 @@ export interface AddEpisodeResult {
   episode: EpisodicNode;
   nodes: EntityNode[];
   edges: EntityEdge[];
+  invalidatedEdges: EntityEdge[];
   episodicEdges: EpisodicEdge[];
 }
 

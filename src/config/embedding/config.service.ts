@@ -9,11 +9,15 @@ export class EmbeddingConfigService {
     return this.configService.get<boolean>('embedding.embeddingEnabled')!;
   }
 
-  get apiKey(): string | undefined {
-    return this.configService.get<string>('embedding.apiKey');
+  get googleApiKey(): string | undefined {
+    return this.configService.get<string>('embedding.googleApiKey');
   }
 
-  get model(): string {
-    return this.configService.get<string>('embedding.model')!;
+  get googleModel(): string {
+    return this.configService.get<string>('embedding.googleModel')!;
+  }
+
+  get dimensions(): number {
+    return this.configService.get<number>('embedding.dimensions')!;
   }
 }

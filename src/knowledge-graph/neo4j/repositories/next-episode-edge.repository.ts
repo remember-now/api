@@ -71,15 +71,20 @@ export class NextEpisodeEdgeRepository {
     limit?: number,
     uuidCursor?: string,
   ): Promise<NextEpisodeEdge[]> {
-    const limitClause = limit ? `LIMIT ${limit}` : '';
+    const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
+    const params: Record<string, unknown> = {
+      groupIds,
+      uuidCursor: uuidCursor ?? null,
+    };
+    if (limit !== undefined) params['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ORDER BY e.uuid DESC ${limitClause}`,
-      { groupIds, uuidCursor: uuidCursor ?? null },
+      params,
     );
     return results.map((r) => this.mapRow(r));
   }
