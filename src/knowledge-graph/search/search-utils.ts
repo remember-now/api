@@ -148,8 +148,8 @@ export async function nodeDistanceReranker(
 
 /**
  * Reranks node UUIDs by the number of episodic mentions.
- * Uses RRF as a preliminary ranker, then sorts ascending by mention count
- * (matching the Python implementation).
+ * Uses RRF as a preliminary ranker, then sorts descending by mention count
+ * so the most-mentioned nodes rank highest.
  */
 export async function episodeMentionsReranker(
   neo4j: Neo4jService,
@@ -172,10 +172,9 @@ export async function episodeMentionsReranker(
   }
 
   for (const uuid of sortedUuids) {
-    if (!scores.has(uuid)) scores.set(uuid, Infinity);
+    if (!scores.has(uuid)) scores.set(uuid, 0);
   }
-
-  sortedUuids.sort((a, b) => scores.get(a)! - scores.get(b)!);
+  sortedUuids.sort((a, b) => scores.get(b)! - scores.get(a)!);
 
   const result = sortedUuids
     .map((uuid) => [uuid, scores.get(uuid)!] as [string, number])
@@ -209,6 +208,7 @@ export async function crossEncoderReranker(
   const rawScores = await Promise.all(
     items.map((item) =>
       scoredModel.invoke([
+        // TOOD: Is this the best way to do this? how is withStructuredOutput populating the prompt?
         new SystemMessage(
           'Rate the relevance of the text to the query from 0 to 100. Respond with only a JSON object containing "score".',
         ),
