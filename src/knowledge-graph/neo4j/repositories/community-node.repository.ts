@@ -7,7 +7,6 @@ import {
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { luceneSanitize } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class CommunityNodeRepository implements OnModuleInit {
@@ -140,7 +139,7 @@ export class CommunityNodeRepository implements OnModuleInit {
               n.name_embedding AS name_embedding
        ORDER BY score DESC
        LIMIT $limit`,
-      { query: luceneSanitize(query), groupIds, limit },
+      { query, groupIds, limit },
     );
     return results.map((r) => this.mapRow(r));
   }

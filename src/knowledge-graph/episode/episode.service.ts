@@ -14,6 +14,7 @@ import {
 import {
   createEpisodicNode,
   createSagaNode,
+  EntityNode,
   EpisodeType,
   EpisodicNode,
 } from '../models/nodes';
@@ -152,21 +153,39 @@ export class EpisodeService {
     });
     await this.episodicNodeRepository.save(episode);
 
-    // 4. Extract nodes
-    // TODO: When shouldChunk(content), split into chunks via chunkContent() and
-    // run extraction per chunk, then merge results. The episode node is saved once;
-    // only extraction runs per chunk.
+    // 4. Extract nodes (with chunking for large content)
+    let extractedNodes: EntityNode[];
     if (shouldChunk(content)) {
-      const _chunks = chunkContent(content, source);
-      void _chunks; // chunked extraction not yet implemented — fall through to full-content extraction
+      const chunks = await chunkContent(content, source);
+      const perChunk = await Promise.all(
+        chunks.map((chunk) =>
+          this.nodeExtractionService.extractNodes(
+            model,
+            { ...episode, content: chunk },
+            previousEpisodes,
+            entityTypes,
+            customInstructions,
+          ),
+        ),
+      );
+      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
+      const nodesByName = new Map<string, EntityNode>();
+      for (const nodes of perChunk) {
+        for (const node of nodes) {
+          const key = node.name.toLowerCase();
+          if (!nodesByName.has(key)) nodesByName.set(key, node);
+        }
+      }
+      extractedNodes = [...nodesByName.values()];
+    } else {
+      extractedNodes = await this.nodeExtractionService.extractNodes(
+        model,
+        episode,
+        previousEpisodes,
+        entityTypes,
+        customInstructions,
+      );
     }
-    const extractedNodes = await this.nodeExtractionService.extractNodes(
-      model,
-      episode,
-      previousEpisodes,
-      entityTypes,
-      customInstructions,
-    );
 
     // 5. Get existing nodes + embed extracted nodes in parallel
     // TODO: scalability — loads ALL entity nodes into memory. For large graphs this

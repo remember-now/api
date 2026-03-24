@@ -333,12 +333,20 @@ export class SearchService {
       rankedUuids = edgeEntries.map(([u]) => u);
       rankedScores = edgeEntries.map(([, s]) => s);
     } else if (reranker === EdgeReranker.episode_mentions) {
-      // Sort by number of episodes referencing this edge (descending)
-      const allEdges = [...edgeMap.values()];
-      allEdges.sort((a, b) => b.episodes.length - a.episodes.length);
-      const filtered = allEdges.filter((e) => e.episodes.length >= rerankerMin);
-      rankedUuids = filtered.map((e) => e.uuid);
-      rankedScores = filtered.map((e) => e.episodes.length);
+      // RRF preliminary ranking, then sort by episode count descending.
+      // Matches Python search.py:256-305: rrf runs first for both EdgeReranker.rrf
+      // and EdgeReranker.episode_mentions, then episode_mentions applies the sort.
+      const [rrfUuids, rrfScores] = rrf(
+        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+        rerankerMin,
+      );
+      const rrfScoreMap = new Map(rrfUuids.map((u, i) => [u, rrfScores[i]]));
+      const rrfEdges = rrfUuids
+        .map((uuid) => edgeMap.get(uuid))
+        .filter((e): e is EntityEdge => e !== undefined);
+      rrfEdges.sort((a, b) => b.episodes.length - a.episodes.length);
+      rankedUuids = rrfEdges.map((e) => e.uuid);
+      rankedScores = rankedUuids.map((u) => rrfScoreMap.get(u) ?? 0);
     } else {
       // Fallback: RRF
       [rankedUuids, rankedScores] = rrf(

@@ -1,6 +1,67 @@
 import { EntityEdge } from '../models/edges/entity-edge';
 
-// ─── UnionFind ────────────────────────────────────────────────────────────────
+/**
+ * Maximum number of concurrent LLM API calls in bulk ingestion.
+ * Prevents rate-limit exhaustion when processing large episode batches.
+ */
+export const LLM_CONCURRENCY_LIMIT = 10;
+
+class CountingSemaphore {
+  private count: number;
+  private readonly waiters: Array<() => void> = [];
+
+  constructor(count: number) {
+    if (count < 1) throw new Error('Semaphore count must be at least 1');
+    this.count = count;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.count > 0) {
+      this.count--;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.waiters.push(resolve);
+    });
+  }
+
+  release(): void {
+    if (this.waiters.length > 0) {
+      const nextResolve = this.waiters.shift();
+      if (nextResolve) nextResolve();
+    } else {
+      this.count++;
+    }
+  }
+}
+
+/**
+ * Runs tasks with bounded parallelism using a counting semaphore.
+ *
+ * All tasks are launched concurrently; the semaphore limits how many run at
+ * once. Each slot is always released in a `finally` block so a rejection never
+ * leaks a held permit.
+ *
+ * @param tasks   Zero-argument factory functions returning Promises.
+ * @param limit   Maximum tasks to run concurrently.
+ * @returns       Results in the same order as `tasks`.
+ */
+export async function withConcurrency<T>(
+  limit: number,
+  tasks: (() => Promise<T>)[],
+): Promise<T[]> {
+  const semaphore = new CountingSemaphore(limit);
+  return Promise.all(
+    tasks.map(async (task) => {
+      await semaphore.acquire();
+      try {
+        return await task();
+      } finally {
+        semaphore.release();
+      }
+    }),
+  );
+}
 
 /**
  * Union-Find (disjoint set) with iterative path compression.
@@ -42,8 +103,6 @@ export class UnionFind {
   }
 }
 
-// ─── compressUuidMap ──────────────────────────────────────────────────────────
-
 /**
  * Maps each UUID to the lexicographically smallest canonical UUID in its
  * duplicate cluster. Used for within-batch bidirectional deduplication.
@@ -64,8 +123,6 @@ export function compressUuidMap(
 
   return new Map([...allUuids].map((uuid) => [uuid, uf.find(uuid)]));
 }
-
-// ─── buildDirectedUuidMap ─────────────────────────────────────────────────────
 
 /**
  * Builds a directed alias → canonical map from (extractedUuid, canonicalUuid)
@@ -98,8 +155,6 @@ export function buildDirectedUuidMap(
 
   return new Map([...parent.keys()].map((uuid) => [uuid, find(uuid)]));
 }
-
-// ─── resolveEdgePointers ─────────────────────────────────────────────────────
 
 /**
  * Remaps edge source/target node UUIDs through a deduplication map.

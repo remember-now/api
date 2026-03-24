@@ -92,6 +92,10 @@ export class CommunityService {
     }
 
     // 7. Delete old communities for this group
+    // NOTE: Communities are deleted before new ones are persisted. If LLM summary
+    // generation (step 8) throws, the group will have no communities until the next
+    // successful buildCommunities call. Adding rollback support would require staging
+    // new communities before deleting the old ones.
     await this.communityNodeRepository.deleteByGroupId(groupId);
 
     // 8. For each community, generate LLM summary

@@ -262,7 +262,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (origin:Entity)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
-       MATCH (origin)-[:RELATES_TO*0..3]-(connected:Entity)
+       MATCH (origin)-[:RELATES_TO*1..3]-(connected:Entity)
        WHERE connected.group_id IN $groupIds
        WITH collect(DISTINCT connected.uuid) AS reachableUuids
        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)

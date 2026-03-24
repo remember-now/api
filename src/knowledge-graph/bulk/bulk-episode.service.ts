@@ -8,7 +8,7 @@ import { nodeSummaryJsonSchema } from '../episode/episode.types';
 import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { createEpisodicEdge } from '../models/edges';
-import { createEpisodicNode } from '../models/nodes';
+import { createEpisodicNode, EntityNode } from '../models/nodes';
 import { validateGroupId } from '../neo4j/neo4j-label-validation';
 import {
   EntityEdgeRepository,
@@ -21,7 +21,12 @@ import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
 } from '../resolution/resolution-utils';
-import { buildDirectedUuidMap, resolveEdgePointers } from './bulk-utils';
+import {
+  buildDirectedUuidMap,
+  LLM_CONCURRENCY_LIMIT,
+  resolveEdgePointers,
+  withConcurrency,
+} from './bulk-utils';
 import { AddBulkEpisodeOptions, AddBulkEpisodeResult } from './bulk.types';
 import { chunkContent, shouldChunk } from './content-chunking';
 
@@ -108,25 +113,41 @@ export class BulkEpisodeService {
       ),
     );
 
-    // 6. Extract nodes in parallel
-    // TODO: When shouldChunk(ep.content), split into chunks via chunkContent() and
-    // run extraction per chunk, then merge. The episode node is saved once.
-    for (const ep of episodicNodes) {
-      if (shouldChunk(ep.content)) {
-        const _chunks = chunkContent(ep.content, ep.source);
-        void _chunks; // chunked extraction not yet implemented — fall through
-      }
-    }
-    const extractedNodesPerEpisode = await Promise.all(
-      episodicNodes.map((ep, i) =>
-        this.nodeExtractionService.extractNodes(
+    // 6. Extract nodes in parallel (with chunking for large content)
+    const extractedNodesPerEpisode = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map((ep, i) => async () => {
+        if (shouldChunk(ep.content)) {
+          const chunks = await chunkContent(ep.content, ep.source);
+          const perChunk = await Promise.all(
+            chunks.map((chunk) =>
+              this.nodeExtractionService.extractNodes(
+                model,
+                { ...ep, content: chunk },
+                prevEpisodesPerEpisode[i],
+                entityTypes,
+                customInstructions,
+              ),
+            ),
+          );
+          // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
+          const nodesByName = new Map<string, EntityNode>();
+          for (const nodes of perChunk) {
+            for (const node of nodes) {
+              const key = node.name.toLowerCase();
+              if (!nodesByName.has(key)) nodesByName.set(key, node);
+            }
+          }
+          return [...nodesByName.values()];
+        }
+        return this.nodeExtractionService.extractNodes(
           model,
           ep,
           prevEpisodesPerEpisode[i],
           entityTypes,
           customInstructions,
-        ),
-      ),
+        );
+      }),
     );
 
     // 7. Embed all extracted nodes (batch)
@@ -147,16 +168,18 @@ export class BulkEpisodeService {
     const existingNodesMap = new Map(existingNodes.map((n) => [n.uuid, n]));
 
     // 9. Pass 1 — resolve nodes vs live graph in parallel
-    const nodeResolutions = await Promise.all(
-      embeddedPerEpisode.map((nodes, i) =>
-        this.nodeResolutionService.resolveNodes(
-          model,
-          episodicNodes[i],
-          nodes,
-          existingNodes,
-          prevEpisodesPerEpisode[i],
-          customInstructions,
-        ),
+    const nodeResolutions = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      embeddedPerEpisode.map(
+        (nodes, i) => () =>
+          this.nodeResolutionService.resolveNodes(
+            model,
+            episodicNodes[i],
+            nodes,
+            existingNodes,
+            prevEpisodesPerEpisode[i],
+            customInstructions,
+          ),
       ),
     );
 
@@ -212,16 +235,18 @@ export class BulkEpisodeService {
     });
 
     // 13. Extract edges in parallel, then resolve pointers
-    const extractedEdgesPerEpisode = await Promise.all(
-      episodicNodes.map((ep, i) =>
-        this.edgeExtractionService.extractEdges(
-          model,
-          ep,
-          canonicalNodesPerEpisode[i],
-          prevEpisodesPerEpisode[i],
-          ep.validAt,
-          customInstructions,
-        ),
+    const extractedEdgesPerEpisode = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map(
+        (ep, i) => () =>
+          this.edgeExtractionService.extractEdges(
+            model,
+            ep,
+            canonicalNodesPerEpisode[i],
+            prevEpisodesPerEpisode[i],
+            ep.validAt,
+            customInstructions,
+          ),
       ),
     );
 
@@ -243,18 +268,20 @@ export class BulkEpisodeService {
       await this.entityEdgeRepository.getByGroupIds(groupIds);
 
     // 16. Resolve edges in parallel
-    const edgeResolutions = await Promise.all(
-      episodicNodes.map((ep, i) =>
-        this.edgeResolutionService.resolveEdges(
-          model,
-          ep,
-          embeddedEdgesPerEpisode[i],
-          existingEdges,
-          finalUuidMap,
-          ep.validAt,
-          prevEpisodesPerEpisode[i],
-          customInstructions,
-        ),
+    const edgeResolutions = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map(
+        (ep, i) => () =>
+          this.edgeResolutionService.resolveEdges(
+            model,
+            ep,
+            embeddedEdgesPerEpisode[i],
+            existingEdges,
+            finalUuidMap,
+            ep.validAt,
+            prevEpisodesPerEpisode[i],
+            customInstructions,
+          ),
       ),
     );
 
@@ -288,7 +315,10 @@ export class BulkEpisodeService {
       const summaryMap = new Map<string, string>();
       for (let i = 0; i < nodesInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
         const batch = nodesInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
-        // Use the first episode as context for the summary prompt (best effort)
+        // TODO: Uses episodicNodes[0] as context for ALL summary batches.
+        // Nodes from later episodes get summarized with episode-0's context, which
+        // degrades quality for diverse batches. Fix: group canonical nodes by their
+        // originating episode and summarize each group with its own context.
         const summaryMessages = buildNodeSummaryMessages({
           episode: episodicNodes[0],
           previousEpisodes: prevEpisodesPerEpisode[0],
@@ -333,6 +363,10 @@ export class BulkEpisodeService {
     ]);
 
     // 20. Optional community build
+    // TODO: Concurrent addEpisodesBulk calls for the same groupId can race here —
+    // two community builds may project conflicting graph snapshots and race on
+    // deleteByGroupId. Investigate a per-groupId mutex or advisory lock before
+    // enabling concurrent bulk ingestion.
     if (updateCommunities) {
       await Promise.all(
         groupIds.map((gid) =>

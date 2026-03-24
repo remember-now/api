@@ -12,6 +12,10 @@ import {
   SearchConfig,
 } from './search-config.types';
 
+// NOTE: None of these recipes include temporal filters, matching the Python
+// Graphiti source (search_config_recipes.py). Temporal filters (e.g. excluding
+// expired_at IS NOT NULL edges) must be added by callers via SearchConfig.filters.
+
 // ─── Combined (all entity types) ────────────────────────────────────────────
 
 export const COMBINED_HYBRID_SEARCH_RRF: SearchConfig = {

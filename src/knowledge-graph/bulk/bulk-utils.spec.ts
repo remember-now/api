@@ -3,9 +3,52 @@ import {
   compressUuidMap,
   resolveEdgePointers,
   UnionFind,
+  withConcurrency,
 } from './bulk-utils';
 
-// ─── UnionFind ────────────────────────────────────────────────────────────────
+describe('withConcurrency', () => {
+  it('returns results in input order', async () => {
+    const tasks = [3, 1, 2].map((n) => () => Promise.resolve(n));
+    const results = await withConcurrency(2, tasks);
+    expect(results).toEqual([3, 1, 2]);
+  });
+
+  it('handles an empty task array', async () => {
+    const results = await withConcurrency(5, []);
+    expect(results).toEqual([]);
+  });
+
+  it('handles a single task', async () => {
+    const results = await withConcurrency(5, [() => Promise.resolve(42)]);
+    expect(results).toEqual([42]);
+  });
+
+  it('runs no more than limit tasks concurrently', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const limit = 3;
+    const tasks = Array.from({ length: 9 }, () => () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      return Promise.resolve().then(() => {
+        active--;
+        return 1;
+      });
+    });
+    await withConcurrency(limit, tasks);
+    expect(maxActive).toBeLessThanOrEqual(limit);
+  });
+
+  it('rethrows a task rejection', async () => {
+    const err = new Error('task failed');
+    const tasks = [
+      () => Promise.resolve(1),
+      () => Promise.reject(err),
+      () => Promise.resolve(3),
+    ];
+    await expect(withConcurrency(5, tasks)).rejects.toThrow('task failed');
+  });
+});
 
 describe('UnionFind', () => {
   it('find returns self for singleton', () => {
@@ -45,8 +88,6 @@ describe('UnionFind', () => {
   });
 });
 
-// ─── compressUuidMap ──────────────────────────────────────────────────────────
-
 describe('compressUuidMap', () => {
   it('single pair: smaller uuid is canonical', () => {
     const map = compressUuidMap([['b', 'a']]);
@@ -77,8 +118,6 @@ describe('compressUuidMap', () => {
   });
 });
 
-// ─── buildDirectedUuidMap ─────────────────────────────────────────────────────
-
 describe('buildDirectedUuidMap', () => {
   it('directed pair b→a maps b to a', () => {
     const map = buildDirectedUuidMap([['b', 'a']]);
@@ -104,8 +143,6 @@ describe('buildDirectedUuidMap', () => {
     expect(map.get('d')).toBe('c');
   });
 });
-
-// ─── resolveEdgePointers ─────────────────────────────────────────────────────
 
 const makeEdge = (
   uuid: string,

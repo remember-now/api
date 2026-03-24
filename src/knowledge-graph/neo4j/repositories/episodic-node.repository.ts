@@ -4,7 +4,6 @@ import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { luceneSanitize } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class EpisodicNodeRepository implements OnModuleInit {
@@ -174,7 +173,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
               n.valid_at AS valid_at
        ORDER BY score DESC
        LIMIT $limit`,
-      { query: luceneSanitize(query), groupIds, limit },
+      { query, groupIds, limit },
     );
     return results.map((r) => this.mapRow(r));
   }

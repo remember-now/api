@@ -77,12 +77,12 @@ describe('buildNodeFilterClause', () => {
     ).toThrow();
   });
 
-  it('temporalFilter with gte: produces >= condition and param', () => {
+  it('single-group single filter (gte): produces >= condition and param', () => {
     const date = new Date('2024-01-01');
     const result = buildNodeFilterClause(
       {
         temporalFilters: [
-          { field: 'valid_at', op: TemporalComparison.gte, value: date },
+          [{ field: 'valid_at', op: TemporalComparison.gte, value: date }],
         ],
       },
       'n',
@@ -92,11 +92,11 @@ describe('buildNodeFilterClause', () => {
     expect(Object.values(result.params)).toContain(date);
   });
 
-  it('isNull: no param added, clause contains IS NULL', () => {
+  it('single-group isNull: no param added, clause contains IS NULL', () => {
     const result = buildNodeFilterClause(
       {
         temporalFilters: [
-          { field: 'invalid_at', op: TemporalComparison.isNull },
+          [{ field: 'invalid_at', op: TemporalComparison.isNull }],
         ],
       },
       'n',
@@ -105,12 +105,47 @@ describe('buildNodeFilterClause', () => {
     expect(Object.keys(result.params)).toHaveLength(0);
   });
 
-  it('mixed labels + temporal: conditions are AND-joined', () => {
+  it('single-group AND: multiple conditions in one group are AND-joined in parens', () => {
+    const d1 = new Date('2024-01-01');
+    const d2 = new Date('2024-12-31');
+    const result = buildNodeFilterClause(
+      {
+        temporalFilters: [
+          [
+            { field: 'valid_at', op: TemporalComparison.gte, value: d1 },
+            { field: 'valid_at', op: TemporalComparison.lte, value: d2 },
+          ],
+        ],
+      },
+      'n',
+    );
+    expect(result.clause).toContain('(n.valid_at >= ');
+    expect(result.clause).toContain(' AND ');
+    expect(result.clause).toContain('n.valid_at <=');
+  });
+
+  it('multi-group OR: two groups are OR-joined and wrapped in outer parens', () => {
+    const date = new Date('2024-06-01');
+    const result = buildNodeFilterClause(
+      {
+        temporalFilters: [
+          [{ field: 'valid_at', op: TemporalComparison.gte, value: date }],
+          [{ field: 'valid_at', op: TemporalComparison.isNull }],
+        ],
+      },
+      'n',
+    );
+    expect(result.clause).toContain(' OR ');
+    expect(result.clause).toContain('IS NULL');
+    expect(result.clause).toMatch(/^\(/); // outer OR group wrapped in parens
+  });
+
+  it('mixed labels + temporal: conditions are AND-joined at top level', () => {
     const result = buildNodeFilterClause(
       {
         nodeLabels: ['Person'],
         temporalFilters: [
-          { field: 'valid_at', op: TemporalComparison.isNotNull },
+          [{ field: 'valid_at', op: TemporalComparison.isNotNull }],
         ],
       },
       'n',

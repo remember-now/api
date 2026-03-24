@@ -118,6 +118,9 @@ export class NodeResolutionService {
         name: n.name,
       }));
 
+      // NOTE: Last-write-wins on case-insensitive name collision. If two existing
+      // nodes differ only in case (e.g. "OpenAI" vs "openai"), one silently shadows
+      // the other in this map. No warning is emitted.
       const existingByName = new Map(
         existingNodes.map((n) => [n.name.toLowerCase(), n]),
       );
@@ -157,11 +160,14 @@ export class NodeResolutionService {
           }
         }
 
-        // Apply canonical name if LLM returned a better one
+        // Apply canonical name if LLM returned a better one.
+        // nameEmbedding is cleared because it was computed for the old name —
+        // persisting a stale embedding would corrupt vector search results.
         if (resolution.name) {
           const node = extractedNodes.find((n) => n.uuid === extractedUuid);
           if (node && resolution.name !== node.name) {
             node.name = resolution.name;
+            node.nameEmbedding = null;
           }
         }
       }

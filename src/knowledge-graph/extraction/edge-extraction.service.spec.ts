@@ -196,6 +196,29 @@ describe('EdgeExtractionService', () => {
     expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
   });
 
+  it('should set episodes to [episode.uuid] on each extracted edge', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      edges: [
+        {
+          source: 'Alice',
+          target: 'Acme Corp',
+          name: 'WORKS_AT',
+          description: 'Alice works at Acme Corp.',
+        },
+      ],
+    });
+
+    const edges = await service.extractEdges(
+      mockModel,
+      baseEpisode,
+      nodes,
+      [],
+      referenceTime,
+    );
+
+    expect(edges[0].episodes).toEqual([baseEpisode.uuid]);
+  });
+
   it('should return empty array when no edges extracted', async () => {
     mockRunnable.invoke.mockResolvedValue({ edges: [] });
 

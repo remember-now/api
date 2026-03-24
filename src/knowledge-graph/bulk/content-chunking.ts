@@ -1,6 +1,6 @@
-import { EpisodeType } from '../models/nodes/node.types';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { EpisodeType } from '../models/nodes/node.types';
 
 export const CHUNK_TOKEN_SIZE = 3000;
 export const CHUNK_OVERLAP_TOKENS = 200;
@@ -13,91 +13,43 @@ export const CHUNK_DENSITY_THRESHOLD = 0.15; // entities per token
 // which is sufficient for chunking decisions but not exact for model billing.
 const CHARS_PER_TOKEN = 4;
 
-// ─── Token estimation ─────────────────────────────────────────────────────────
-
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
-
-// ─── shouldChunk ─────────────────────────────────────────────────────────────
 
 export function shouldChunk(content: string): boolean {
   return estimateTokens(content) > CHUNK_TOKEN_SIZE;
 }
 
-// ─── chunkText ────────────────────────────────────────────────────────────────
-
 /**
- * Splits text into overlapping chunks on sentence boundaries.
- * Falls back to hard character splits when no sentence boundary is found.
+ * Splits text into overlapping chunks using LangChain's RecursiveCharacterTextSplitter.
+ * Respects paragraph → sentence → word → character boundaries in that order.
  */
-export function chunkText(
+export async function chunkText(
   text: string,
   chunkSize = CHUNK_TOKEN_SIZE,
   overlap = CHUNK_OVERLAP_TOKENS,
-): string[] {
+): Promise<string[]> {
   if (estimateTokens(text) <= chunkSize) return [text];
 
-  const chunkChars = chunkSize * CHARS_PER_TOKEN;
-  const overlapChars = overlap * CHARS_PER_TOKEN;
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: chunkSize * CHARS_PER_TOKEN,
+    chunkOverlap: overlap * CHARS_PER_TOKEN,
+    separators: ['\n\n', '\n', '. ', '! ', '? ', ' ', ''],
+  });
 
-  const chunks: string[] = [];
-  let start = 0;
-
-  while (start < text.length) {
-    const end = Math.min(start + chunkChars, text.length);
-    let chunkEnd = end;
-
-    // Try to break on a sentence boundary (.  !  ?) within the last 20% of the chunk
-    if (end < text.length) {
-      const searchStart = start + Math.floor(chunkChars * 0.8);
-      const sentenceEnd = findSentenceBoundary(text, searchStart, end);
-      if (sentenceEnd !== -1) {
-        chunkEnd = sentenceEnd;
-      }
-    }
-
-    const chunk = text.slice(start, chunkEnd).trim();
-    if (chunk.length > 0) {
-      chunks.push(chunk);
-    }
-
-    if (chunkEnd >= text.length) break;
-
-    // Move start forward, backing off by overlap
-    start = Math.max(chunkEnd - overlapChars, start + 1);
-  }
-
-  return chunks;
+  const docs = await splitter.createDocuments([text]);
+  return docs.map((d) => d.pageContent);
 }
-
-function findSentenceBoundary(
-  text: string,
-  searchStart: number,
-  searchEnd: number,
-): number {
-  for (let i = searchEnd - 1; i >= searchStart; i--) {
-    if (
-      (text[i] === '.' || text[i] === '!' || text[i] === '?') &&
-      i + 1 < text.length &&
-      text[i + 1] === ' '
-    ) {
-      return i + 1;
-    }
-  }
-  return -1;
-}
-
-// ─── chunkJson ────────────────────────────────────────────────────────────────
 
 /**
  * Splits a JSON array string into token-budget chunks.
  * If the content is not a valid JSON array, falls back to chunkText.
  */
-export function chunkJson(
+export async function chunkJson(
   json: string,
   chunkSize = CHUNK_TOKEN_SIZE,
-): string[] {
+): Promise<string[]> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -137,15 +89,16 @@ export function chunkJson(
   return chunks.length > 0 ? chunks : [json];
 }
 
-// ─── chunkContent ─────────────────────────────────────────────────────────────
-
 /**
  * Dispatcher: routes content to the appropriate chunker based on episode type.
  */
-export function chunkContent(content: string, source: EpisodeType): string[] {
+export async function chunkContent(
+  content: string,
+  source: EpisodeType,
+): Promise<string[]> {
   if (source === EpisodeType.json) {
     return chunkJson(content);
   }
-  // text and message types use sentence-boundary text chunking
+  // text and message types use recursive character text chunking
   return chunkText(content);
 }

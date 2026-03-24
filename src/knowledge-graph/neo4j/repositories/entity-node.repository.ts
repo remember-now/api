@@ -8,10 +8,7 @@ import {
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import {
-  buildNodeFilterClause,
-  luceneSanitize,
-} from '@/knowledge-graph/search/search-filters';
+import { buildNodeFilterClause } from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
@@ -171,7 +168,7 @@ export class EntityNodeRepository implements OnModuleInit {
               labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
-      { query: luceneSanitize(query), groupIds, limit, ...filterParams },
+      { query, groupIds, limit, ...filterParams },
     );
     return results.map((r) => this.mapRow(r));
   }

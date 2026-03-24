@@ -148,7 +148,11 @@ describe('EdgeResolutionService', () => {
       referenceTime,
     );
 
-    expect(result.resolvedEdges).toHaveLength(0);
+    // The existing edge is returned in resolvedEdges with the episode UUID appended
+    // so it can be re-persisted with the updated episodes array.
+    expect(result.resolvedEdges).toHaveLength(1);
+    expect(result.resolvedEdges[0].uuid).toBe('exist-edge-uuid');
+    expect(result.resolvedEdges[0].episodes).toContain(baseEpisode.uuid);
     expect(result.invalidatedEdges).toHaveLength(0);
   });
 

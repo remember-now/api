@@ -71,6 +71,28 @@ describe('EpisodicEdgeRepository', () => {
     });
   });
 
+  describe('saveBulk', () => {
+    it('calls executeWrite exactly once for N edges (single UNWIND round-trip)', async () => {
+      neo4j.executeWrite.mockResolvedValue([]);
+      const edges = [
+        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+      ];
+      await repo.saveBulk(edges);
+      expect(neo4j.executeWrite).toHaveBeenCalledTimes(1);
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.stringContaining('UNWIND'),
+        expect.anything(),
+      );
+    });
+
+    it('does nothing when given an empty array', async () => {
+      await repo.saveBulk([]);
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
       neo4j.executeRead.mockResolvedValue([]);

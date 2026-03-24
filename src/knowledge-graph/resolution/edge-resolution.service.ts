@@ -64,6 +64,7 @@ export class EdgeResolutionService {
     }
 
     const resolvedEdges: EntityEdge[] = [];
+    const resolvedExistingUuids = new Set<string>();
     const invalidatedEdgesMap = new Map<string, EntityEdge>();
 
     for (const edge of deduped) {
@@ -159,6 +160,22 @@ export class EdgeResolutionService {
 
       if (!isDuplicate) {
         resolvedEdges.push(edge);
+      } else {
+        // Append this episode's UUID to the matching existing endpoint edge(s)
+        // and include them in resolvedEdges so they are re-saved with updated episodes.
+        // Mirrors Python edge_operations.py:523-524 and 581-582.
+        for (const idx of dedupe.duplicate_facts) {
+          if (idx < endpointEdges.length) {
+            const existingEdge = idxToEdge.get(idx);
+            if (existingEdge && !resolvedExistingUuids.has(existingEdge.uuid)) {
+              if (!existingEdge.episodes.includes(episode.uuid)) {
+                existingEdge.episodes.push(episode.uuid);
+              }
+              resolvedEdges.push(existingEdge);
+              resolvedExistingUuids.add(existingEdge.uuid);
+            }
+          }
+        }
       }
 
       for (const idx of dedupe.contradicted_facts) {

@@ -47,6 +47,7 @@ export class EdgeExtractionService {
           groupId: episode.groupId,
           sourceNodeUuid: sourceNode.uuid,
           targetNodeUuid: targetNode.uuid,
+          episodes: [episode.uuid],
           validAt: typeof e.validAt === 'string' ? new Date(e.validAt) : null,
           invalidAt:
             typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,

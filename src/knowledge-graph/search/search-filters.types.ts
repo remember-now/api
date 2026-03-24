@@ -27,11 +27,17 @@ export interface SearchFilters {
   nodeLabels?: string[];
   /** Filter entity edges by their name/type property. */
   edgeTypes?: string[];
-  // TODO: Python Graphiti supports nested AND/OR temporal filter groups
-  // (list[list[DateFilter]]). This port uses a flat AND-only list. Extend
-  // SearchFilters with OR-group semantics when needed.
-  /** Temporal conditions applied to the matched entities. */
-  temporalFilters?: TemporalFilter[];
+  /**
+   * Temporal conditions applied to the matched entities.
+   *
+   * Mirrors Python Graphiti's `list[list[DateFilter]]` structure:
+   * - Outer array: OR groups — at least one group must match.
+   * - Inner array: AND conditions — all conditions within a group must match.
+   *
+   * Example: `[[{ field: 'valid_at', op: gte, value: t1 }, { field: 'valid_at', op: lt, value: t2 }], [{ field: 'valid_at', op: isNull }]]`
+   * produces: `((e.valid_at >= $p AND e.valid_at < $p2) OR (e.valid_at IS NULL))`
+   */
+  temporalFilters?: TemporalFilter[][];
   /** Only return edges whose UUID is in this list. */
   edgeUuids?: string[];
 }

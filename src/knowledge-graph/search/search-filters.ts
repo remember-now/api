@@ -24,27 +24,54 @@ export function luceneSanitize(query: string): string {
   return query.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, '\\$&');
 }
 
+/**
+ * Builds temporal WHERE conditions from OR-groups of AND-joined filters.
+ *
+ * Each outer group produces one parenthesized AND expression; groups are
+ * OR-joined. A single group with a single filter produces a bare condition
+ * without extra parentheses.
+ *
+ * Mirrors Python's edge_search_filter_query_constructor (search_ops.py:149-178).
+ */
 function buildTemporalConditions(
   temporalFilters: SearchFilters['temporalFilters'],
   alias: string,
   params: Record<string, unknown>,
 ): string[] {
-  const conditions: string[] = [];
-  (temporalFilters ?? []).forEach((tf, idx) => {
-    if (!TEMPORAL_FIELDS.has(tf.field)) return;
-    if (!WHITELISTED_OPS.has(tf.op)) return;
+  if (!temporalFilters || temporalFilters.length === 0) return [];
 
-    if (tf.op === TemporalComparison.isNull) {
-      conditions.push(`${alias}.${tf.field} IS NULL`);
-    } else if (tf.op === TemporalComparison.isNotNull) {
-      conditions.push(`${alias}.${tf.field} IS NOT NULL`);
-    } else {
-      const paramName = `filterTemporal_${idx}`;
-      conditions.push(`${alias}.${tf.field} ${tf.op} $${paramName}`);
-      params[paramName] = tf.value;
+  const groupClauses: string[] = [];
+
+  for (let outerIdx = 0; outerIdx < temporalFilters.length; outerIdx++) {
+    const group = temporalFilters[outerIdx];
+    const andParts: string[] = [];
+
+    for (let innerIdx = 0; innerIdx < group.length; innerIdx++) {
+      const tf = group[innerIdx];
+      if (!TEMPORAL_FIELDS.has(tf.field)) continue;
+      if (!WHITELISTED_OPS.has(tf.op)) continue;
+
+      if (tf.op === TemporalComparison.isNull) {
+        andParts.push(`${alias}.${tf.field} IS NULL`);
+      } else if (tf.op === TemporalComparison.isNotNull) {
+        andParts.push(`${alias}.${tf.field} IS NOT NULL`);
+      } else {
+        const paramName = `filterTemporal_${outerIdx}_${innerIdx}`;
+        andParts.push(`${alias}.${tf.field} ${tf.op} $${paramName}`);
+        params[paramName] = tf.value;
+      }
     }
-  });
-  return conditions;
+
+    if (andParts.length > 0) {
+      groupClauses.push(
+        andParts.length === 1 ? andParts[0] : `(${andParts.join(' AND ')})`,
+      );
+    }
+  }
+
+  if (groupClauses.length === 0) return [];
+  if (groupClauses.length === 1) return [groupClauses[0]];
+  return [`(${groupClauses.join(' OR ')})`];
 }
 
 /**
