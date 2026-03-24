@@ -57,6 +57,8 @@ export interface EdgeSearchConfig {
   limit?: number;
   rerankerMinScore?: number;
   mmrLambda?: number;
+  /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
+  maxDepth?: number;
 }
 
 export interface NodeSearchConfig {
@@ -65,6 +67,8 @@ export interface NodeSearchConfig {
   limit?: number;
   rerankerMinScore?: number;
   mmrLambda?: number;
+  /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
+  maxDepth?: number;
 }
 
 export interface EpisodeSearchConfig {

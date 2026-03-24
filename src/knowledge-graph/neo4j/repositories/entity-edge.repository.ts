@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { z } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
@@ -7,6 +8,7 @@ import {
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
 import { buildEdgeFilterClause } from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
@@ -249,20 +251,26 @@ export class EntityEdgeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
     filters?: SearchFilters,
+    maxDepth?: number,
   ): Promise<EntityEdge[]> {
     if (originNodeUuids.length === 0) return [];
+
+    const depth = z
+      .number()
+      .int()
+      .positive()
+      .default(MAX_SEARCH_DEPTH)
+      .parse(maxDepth ?? MAX_SEARCH_DEPTH);
 
     const { clause, params: filterParams } = filters
       ? buildEdgeFilterClause(filters, 'e')
       : { clause: '', params: {} };
     const whereExtra = clause ? ` AND ${clause}` : '';
 
-    // Variable-length paths cannot use a parameter for depth in Cypher — depth
-    // is hardcoded to MAX_SEARCH_DEPTH (3) to match the Python Graphiti default.
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (origin:Entity)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
-       MATCH (origin)-[:RELATES_TO*1..3]-(connected:Entity)
+       MATCH (origin)-[:RELATES_TO*1..${depth}]-(connected:Entity)
        WHERE connected.group_id IN $groupIds
        WITH collect(DISTINCT connected.uuid) AS reachableUuids
        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)

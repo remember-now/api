@@ -102,6 +102,9 @@ export class CommunityService {
     const communityNodes = [];
     const communityEdges = [];
 
+    // TODO(#992): executes one getByUuids query per community instead of a single
+    // batched query. On large graphs with many communities this may be slow.
+    // https://github.com/getzep/graphiti/issues/992
     for (const [, memberUuids] of communityMap) {
       const memberNodes =
         await this.entityNodeRepository.getByUuids(memberUuids);

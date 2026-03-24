@@ -269,6 +269,7 @@ export class SearchService {
           groupIds,
           fetch,
           filters,
+          config.maxDepth,
         );
         for (const e of bfsEdges) edgeMap.set(e.uuid, e);
         bfsUuids = bfsEdges.map((e) => e.uuid);
@@ -428,6 +429,7 @@ export class SearchService {
           groupIds,
           fetch,
           filters,
+          config.maxDepth,
         );
         for (const n of bfsNodes) nodeMap.set(n.uuid, n);
         bfsUuids = bfsNodes.map((n) => n.uuid);

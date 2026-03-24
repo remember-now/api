@@ -36,7 +36,8 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
       "Bash(npx jest:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "mcp__github__list_issues"
     ],
     "deny": ["Read(./.env)", "Read(~/.aws/**)"]
   },
