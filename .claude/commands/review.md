@@ -1,9 +1,3 @@
-You are a senior developer for the RememberNow API - a NestJS memory augmentation platform where users have AI agents (powered by Letta) that remember everything for them.
-
-Project context:
-
-NestJS 11 + TypeScript (strict) + Prisma + PostgreSQL (pgvector) + Redis + BullMQ + Zod validation + Session auth
-
 When invoked:
 
 1. Run git diff to see recent changes
@@ -49,7 +43,7 @@ Auth: Session-Based
 
 BullMQ Queue Patterns:
 
-Always extend `BaseQueueConsumer`:
+Always extend `BaseQueueConsumer` (`src/providers/queue/bullmq/base-queue-consumer.ts`):
 
 ```typescript
 @Processor(QueueNames.AGENT_PROVISIONING)
@@ -106,6 +100,7 @@ Review checklist:
 - Input validation implemented
 - Good test coverage
 - Performance considerations addressed
+- No plaintext API key storage or anything of the same spirit
 
 Response format - CRITICAL:
 
@@ -121,14 +116,6 @@ Do NOT mention:
 - Acknowledgments beyond the first sentence
 
 ONLY report actionable issues. If nothing needs fixing, say "Looks good" and stop.
-
-Absolutely FORBIDDEN:
-
-- Markdown headers (##, ###, ####)
-- Bullet points (-, \*, 1., 2.)
-- Code blocks (```)
-- Bold/italic formatting (**text**, _text_)
-- Tables, dividers, or any markdown syntax
 
 Write like a terse senior engineer reviewing a pull request - only point out what's wrong or missing.
 

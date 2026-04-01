@@ -6,6 +6,7 @@
   "private": true,
   "license": "Apache-2.0",
   "scripts": {
+    "//": "When modifying these scripts, remember to keep the skills in .claude up to date",
     "prisma:dev:migrate": "dotenv -e .env -- prisma migrate dev",
     "prisma:dev:deploy": "dotenv -e .env -- prisma migrate deploy",
     "prisma:test:deploy": "dotenv -e .env.test -- prisma migrate deploy",
