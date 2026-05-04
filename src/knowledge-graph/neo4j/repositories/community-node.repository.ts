@@ -7,6 +7,7 @@ import {
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class CommunityNodeRepository implements OnModuleInit {
@@ -16,19 +17,21 @@ export class CommunityNodeRepository implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await Promise.all([
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE FULLTEXT INDEX community_names IF NOT EXISTS
-         FOR (n:Community) ON EACH [n.name, n.summary]`,
-        {},
-      ),
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
-         FOR (n:Community) ON n.name_embedding
-         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: toNeo4jInt(this.embeddingService.dimensions) },
-      ),
-    ]);
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE FULLTEXT INDEX community_names IF NOT EXISTS
+       FOR (n:Community) ON EACH [n.name, n.summary, n.group_id]`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
+       FOR (n:Community) ON n.name_embedding
+       OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+      { dims: toNeo4jInt(this.embeddingService.dimensions) },
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX community_group_id IF NOT EXISTS FOR (n:Community) ON (n.group_id)`,
+      {},
+    );
   }
 
   async save(node: CommunityNode): Promise<string> {
@@ -60,7 +63,50 @@ export class CommunityNodeRepository implements OnModuleInit {
   }
 
   async saveBulk(nodes: CommunityNode[]): Promise<void> {
-    await Promise.all(nodes.map((n) => this.save(n)));
+    if (nodes.length === 0) return;
+    const withEmbedding = nodes.filter((n) => n.nameEmbedding);
+    const withoutEmbedding = nodes.filter((n) => !n.nameEmbedding);
+
+    if (withoutEmbedding.length > 0) {
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $nodes AS node
+         MERGE (n:Community {uuid: node.uuid})
+         SET n += node.props`,
+        {
+          nodes: withoutEmbedding.map((n) => ({
+            uuid: n.uuid,
+            props: {
+              name: n.name,
+              group_id: n.groupId,
+              created_at: toNeo4jDateTime(n.createdAt),
+              summary: n.summary,
+            },
+          })),
+        },
+      );
+    }
+
+    if (withEmbedding.length > 0) {
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $nodes AS node
+         MERGE (n:Community {uuid: node.uuid})
+         SET n += node.props
+         WITH n, node
+         CALL db.create.setNodeVectorProperty(n, 'name_embedding', node.nameEmbedding)`,
+        {
+          nodes: withEmbedding.map((n) => ({
+            uuid: n.uuid,
+            props: {
+              name: n.name,
+              group_id: n.groupId,
+              created_at: toNeo4jDateTime(n.createdAt),
+              summary: n.summary,
+            },
+            nameEmbedding: n.nameEmbedding,
+          })),
+        },
+      );
+    }
   }
 
   async delete(uuid: string): Promise<void> {
@@ -131,15 +177,14 @@ export class CommunityNodeRepository implements OnModuleInit {
     limit: number,
   ): Promise<CommunityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.fulltext.queryNodes('community_names', $query)
+      /* cypher */ `CALL db.index.fulltext.queryNodes('community_names', $luceneQuery)
        YIELD node AS n, score
-       WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding
        ORDER BY score DESC
        LIMIT $limit`,
-      { query, groupIds, limit },
+      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -148,15 +193,16 @@ export class CommunityNodeRepository implements OnModuleInit {
     embedding: number[],
     groupIds: string[],
     limit: number,
+    minScore = 0,
   ): Promise<CommunityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.vector.queryNodes('community_names_embedding', $limit, $embedding)
        YIELD node AS n, score
-       WHERE n.group_id IN $groupIds
+       WHERE n.group_id IN $groupIds AND score >= $minScore
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding`,
-      { embedding, groupIds, limit },
+      { embedding, groupIds, limit, minScore },
     );
     return results.map((r) => this.mapRow(r));
   }

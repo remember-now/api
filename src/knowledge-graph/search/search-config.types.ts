@@ -56,6 +56,8 @@ export interface EdgeSearchConfig {
   reranker: EdgeReranker;
   limit?: number;
   rerankerMinScore?: number;
+  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
+  simMinScore?: number;
   mmrLambda?: number;
   /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
   maxDepth?: number;
@@ -66,6 +68,8 @@ export interface NodeSearchConfig {
   reranker: NodeReranker;
   limit?: number;
   rerankerMinScore?: number;
+  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
+  simMinScore?: number;
   mmrLambda?: number;
   /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
   maxDepth?: number;
@@ -83,6 +87,8 @@ export interface CommunitySearchConfig {
   reranker: CommunityReranker;
   limit?: number;
   rerankerMinScore?: number;
+  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
+  simMinScore?: number;
   mmrLambda?: number;
 }
 
@@ -92,5 +98,5 @@ export interface SearchConfig {
   episodeConfig?: EpisodeSearchConfig;
   communityConfig?: CommunitySearchConfig;
   limit: number;
-  rerankerMinScore: number;
+  rerankerMinScore?: number;
 }

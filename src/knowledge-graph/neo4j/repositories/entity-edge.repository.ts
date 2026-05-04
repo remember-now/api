@@ -9,7 +9,10 @@ import {
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
-import { buildEdgeFilterClause } from '@/knowledge-graph/search/search-filters';
+import {
+  buildEdgeFilterClause,
+  buildFulltextQuery,
+} from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
@@ -20,20 +23,22 @@ export class EntityEdgeRepository implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await Promise.all([
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
-         FOR ()-[r:RELATES_TO]-()
-         ON EACH [r.fact]`,
-        {},
-      ),
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
-         FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
-         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: toNeo4jInt(this.embeddingService.dimensions) },
-      ),
-    ]);
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
+       FOR ()-[r:RELATES_TO]-()
+       ON EACH [r.fact, r.group_id]`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
+       FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
+       OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+      { dims: toNeo4jInt(this.embeddingService.dimensions) },
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX entity_edge_group_id IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.group_id)`,
+      {},
+    );
   }
 
   async save(edge: EntityEdge): Promise<string> {
@@ -85,7 +90,55 @@ export class EntityEdgeRepository implements OnModuleInit {
   }
 
   async saveBulk(edges: EntityEdge[]): Promise<void> {
-    await Promise.all(edges.map((e) => this.save(e)));
+    if (edges.length === 0) return;
+    const withEmbedding = edges.filter((e) => e.factEmbedding);
+    const withoutEmbedding = edges.filter((e) => !e.factEmbedding);
+
+    const toRow = (e: EntityEdge) => ({
+      uuid: e.uuid,
+      sourceNodeUuid: e.sourceNodeUuid,
+      targetNodeUuid: e.targetNodeUuid,
+      props: {
+        name: e.name,
+        group_id: e.groupId,
+        created_at: toNeo4jDateTime(e.createdAt),
+        fact: e.fact,
+        episodes: e.episodes,
+        expired_at: e.expiredAt ? toNeo4jDateTime(e.expiredAt) : null,
+        valid_at: e.validAt ? toNeo4jDateTime(e.validAt) : null,
+        invalid_at: e.invalidAt ? toNeo4jDateTime(e.invalidAt) : null,
+        attributes: JSON.stringify(e.attributes),
+      },
+    });
+
+    if (withoutEmbedding.length > 0) {
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $edges AS edge
+         MATCH (source:Entity {uuid: edge.sourceNodeUuid})
+         MATCH (target:Entity {uuid: edge.targetNodeUuid})
+         MERGE (source)-[e:RELATES_TO {uuid: edge.uuid}]->(target)
+         SET e += edge.props`,
+        { edges: withoutEmbedding.map(toRow) },
+      );
+    }
+
+    if (withEmbedding.length > 0) {
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $edges AS edge
+         MATCH (source:Entity {uuid: edge.sourceNodeUuid})
+         MATCH (target:Entity {uuid: edge.targetNodeUuid})
+         MERGE (source)-[e:RELATES_TO {uuid: edge.uuid}]->(target)
+         SET e += edge.props
+         WITH e, edge
+         CALL db.create.setRelationshipVectorProperty(e, 'fact_embedding', edge.factEmbedding)`,
+        {
+          edges: withEmbedding.map((e) => ({
+            ...toRow(e),
+            factEmbedding: e.factEmbedding,
+          })),
+        },
+      );
+    }
   }
 
   async delete(uuid: string): Promise<void> {
@@ -202,9 +255,8 @@ export class EntityEdgeRepository implements OnModuleInit {
     limit: number,
   ): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.fulltext.queryRelationships('edge_facts', $query)
+      /* cypher */ `CALL db.index.fulltext.queryRelationships('edge_facts', $luceneQuery)
        YIELD relationship AS e, score
-       WHERE e.group_id IN $groupIds
        MATCH (source:Entity)-[e]->(target:Entity)
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
@@ -214,7 +266,7 @@ export class EntityEdgeRepository implements OnModuleInit {
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ORDER BY score DESC
        LIMIT $limit`,
-      { query, groupIds, limit },
+      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -224,6 +276,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
     filters?: SearchFilters,
+    minScore = 0,
   ): Promise<EntityEdge[]> {
     const { clause, params: filterParams } = filters
       ? buildEdgeFilterClause(filters, 'e')
@@ -233,7 +286,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.vector.queryRelationships('edge_facts_embedding', $limit, $embedding)
        YIELD relationship AS e, score
-       WHERE e.group_id IN $groupIds${whereExtra}
+       WHERE e.group_id IN $groupIds AND score >= $minScore${whereExtra}
        MATCH (source:Entity)-[e]->(target:Entity)
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
@@ -241,7 +294,7 @@ export class EntityEdgeRepository implements OnModuleInit {
               e.expired_at AS expired_at, e.valid_at AS valid_at,
               e.invalid_at AS invalid_at, e.attributes AS attributes,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid`,
-      { embedding, groupIds, limit, ...filterParams },
+      { embedding, groupIds, limit, minScore, ...filterParams },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -272,7 +325,7 @@ export class EntityEdgeRepository implements OnModuleInit {
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
        MATCH (origin)-[:RELATES_TO*1..${depth}]-(connected:Entity)
        WHERE connected.group_id IN $groupIds
-       WITH collect(DISTINCT connected.uuid) AS reachableUuids
+       WITH $originNodeUuids + collect(DISTINCT connected.uuid) AS reachableUuids
        MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.group_id IN $groupIds
          AND source.uuid IN reachableUuids

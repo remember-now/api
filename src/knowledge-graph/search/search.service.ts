@@ -20,6 +20,7 @@ import {
   CommunityReranker,
   CommunitySearchConfig,
   CommunitySearchMethod,
+  DEFAULT_MIN_SCORE,
   DEFAULT_SEARCH_LIMIT,
   EdgeReranker,
   EdgeSearchConfig,
@@ -247,7 +248,13 @@ export class SearchService {
     ) {
       tasks.push(
         this.entityEdgeRepository
-          .searchBySimilarity(queryVector, groupIds, fetch, filters)
+          .searchBySimilarity(
+            queryVector,
+            groupIds,
+            fetch,
+            filters,
+            config.simMinScore ?? DEFAULT_MIN_SCORE,
+          )
           .then((edges) => {
             for (const e of edges) edgeMap.set(e.uuid, e);
             cosineUuids.push(...edges.map((e) => e.uuid));
@@ -407,7 +414,13 @@ export class SearchService {
     ) {
       tasks.push(
         this.entityNodeRepository
-          .searchBySimilarity(queryVector, groupIds, fetch, filters)
+          .searchBySimilarity(
+            queryVector,
+            groupIds,
+            fetch,
+            filters,
+            config.simMinScore ?? DEFAULT_MIN_SCORE,
+          )
           .then((nodes) => {
             for (const n of nodes) nodeMap.set(n.uuid, n);
             cosineUuids.push(...nodes.map((n) => n.uuid));
@@ -590,7 +603,12 @@ export class SearchService {
     ) {
       tasks.push(
         this.communityNodeRepository
-          .searchBySimilarity(queryVector, groupIds, fetch)
+          .searchBySimilarity(
+            queryVector,
+            groupIds,
+            fetch,
+            config.simMinScore ?? DEFAULT_MIN_SCORE,
+          )
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.uuid, n);
             cosineUuids.push(...nodes.map((n) => n.uuid));

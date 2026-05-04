@@ -10,7 +10,10 @@ import {
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
-import { buildNodeFilterClause } from '@/knowledge-graph/search/search-filters';
+import {
+  buildFulltextQuery,
+  buildNodeFilterClause,
+} from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
@@ -21,19 +24,21 @@ export class EntityNodeRepository implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await Promise.all([
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
-         FOR (n:Entity) ON EACH [n.name, n.summary]`,
-        {},
-      ),
-      this.neo4j.executeWrite(
-        /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
-         FOR (n:Entity) ON n.name_embedding
-         OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
-        { dims: toNeo4jInt(this.embeddingService.dimensions) },
-      ),
-    ]);
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
+       FOR (n:Entity) ON EACH [n.name, n.summary, n.group_id]`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
+       FOR (n:Entity) ON n.name_embedding
+       OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
+      { dims: toNeo4jInt(this.embeddingService.dimensions) },
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX entity_group_id IF NOT EXISTS FOR (n:Entity) ON (n.group_id)`,
+      {},
+    );
   }
 
   async save(node: EntityNode): Promise<string> {
@@ -71,7 +76,64 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async saveBulk(nodes: EntityNode[]): Promise<void> {
-    await Promise.all(nodes.map((n) => this.save(n)));
+    if (nodes.length === 0) return;
+
+    const byLabel = new Map<string, EntityNode[]>();
+    for (const n of nodes) {
+      const key = [...new Set(n.labels)].sort().join(':');
+      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
+    }
+
+    for (const [labelStr, group] of byLabel) {
+      validateNodeLabels(labelStr.split(':'));
+      const withEmbedding = group.filter((n) => n.nameEmbedding);
+      const withoutEmbedding = group.filter((n) => !n.nameEmbedding);
+
+      if (withoutEmbedding.length > 0) {
+        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        await this.neo4j.executeWrite(
+          /* cypher */ `UNWIND $nodes AS node
+           MERGE (n:${labelStr} {uuid: node.uuid})
+           SET n += node.props`,
+          {
+            nodes: withoutEmbedding.map((n) => ({
+              uuid: n.uuid,
+              props: {
+                name: n.name,
+                group_id: n.groupId,
+                created_at: toNeo4jDateTime(n.createdAt),
+                summary: n.summary,
+                attributes: JSON.stringify(n.attributes),
+              },
+            })),
+          },
+        );
+      }
+
+      if (withEmbedding.length > 0) {
+        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        await this.neo4j.executeWrite(
+          /* cypher */ `UNWIND $nodes AS node
+           MERGE (n:${labelStr} {uuid: node.uuid})
+           SET n += node.props
+           WITH n, node
+           CALL db.create.setNodeVectorProperty(n, 'name_embedding', node.nameEmbedding)`,
+          {
+            nodes: withEmbedding.map((n) => ({
+              uuid: n.uuid,
+              props: {
+                name: n.name,
+                group_id: n.groupId,
+                created_at: toNeo4jDateTime(n.createdAt),
+                summary: n.summary,
+                attributes: JSON.stringify(n.attributes),
+              },
+              nameEmbedding: n.nameEmbedding,
+            })),
+          },
+        );
+      }
+    }
   }
 
   async delete(uuid: string): Promise<void> {
@@ -158,19 +220,23 @@ export class EntityNodeRepository implements OnModuleInit {
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'n')
       : { clause: '', params: {} };
-    const whereExtra = clause ? ` AND ${clause}` : '';
+    const whereClause = clause ? `WHERE ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.fulltext.queryNodes('entity_names', $query)
+      /* cypher */ `CALL db.index.fulltext.queryNodes('entity_names', $luceneQuery)
        YIELD node AS n, score
-       WHERE n.group_id IN $groupIds${whereExtra}
+       ${whereClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,
               labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
-      { query, groupIds, limit, ...filterParams },
+      {
+        luceneQuery: buildFulltextQuery(query, groupIds),
+        limit,
+        ...filterParams,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }
@@ -180,6 +246,7 @@ export class EntityNodeRepository implements OnModuleInit {
     groupIds: string[],
     limit: number,
     filters?: SearchFilters,
+    minScore = 0,
   ): Promise<EntityNode[]> {
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'n')
@@ -189,12 +256,12 @@ export class EntityNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.vector.queryNodes('entity_names_embedding', $limit, $embedding)
        YIELD node AS n, score
-       WHERE n.group_id IN $groupIds${whereExtra}
+       WHERE n.group_id IN $groupIds AND score >= $minScore${whereExtra}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.attributes AS attributes, n.name_embedding AS name_embedding,
               labels(n) AS labels`,
-      { embedding, groupIds, limit, ...filterParams },
+      { embedding, groupIds, limit, minScore, ...filterParams },
     );
     return results.map((r) => this.mapRow(r));
   }

@@ -169,14 +169,15 @@ describe('EntityEdgeRepository', () => {
   });
 
   describe('searchByFact', () => {
-    it('should use fulltext queryRelationships procedure', async () => {
+    it('should use fulltext queryRelationships procedure with Lucene query', async () => {
       neo4j.executeRead.mockResolvedValue([]);
       await repo.searchByFact('Alice works', ['group-1'], 10);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('db.index.fulltext.queryRelationships'),
         expect.objectContaining({
-          query: 'Alice works',
-          groupIds: ['group-1'],
+          luceneQuery: expect.stringContaining(
+            'Alice works',
+          ) as unknown as string,
         }),
       );
     });

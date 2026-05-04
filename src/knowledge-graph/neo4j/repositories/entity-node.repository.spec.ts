@@ -81,14 +81,46 @@ describe('EntityNodeRepository', () => {
   });
 
   describe('saveBulk', () => {
-    it('should call save for each node', async () => {
+    it('should batch nodes of the same label into a single UNWIND call', async () => {
       const nodes = [
         createEntityNode({ name: 'Test1' }),
         createEntityNode({ name: 'Test2' }),
       ];
-      neo4j.executeWrite.mockResolvedValue([{ uuid: 'some-uuid' }]);
+      neo4j.executeWrite.mockResolvedValue([]);
+      await repo.saveBulk(nodes);
+      expect(neo4j.executeWrite).toHaveBeenCalledTimes(1);
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.stringContaining('UNWIND'),
+        expect.anything(),
+      );
+    });
+
+    it('should issue separate UNWIND calls per label group', async () => {
+      const nodes = [
+        createEntityNode({ name: 'Test1', labels: ['Entity'] }),
+        createEntityNode({ name: 'Test2', labels: ['Entity', 'Person'] }),
+      ];
+      neo4j.executeWrite.mockResolvedValue([]);
       await repo.saveBulk(nodes);
       expect(neo4j.executeWrite).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use vector property call for nodes with embedding', async () => {
+      const nodes = [
+        createEntityNode({ name: 'Test1', nameEmbedding: [0.1, 0.2] }),
+        createEntityNode({ name: 'Test2', nameEmbedding: [0.3, 0.4] }),
+      ];
+      neo4j.executeWrite.mockResolvedValue([]);
+      await repo.saveBulk(nodes);
+      expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.stringContaining('setNodeVectorProperty'),
+        expect.anything(),
+      );
+    });
+
+    it('should return immediately for empty array', async () => {
+      await repo.saveBulk([]);
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
     });
   });
 

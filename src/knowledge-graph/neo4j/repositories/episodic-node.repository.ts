@@ -4,6 +4,7 @@ import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class EpisodicNodeRepository implements OnModuleInit {
@@ -12,7 +13,11 @@ export class EpisodicNodeRepository implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE FULLTEXT INDEX episode_content IF NOT EXISTS
-       FOR (n:Episodic) ON EACH [n.content]`,
+       FOR (n:Episodic) ON EACH [n.content, n.group_id]`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX episodic_group_id IF NOT EXISTS FOR (n:Episodic) ON (n.group_id)`,
       {},
     );
   }
@@ -39,7 +44,26 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async saveBulk(nodes: EpisodicNode[]): Promise<void> {
-    await Promise.all(nodes.map((n) => this.save(n)));
+    if (nodes.length === 0) return;
+    await this.neo4j.executeWrite(
+      /* cypher */ `UNWIND $nodes AS node
+       MERGE (n:Episodic {uuid: node.uuid})
+       SET n += node.props`,
+      {
+        nodes: nodes.map((n) => ({
+          uuid: n.uuid,
+          props: {
+            name: n.name,
+            group_id: n.groupId,
+            created_at: toNeo4jDateTime(n.createdAt),
+            source: n.source,
+            source_description: n.sourceDescription,
+            content: n.content,
+            valid_at: toNeo4jDateTime(n.validAt),
+          },
+        })),
+      },
+    );
   }
 
   async delete(uuid: string): Promise<void> {
@@ -164,16 +188,15 @@ export class EpisodicNodeRepository implements OnModuleInit {
     limit: number,
   ): Promise<EpisodicNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.fulltext.queryNodes('episode_content', $query)
+      /* cypher */ `CALL db.index.fulltext.queryNodes('episode_content', $luceneQuery)
        YIELD node AS n, score
-       WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
               n.valid_at AS valid_at
        ORDER BY score DESC
        LIMIT $limit`,
-      { query, groupIds, limit },
+      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
     );
     return results.map((r) => this.mapRow(r));
   }

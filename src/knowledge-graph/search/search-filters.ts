@@ -25,6 +25,18 @@ export function luceneSanitize(query: string): string {
 }
 
 /**
+ * Builds a Lucene query string that combines free-text search with a
+ * group_id filter.
+ */
+export function buildFulltextQuery(query: string, groupIds: string[]): string {
+  const sanitized = luceneSanitize(query);
+  const groupPart = groupIds
+    .map((id) => `group_id:"${luceneSanitize(id)}"`)
+    .join(' OR ');
+  return sanitized ? `(${sanitized}) AND (${groupPart})` : `(${groupPart})`;
+}
+
+/**
  * Builds temporal WHERE conditions from OR-groups of AND-joined filters.
  *
  * Each outer group produces one parenthesized AND expression; groups are

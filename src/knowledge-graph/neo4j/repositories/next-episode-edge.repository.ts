@@ -27,7 +27,23 @@ export class NextEpisodeEdgeRepository {
   }
 
   async saveBulk(edges: NextEpisodeEdge[]): Promise<void> {
-    await Promise.all(edges.map((e) => this.save(e)));
+    if (edges.length === 0) return;
+    await this.neo4j.executeWrite(
+      /* cypher */ `UNWIND $edges AS edge
+       MATCH (source:Episodic {uuid: edge.sourceNodeUuid})
+       MATCH (target:Episodic {uuid: edge.targetNodeUuid})
+       MERGE (source)-[e:NEXT_EPISODE {uuid: edge.uuid}]->(target)
+       SET e.group_id = edge.groupId, e.created_at = edge.createdAt`,
+      {
+        edges: edges.map((e) => ({
+          uuid: e.uuid,
+          sourceNodeUuid: e.sourceNodeUuid,
+          targetNodeUuid: e.targetNodeUuid,
+          groupId: e.groupId,
+          createdAt: toNeo4jDateTime(e.createdAt),
+        })),
+      },
+    );
   }
 
   async delete(uuid: string): Promise<void> {

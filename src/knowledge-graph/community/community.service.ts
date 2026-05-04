@@ -76,7 +76,7 @@ export class CommunityService {
         { graphName },
       );
 
-      // 6. Group entity UUIDs by communityId
+      // 5. Group entity UUIDs by communityId
       communityMap = new Map<number, string[]>();
       for (const row of leidenResults) {
         const existing = communityMap.get(row.communityId) ?? [];
@@ -84,7 +84,7 @@ export class CommunityService {
         communityMap.set(row.communityId, existing);
       }
     } finally {
-      // 5. Drop projection (always)
+      // 6. Drop projection (always)
       await this.neo4jService.executeWrite(
         /* cypher */ `CALL gds.graph.drop($graphName, false)`,
         { graphName },

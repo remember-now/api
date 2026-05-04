@@ -26,7 +26,22 @@ export class SagaNodeRepository {
   }
 
   async saveBulk(nodes: SagaNode[]): Promise<void> {
-    await Promise.all(nodes.map((n) => this.save(n)));
+    if (nodes.length === 0) return;
+    await this.neo4j.executeWrite(
+      /* cypher */ `UNWIND $nodes AS node
+       MERGE (n:Saga {uuid: node.uuid})
+       SET n += node.props`,
+      {
+        nodes: nodes.map((n) => ({
+          uuid: n.uuid,
+          props: {
+            name: n.name,
+            group_id: n.groupId,
+            created_at: toNeo4jDateTime(n.createdAt),
+          },
+        })),
+      },
+    );
   }
 
   async delete(uuid: string): Promise<void> {
