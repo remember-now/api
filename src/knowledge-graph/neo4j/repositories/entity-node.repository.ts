@@ -254,8 +254,12 @@ export class EntityNodeRepository implements OnModuleInit {
     const whereExtra = clause ? ` AND ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.vector.queryNodes('entity_names_embedding', $limit, $embedding)
-       YIELD node AS n, score
+      /* cypher */ `MATCH (n:Entity)
+       SEARCH n IN (
+         VECTOR INDEX entity_names_embedding
+         FOR $embedding
+         LIMIT $limit
+       ) SCORE AS score
        WHERE n.group_id IN $groupIds AND score >= $minScore${whereExtra}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,

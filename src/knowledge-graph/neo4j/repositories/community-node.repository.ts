@@ -196,8 +196,12 @@ export class CommunityNodeRepository implements OnModuleInit {
     minScore = 0,
   ): Promise<CommunityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.vector.queryNodes('community_names_embedding', $limit, $embedding)
-       YIELD node AS n, score
+      /* cypher */ `MATCH (n:Community)
+       SEARCH n IN (
+         VECTOR INDEX community_names_embedding
+         FOR $embedding
+         LIMIT $limit
+       ) SCORE AS score
        WHERE n.group_id IN $groupIds AND score >= $minScore
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,

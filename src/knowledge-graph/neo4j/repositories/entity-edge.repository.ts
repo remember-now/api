@@ -284,10 +284,14 @@ export class EntityEdgeRepository implements OnModuleInit {
     const whereExtra = clause ? ` AND ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `CALL db.index.vector.queryRelationships('edge_facts_embedding', $limit, $embedding)
-       YIELD relationship AS e, score
+      /* cypher */ `MATCH ()-[e:RELATES_TO]->()
+       SEARCH e IN (
+         VECTOR INDEX edge_facts_embedding
+         FOR $embedding
+         LIMIT $limit
+       ) SCORE AS score
        WHERE e.group_id IN $groupIds AND score >= $minScore${whereExtra}
-       MATCH (source:Entity)-[e]->(target:Entity)
+       WITH e, score, startNode(e) AS source, endNode(e) AS target
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
               e.fact_embedding AS fact_embedding, e.episodes AS episodes,
