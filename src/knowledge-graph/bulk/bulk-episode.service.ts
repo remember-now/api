@@ -5,7 +5,11 @@ import { LlmService } from '@/llm/llm.service';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
-import { nodeSummaryJsonSchema } from '../episode/episode.types';
+import {
+  EdgeTypeMap,
+  getApplicableEdgeTypes,
+  nodeSummaryJsonSchema,
+} from '../episode/episode.types';
 import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { createEpisodicEdge, EntityEdge } from '../models/edges';
@@ -17,7 +21,10 @@ import {
   EpisodicEdgeRepository,
   EpisodicNodeRepository,
 } from '../neo4j/repositories';
-import { buildExtractEntityAttributesMessages } from '../prompts/extract-entity-attributes.prompts';
+import {
+  buildExtractEdgeAttributesMessages,
+  buildExtractEntityAttributesMessages,
+} from '../prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,
@@ -69,9 +76,16 @@ export class BulkEpisodeService {
       userId,
       episodes,
       entityTypes,
+      edgeTypes,
+      edgeTypeMap,
+      excludedEntityTypes,
       customInstructions,
       updateCommunities,
     } = options;
+
+    const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
+      edgeTypeMap ??
+      (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
 
     // 1. Guard
     if (episodes.length === 0) {
@@ -131,6 +145,7 @@ export class BulkEpisodeService {
                 prevEpisodesPerEpisode[i],
                 entityTypes,
                 customInstructions,
+                excludedEntityTypes,
               ),
             ),
           );
@@ -150,6 +165,7 @@ export class BulkEpisodeService {
           prevEpisodesPerEpisode[i],
           entityTypes,
           customInstructions,
+          excludedEntityTypes,
         );
       }),
     );
@@ -257,6 +273,8 @@ export class BulkEpisodeService {
             prevEpisodesPerEpisode[i],
             ep.validAt,
             customInstructions,
+            edgeTypes,
+            effectiveEdgeTypeMap,
           ),
       ),
     );
@@ -311,12 +329,67 @@ export class BulkEpisodeService {
       ].map((e) => e.uuid);
     });
 
-    // 17. Generate node summaries for all new canonical nodes
+    // 16.5. Extract edge attributes for resolved edges (custom edge types)
     const allCanonicalNodes = [
       ...new Map(
         canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n]),
       ).values(),
     ];
+    if (edgeTypes && effectiveEdgeTypeMap) {
+      const uuidToNode = new Map<string, EntityNode>(
+        allCanonicalNodes.map((n) => [n.uuid, n]),
+      );
+
+      type EdgeAttrTask = { edge: EntityEdge; epIndex: number };
+      const edgeAttrTasks: EdgeAttrTask[] = [];
+
+      edgeResolutions.forEach((res, epIndex) => {
+        for (const edge of res.resolvedEdges) {
+          const src = uuidToNode.get(edge.sourceNodeUuid);
+          const tgt = uuidToNode.get(edge.targetNodeUuid);
+          if (!src || !tgt) continue;
+          const applicable = getApplicableEdgeTypes(
+            src.labels,
+            tgt.labels,
+            edgeTypes,
+            effectiveEdgeTypeMap,
+          );
+          const typeDef = applicable[edge.name];
+          if (!typeDef) continue;
+          const jsonSchema = z.toJSONSchema(typeDef.schema) as {
+            properties?: Record<string, unknown>;
+          };
+          if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
+          edgeAttrTasks.push({ edge, epIndex });
+        }
+      });
+
+      await withConcurrency(
+        LLM_CONCURRENCY_LIMIT,
+        edgeAttrTasks.map(({ edge, epIndex }) => async () => {
+          const src = uuidToNode.get(edge.sourceNodeUuid)!;
+          const tgt = uuidToNode.get(edge.targetNodeUuid)!;
+          const applicable = getApplicableEdgeTypes(
+            src.labels,
+            tgt.labels,
+            edgeTypes,
+            effectiveEdgeTypeMap,
+          );
+          const typeDef = applicable[edge.name];
+          const jsonSchema = z.toJSONSchema(typeDef.schema);
+          const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
+            buildExtractEdgeAttributesMessages({
+              fact: edge.fact,
+              referenceTime: episodicNodes[epIndex].validAt,
+              existingAttributes: edge.attributes ?? {},
+            }),
+          )) as Record<string, unknown>;
+          edge.attributes = { ...edge.attributes, ...attrs };
+        }),
+      );
+    }
+
+    // 17. Generate node summaries for all new canonical nodes
     const newNodesOnly = allCanonicalNodes.filter(
       (n) => !existingNodesMap.has(n.uuid),
     );
@@ -385,7 +458,7 @@ export class BulkEpisodeService {
     for (const node of newNodesOnly) {
       const label = node.labels.find((l) => l !== 'Entity');
       const entityType = label ? entityTypes?.[label] : undefined;
-      if (entityType?.schema) {
+      if (entityType) {
         const ctx = nodeToEpisodeCtx.get(node.uuid);
         if (!ctx) continue;
         const nodeEdges = allResolvedEdges.filter(

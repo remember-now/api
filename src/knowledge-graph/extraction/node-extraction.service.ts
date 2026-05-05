@@ -26,6 +26,7 @@ export class NodeExtractionService {
     previousEpisodes: EpisodicNode[],
     entityTypes?: EntityTypeMap,
     customInstructions?: string,
+    excludedEntityTypes?: string[],
   ): Promise<EntityNode[]> {
     const messages = buildExtractNodesMessages({
       episode,
@@ -46,6 +47,12 @@ export class NodeExtractionService {
           groupId: episode.groupId,
           labels: resolveLabels(e.entityTypeId, entityTypes),
         }),
-      );
+      )
+      .filter((node) => {
+        if (!excludedEntityTypes?.length) return true;
+        const specificLabel =
+          node.labels.find((l) => l !== 'Entity') ?? 'Entity';
+        return !excludedEntityTypes.includes(specificLabel);
+      });
   }
 }

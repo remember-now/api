@@ -1,6 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
+import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
 import { createEntityEdge, EntityEdge } from '../models/edges';
 import { EntityNode, EpisodicNode } from '../models/nodes';
 import { buildExtractEdgesMessages } from '../prompts';
@@ -15,6 +16,8 @@ export class EdgeExtractionService {
     previousEpisodes: EpisodicNode[],
     referenceTime: Date,
     customInstructions?: string,
+    edgeTypes?: EdgeTypesMap,
+    edgeTypeMap?: EdgeTypeMap,
   ): Promise<EntityEdge[]> {
     const nameToNode = new Map<string, EntityNode>(
       nodes.map((n) => [n.name.toLowerCase(), n]),
@@ -26,6 +29,8 @@ export class EdgeExtractionService {
       previousEpisodes,
       referenceTime,
       customInstructions,
+      edgeTypes,
+      edgeTypeMap,
     });
 
     const result = await model

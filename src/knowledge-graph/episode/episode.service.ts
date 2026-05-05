@@ -30,11 +30,16 @@ import {
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
 } from '../neo4j/repositories';
-import { buildExtractEntityAttributesMessages } from '../prompts/extract-entity-attributes.prompts';
+import {
+  buildExtractEdgeAttributesMessages,
+  buildExtractEntityAttributesMessages,
+} from '../prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   AddEpisodeOptions,
   AddEpisodeResult,
+  EdgeTypeMap,
+  getApplicableEdgeTypes,
   nodeSummaryJsonSchema,
 } from './episode.types';
 import { buildNodeSummaryMessages } from './node-summary.prompts';
@@ -131,8 +136,15 @@ export class EpisodeService {
       referenceTime = new Date(),
       sagaUuid,
       entityTypes,
+      edgeTypes,
+      edgeTypeMap,
+      excludedEntityTypes,
       customInstructions,
     } = options;
+
+    const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
+      edgeTypeMap ??
+      (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
 
     validateGroupId(groupId);
 
@@ -169,6 +181,7 @@ export class EpisodeService {
             previousEpisodes,
             entityTypes,
             customInstructions,
+            excludedEntityTypes,
           ),
         ),
       );
@@ -188,6 +201,7 @@ export class EpisodeService {
         previousEpisodes,
         entityTypes,
         customInstructions,
+        excludedEntityTypes,
       );
     }
 
@@ -223,6 +237,8 @@ export class EpisodeService {
       previousEpisodes,
       referenceTime,
       customInstructions,
+      edgeTypes,
+      effectiveEdgeTypeMap,
     );
 
     // 8. Embed extracted edges, then collect search-based candidates
@@ -254,7 +270,7 @@ export class EpisodeService {
     for (const node of resolvedNodes) {
       const label = node.labels.find((l) => l !== 'Entity');
       const entityType = label ? entityTypes?.[label] : undefined;
-      if (entityType?.schema) {
+      if (entityType) {
         const nodeEdges = resolvedEdges.filter(
           (e) =>
             e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
@@ -270,6 +286,38 @@ export class EpisodeService {
           .withStructuredOutput(z.toJSONSchema(entityType.schema))
           .invoke(attrMessages)) as Record<string, unknown>;
         node.attributes = { ...node.attributes, ...attrs };
+      }
+    }
+
+    // 9.6. Extract edge attributes post-resolution (custom edge types)
+    if (edgeTypes && effectiveEdgeTypeMap) {
+      const uuidToNode = new Map<string, EntityNode>(
+        canonicalNodes.map((n) => [n.uuid, n]),
+      );
+      for (const edge of resolvedEdges) {
+        const src = uuidToNode.get(edge.sourceNodeUuid);
+        const tgt = uuidToNode.get(edge.targetNodeUuid);
+        if (!src || !tgt) continue;
+        const applicable = getApplicableEdgeTypes(
+          src.labels,
+          tgt.labels,
+          edgeTypes,
+          effectiveEdgeTypeMap,
+        );
+        const typeDef = applicable[edge.name];
+        if (!typeDef) continue;
+        const jsonSchema = z.toJSONSchema(typeDef.schema) as {
+          properties?: Record<string, unknown>;
+        };
+        if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
+        const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
+          buildExtractEdgeAttributesMessages({
+            fact: edge.fact,
+            referenceTime: episode.validAt,
+            existingAttributes: edge.attributes ?? {},
+          }),
+        )) as Record<string, unknown>;
+        edge.attributes = { ...edge.attributes, ...attrs };
       }
     }
 

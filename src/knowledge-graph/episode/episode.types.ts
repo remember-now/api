@@ -8,9 +8,39 @@ export type EntityTypeMap = Record<
   string,
   {
     description: string;
-    schema?: z.ZodTypeAny;
+    schema: z.ZodTypeAny;
   }
 >;
+
+export type EdgeTypesMap = Record<
+  string,
+  {
+    description: string;
+    schema: z.ZodTypeAny;
+  }
+>;
+
+// key format: "SourceLabel,TargetLabel" — e.g. "Person,Company", "Entity,Entity"
+export type EdgeTypeMap = Record<string, string[]>;
+
+export function getApplicableEdgeTypes(
+  sourceLabels: string[],
+  targetLabels: string[],
+  edgeTypes: EdgeTypesMap,
+  edgeTypeMap: EdgeTypeMap,
+): EdgeTypesMap {
+  const result: EdgeTypesMap = {};
+  for (const src of sourceLabels) {
+    for (const tgt of targetLabels) {
+      const key = `${src},${tgt}`;
+      for (const typeName of edgeTypeMap[key] ?? []) {
+        const typeDef = edgeTypes[typeName];
+        if (typeDef && !(typeName in result)) result[typeName] = typeDef;
+      }
+    }
+  }
+  return result;
+}
 
 export interface AddEpisodeOptions {
   userId: number;
@@ -22,6 +52,9 @@ export interface AddEpisodeOptions {
   referenceTime?: Date;
   sagaUuid?: string;
   entityTypes?: EntityTypeMap;
+  edgeTypes?: EdgeTypesMap;
+  edgeTypeMap?: EdgeTypeMap;
+  excludedEntityTypes?: string[];
   customInstructions?: string;
   updateCommunities?: boolean;
 }

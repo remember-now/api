@@ -4,6 +4,7 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
+import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
 import { EntityNode } from '../models/nodes';
 import { EpisodicNode } from '../models/nodes';
 import { episodeToContext } from './prompts.types';
@@ -15,10 +16,13 @@ Your task is to identify meaningful relationships between the provided entities 
 Rules:
 - Only use entity names from the provided entities list
 - Extract one fact per edge
-- Use active-voice relationship names in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, MARRIED_TO, FOUNDED_BY)
 - The fact should be a complete sentence describing the relationship
 - Only extract relationships that are clearly supported by the episode content
 - Do not infer or hallucinate relationships not present in the text
+
+RELATION TYPE RULES:
+- If FACT_TYPES are provided and the relationship matches one of the types (considering the entity type signature), use that fact_type_name as the relation type
+- Otherwise, derive a relation type in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, MARRIED_TO, FOUNDED_BY)
 
 DATETIME RULES:
 - validAt: the ISO 8601 datetime when the fact became true; set to the reference time if the fact appears ongoing; leave null if no temporal information is present
@@ -36,12 +40,21 @@ function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
     .join('\n');
 }
 
+function formatEntities(nodes: EntityNode[]): string {
+  if (nodes.length === 0) return '';
+  return nodes
+    .map((n) => `- name: "${n.name}", types: [${n.labels.join(', ')}]`)
+    .join('\n');
+}
+
 export function buildExtractEdgesMessages(ctx: {
   episode: EpisodicNode;
   nodes: EntityNode[];
   previousEpisodes: EpisodicNode[];
   referenceTime: Date;
   customInstructions?: string;
+  edgeTypes?: EdgeTypesMap;
+  edgeTypeMap?: EdgeTypeMap;
 }): BaseMessage[] {
   const {
     episode,
@@ -49,14 +62,38 @@ export function buildExtractEdgesMessages(ctx: {
     previousEpisodes,
     referenceTime,
     customInstructions,
+    edgeTypes,
+    edgeTypeMap,
   } = ctx;
 
-  const entityNames = nodes.map((n) => n.name).join(', ');
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
+  const entitiesText = formatEntities(nodes);
+
+  // Build inverted signatures map: typeName → list of "SourceLabel,TargetLabel" keys
+  const edgeTypeSignaturesMap: Record<string, string[]> = {};
+  if (edgeTypeMap) {
+    for (const [sig, names] of Object.entries(edgeTypeMap)) {
+      for (const n of names) {
+        (edgeTypeSignaturesMap[n] ??= []).push(sig);
+      }
+    }
+  }
+
+  const edgeTypesContext = edgeTypes
+    ? Object.entries(edgeTypes).map(([name, { description }]) => ({
+        fact_type_name: name,
+        fact_type_signatures: edgeTypeSignaturesMap[name] ?? ['Entity,Entity'],
+        fact_type_description: description,
+      }))
+    : [];
 
   let humanContent =
     `REFERENCE TIME: ${referenceTime.toISOString()}\n\n` +
-    `ENTITIES:\n${entityNames}\n\nPREVIOUS EPISODES:\n${previousEpisodesText}\n\nCURRENT EPISODE:\nName: ${episode.name}\nSource: ${episode.source}\nContent: ${episode.content}`;
+    `ENTITIES:\n${entitiesText}\n\nPREVIOUS EPISODES:\n${previousEpisodesText}\n\nCURRENT EPISODE:\nName: ${episode.name}\nSource: ${episode.source}\nContent: ${episode.content}`;
+
+  if (edgeTypesContext.length > 0) {
+    humanContent += `\n\n<FACT_TYPES>\n${JSON.stringify(edgeTypesContext, null, 2)}\n</FACT_TYPES>`;
+  }
 
   if (customInstructions) {
     humanContent += `\n\n${customInstructions}`;

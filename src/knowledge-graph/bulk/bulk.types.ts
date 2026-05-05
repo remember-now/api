@@ -1,4 +1,8 @@
-import { EntityTypeMap } from '../episode/episode.types';
+import {
+  EdgeTypeMap,
+  EdgeTypesMap,
+  EntityTypeMap,
+} from '../episode/episode.types';
 import { EntityEdge } from '../models/edges/entity-edge';
 import { EpisodicEdge } from '../models/edges/episodic-edge';
 import { EntityNode } from '../models/nodes/entity-node';
@@ -20,6 +24,9 @@ export interface AddBulkEpisodeOptions {
   userId: number;
   episodes: RawEpisode[];
   entityTypes?: EntityTypeMap;
+  edgeTypes?: EdgeTypesMap;
+  edgeTypeMap?: EdgeTypeMap;
+  excludedEntityTypes?: string[];
   customInstructions?: string;
   updateCommunities?: boolean;
 }
