@@ -30,6 +30,26 @@ describe('EpisodicNode', () => {
       });
       expect(node.source).toBe(EpisodeType.message);
     });
+
+    it('should default entityEdges to empty array', () => {
+      const node = createEpisodicNode({
+        name: 'Episode',
+        content: 'content',
+        validAt,
+      });
+      expect(node.entityEdges).toEqual([]);
+    });
+
+    it('should allow overriding entityEdges', () => {
+      const uuids = ['uuid-1', 'uuid-2'];
+      const node = createEpisodicNode({
+        name: 'Episode',
+        content: 'content',
+        validAt,
+        entityEdges: uuids,
+      });
+      expect(node.entityEdges).toEqual(uuids);
+    });
   });
 
   describe('EpisodicNodeSchema', () => {
@@ -63,6 +83,36 @@ describe('EpisodicNode', () => {
         });
         expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
       }
+    });
+
+    it('should accept empty entityEdges array', () => {
+      const node = createEpisodicNode({
+        name: 'Episode',
+        content: 'content',
+        validAt,
+      });
+      expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
+    });
+
+    it('should accept entityEdges with string uuid values', () => {
+      const node = createEpisodicNode({
+        name: 'Episode',
+        content: 'content',
+        validAt,
+        entityEdges: ['uuid-a', 'uuid-b'],
+      });
+      expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
+    });
+
+    it('should reject entityEdges with non-string elements', () => {
+      const node = createEpisodicNode({
+        name: 'Episode',
+        content: 'content',
+        validAt,
+      });
+      expect(() =>
+        EpisodicNodeSchema.parse({ ...node, entityEdges: [123] }),
+      ).toThrow();
     });
   });
 });

@@ -138,7 +138,8 @@ describe('EpisodeService', () => {
     mockEpisodicNodeRepository.retrieveEpisodes.mockResolvedValue([]);
     mockEpisodicNodeRepository.save.mockResolvedValue('episode-uuid');
     mockNodeExtractionService.extractNodes.mockResolvedValue([]);
-    mockEntityNodeRepository.getByGroupIds.mockResolvedValue([]);
+    mockEntityNodeRepository.searchByName.mockResolvedValue([]);
+    mockEntityNodeRepository.searchBySimilarity.mockResolvedValue([]);
     mockEmbeddingService.embedNodes.mockResolvedValue([]);
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
@@ -146,7 +147,8 @@ describe('EpisodeService', () => {
       duplicatePairs: [],
     });
     mockEdgeExtractionService.extractEdges.mockResolvedValue([]);
-    mockEntityEdgeRepository.getByGroupIds.mockResolvedValue([]);
+    mockEntityEdgeRepository.searchByFact.mockResolvedValue([]);
+    mockEntityEdgeRepository.searchBySimilarity.mockResolvedValue([]);
     mockEmbeddingService.embedEdges.mockResolvedValue([]);
     mockEdgeResolutionService.resolveEdges.mockResolvedValue({
       resolvedEdges: [],
@@ -196,14 +198,14 @@ describe('EpisodeService', () => {
     expect(mockEmbeddingService.embedNodes).toHaveBeenCalledWith([node]);
   });
 
-  it('should call resolveNodes with embedded nodes and existing nodes', async () => {
+  it('should call resolveNodes with embedded nodes and search-based candidates', async () => {
     const extracted = makeNode('Alice');
     const existing = makeNode('Bob');
     const embedded = { ...extracted, nameEmbedding: [1, 0, 0] };
 
     mockNodeExtractionService.extractNodes.mockResolvedValue([extracted]);
     mockEmbeddingService.embedNodes.mockResolvedValue([embedded]);
-    mockEntityNodeRepository.getByGroupIds.mockResolvedValue([existing]);
+    mockEntityNodeRepository.searchByName.mockResolvedValue([existing]);
 
     await service.addEpisode(baseOptions);
 
@@ -222,12 +224,17 @@ describe('EpisodeService', () => {
     const existingNode = { ...makeNode('Bob'), uuid: 'existing-bob-uuid' };
     const uuidMap = new Map([['temp-uuid', existingNode.uuid]]);
 
+    // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
+    mockNodeExtractionService.extractNodes.mockResolvedValue([resolvedNode]);
+    mockEmbeddingService.embedNodes.mockResolvedValue([
+      { ...resolvedNode, nameEmbedding: null },
+    ]);
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [resolvedNode],
       uuidMap,
       duplicatePairs: [],
     });
-    mockEntityNodeRepository.getByGroupIds.mockResolvedValue([existingNode]);
+    mockEntityNodeRepository.searchByName.mockResolvedValue([existingNode]);
 
     await service.addEpisode(baseOptions);
 
@@ -258,7 +265,7 @@ describe('EpisodeService', () => {
     const uuidMap = new Map<string, string>();
 
     mockEmbeddingService.embedEdges.mockResolvedValue([embeddedEdge]);
-    mockEntityEdgeRepository.getByGroupIds.mockResolvedValue([existingEdge]);
+    mockEntityEdgeRepository.searchByFact.mockResolvedValue([existingEdge]);
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       uuidMap,
@@ -333,12 +340,17 @@ describe('EpisodeService', () => {
     const existingNode = { ...makeNode('Bob'), uuid: 'bob-uuid' };
     const uuidMap = new Map([['some-uuid', existingNode.uuid]]);
 
+    // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
+    mockNodeExtractionService.extractNodes.mockResolvedValue([resolvedNode]);
+    mockEmbeddingService.embedNodes.mockResolvedValue([
+      { ...resolvedNode, nameEmbedding: null },
+    ]);
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [resolvedNode],
       uuidMap,
       duplicatePairs: [],
     });
-    mockEntityNodeRepository.getByGroupIds.mockResolvedValue([existingNode]);
+    mockEntityNodeRepository.searchByName.mockResolvedValue([existingNode]);
 
     await service.addEpisode(baseOptions);
 

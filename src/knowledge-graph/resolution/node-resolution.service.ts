@@ -77,18 +77,7 @@ export class NodeResolutionService {
           .sort((a, b) => b.score - a.score)
           .slice(0, MAX_CANDIDATES);
 
-        if (scored.length === 1) {
-          // TODO: A single candidate above the cosine threshold is treated as a
-          // definitive match to avoid an LLM call. This could merge distinct entities
-          // that happen to have similar embeddings; consider raising the threshold or
-          // always going to LLM for borderline scores.
-          uuidMap.set(extracted.uuid, scored[0].node.uuid);
-          duplicatePairs.push({
-            extractedUuid: extracted.uuid,
-            canonicalUuid: scored[0].node.uuid,
-          });
-          continue;
-        } else if (scored.length > 1) {
+        if (scored.length >= 1) {
           llmCandidates.set(
             extracted.uuid,
             scored.map((s) => s.node),

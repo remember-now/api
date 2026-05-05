@@ -32,6 +32,9 @@ There are pre-commit hooks - `npm run lint` and `npm run format`.
 
 When implementing things, please use context7 as it allows you to fetch all
 relevant documentation, and don't forget to lint and format at the end.
+Never add "migration code" to make sure the code is compatible with previous
+versions of the graph. If something requires a manual migration, tell that
+to me explicitly.
 
 Lastly, `tsconfig.json`:
 

@@ -48,6 +48,19 @@ describe('luceneSanitize', () => {
   it('returns empty string unchanged', () => {
     expect(luceneSanitize('')).toBe('');
   });
+
+  it('escapes uppercase letters that form Lucene operators', () => {
+    expect(luceneSanitize('AND')).toBe('\\A\\N\\D');
+    expect(luceneSanitize('OR')).toBe('\\O\\R');
+    expect(luceneSanitize('NOT')).toBe('\\N\\O\\T');
+    expect(luceneSanitize('TO')).toBe('\\T\\O');
+  });
+
+  it('does not escape lowercase operator-letter equivalents', () => {
+    expect(luceneSanitize('and')).toBe('and');
+    expect(luceneSanitize('or')).toBe('or');
+    expect(luceneSanitize('not')).toBe('not');
+  });
 });
 
 // ─── buildNodeFilterClause ────────────────────────────────────────────────────

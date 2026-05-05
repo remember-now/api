@@ -32,6 +32,7 @@ export class EntityNodeRepository implements OnModuleInit {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
        FOR (n:Entity) ON n.name_embedding
+       WITH [n.group_id]
        OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
       { dims: toNeo4jInt(this.embeddingService.dimensions) },
     );
@@ -260,26 +261,38 @@ export class EntityNodeRepository implements OnModuleInit {
     filters?: SearchFilters,
     minScore = 0,
   ): Promise<EntityNode[]> {
+    if (groupIds.length === 0) return [];
+
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'n')
       : { clause: '', params: {} };
     const whereExtra = clause ? ` AND ${clause}` : '';
 
-    const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `MATCH (n:Entity)
-       SEARCH n IN (
-         VECTOR INDEX entity_names_embedding
-         FOR $embedding
-         LIMIT $limit
-       ) SCORE AS score
-       WHERE n.group_id IN $groupIds AND score >= $minScore${whereExtra}
-       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at, n.summary AS summary,
-              n.attributes AS attributes, n.name_embedding AS name_embedding,
-              labels(n) AS labels`,
-      { embedding, groupIds, limit, minScore, ...filterParams },
+    const perGroup = await Promise.all(
+      groupIds.map((groupId) =>
+        this.neo4j.executeRead<Record<string, unknown>>(
+          /* cypher */ `MATCH (n:Entity)
+           SEARCH n IN (
+             VECTOR INDEX entity_names_embedding
+             FOR $embedding
+             WHERE n.group_id = $groupId
+             LIMIT $limit
+           ) SCORE AS score
+           WHERE score >= $minScore${whereExtra}
+           RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+                  n.created_at AS created_at, n.summary AS summary,
+                  n.attributes AS attributes, n.name_embedding AS name_embedding,
+                  labels(n) AS labels, score`,
+          { embedding, groupId, limit, minScore, ...filterParams },
+        ),
+      ),
     );
-    return results.map((r) => this.mapRow(r));
+
+    return perGroup
+      .flat()
+      .sort((a, b) => (b['score'] as number) - (a['score'] as number))
+      .slice(0, limit)
+      .map((r) => this.mapRow(r));
   }
 
   async searchByBfs(

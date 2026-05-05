@@ -18,12 +18,13 @@ export const EdgeBaseSchema = z.object({
   createdAt: z.date(),
 });
 
-export function createEdgeDefaults(): EdgeBase {
+export function createEdgeDefaults(): Omit<
+  EdgeBase,
+  'sourceNodeUuid' | 'targetNodeUuid'
+> {
   return {
     uuid: randomUUID(),
     groupId: '',
-    sourceNodeUuid: '',
-    targetNodeUuid: '',
     createdAt: new Date(),
   };
 }

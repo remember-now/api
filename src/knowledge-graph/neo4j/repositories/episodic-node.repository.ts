@@ -49,6 +49,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
           source_description: node.sourceDescription,
           content: node.content,
           valid_at: toNeo4jDateTime(node.validAt),
+          entity_edges: node.entityEdges,
         },
       },
     );
@@ -72,6 +73,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
             source_description: n.sourceDescription,
             content: n.content,
             valid_at: toNeo4jDateTime(n.validAt),
+            entity_edges: n.entityEdges,
           },
         })),
       },
@@ -105,7 +107,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at`,
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges`,
       { uuid },
     );
     if (!results.length) return null;
@@ -118,7 +120,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at`,
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges`,
       { uuids },
     );
     return results.map((r) => this.mapRow(r));
@@ -136,7 +138,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges
        ${limitClause}`,
       params,
     );
@@ -149,7 +151,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
               e.source_description AS source_description, e.content AS content,
-              e.valid_at AS valid_at`,
+              e.valid_at AS valid_at, e.entity_edges AS entity_edges`,
       { entityNodeUuid },
     );
     return results.map((r) => this.mapRow(r));
@@ -173,7 +175,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
               e.source_description AS source_description, e.content AS content,
-              e.valid_at AS valid_at`,
+              e.valid_at AS valid_at, e.entity_edges AS entity_edges`,
       {
         referenceTime: toNeo4jDateTime(referenceTime),
         groupIds: groupIds ?? null,
@@ -205,7 +207,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges
        ORDER BY score DESC
        LIMIT $limit`,
       { luceneQuery: buildFulltextQuery(query, groupIds), limit },
@@ -223,6 +225,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
       sourceDescription: (row['source_description'] as string) ?? '',
       content: (row['content'] as string) ?? '',
       validAt: row['valid_at'] as Date,
+      entityEdges: (row['entity_edges'] as string[]) ?? [],
     };
   }
 }

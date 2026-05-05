@@ -9,17 +9,34 @@ const SYSTEM_PROMPT = `You are a helpful assistant that extracts entity properti
 Extract only properties that are clearly mentioned in the text. Do not infer or hallucinate properties not present.`;
 
 export function buildExtractEntityAttributesMessages(ctx: {
-  fact: string;
+  episodeContent: string;
+  previousEpisodesContent: string[];
+  relatedFacts: string[];
   referenceTime: Date;
   existingAttributes: Record<string, unknown>;
 }): BaseMessage[] {
-  const { fact, referenceTime, existingAttributes } = ctx;
+  const {
+    episodeContent,
+    previousEpisodesContent,
+    relatedFacts,
+    referenceTime,
+    existingAttributes,
+  } = ctx;
 
-  const humanContent =
-    `FACT:\n${fact}\n\n` +
+  let humanContent = `EPISODE:\n${episodeContent}\n\n`;
+
+  if (previousEpisodesContent.length > 0) {
+    humanContent += `PREVIOUS EPISODES:\n${previousEpisodesContent.join('\n---\n')}\n\n`;
+  }
+
+  if (relatedFacts.length > 0) {
+    humanContent += `RELATED FACTS:\n${relatedFacts.join('\n')}\n\n`;
+  }
+
+  humanContent +=
     `REFERENCE TIME: ${referenceTime.toISOString()}\n\n` +
     `EXISTING ATTRIBUTES:\n${JSON.stringify(existingAttributes, null, 2)}\n\n` +
-    `Extract the entity properties from the FACT text. Only include properties explicitly mentioned.`;
+    `Extract the entity properties from the text above. Only include properties explicitly mentioned.`;
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
 }

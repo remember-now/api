@@ -222,6 +222,62 @@ describe('EntityNodeRepository', () => {
     });
   });
 
+  describe('searchBySimilarity', () => {
+    const embedding = [0.1, 0.2, 0.3];
+
+    it('should return empty array when groupIds is empty', async () => {
+      const result = await repo.searchBySimilarity(embedding, [], 10);
+      expect(result).toEqual([]);
+      expect(neo4j.executeRead).not.toHaveBeenCalled();
+    });
+
+    it('should issue one query per groupId with in-index group_id filter', async () => {
+      neo4j.executeRead.mockResolvedValue([]);
+      await repo.searchBySimilarity(embedding, ['g1', 'g2'], 5);
+      expect(neo4j.executeRead).toHaveBeenCalledTimes(2);
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE n.group_id = $groupId'),
+        expect.objectContaining({ groupId: 'g1' }),
+      );
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE n.group_id = $groupId'),
+        expect.objectContaining({ groupId: 'g2' }),
+      );
+    });
+
+    it('should merge results from all groups, sort by score desc, and slice to limit', async () => {
+      const node = createEntityNode({ name: 'Test' });
+      const rowFor = (name: string, score: number) => ({
+        uuid: node.uuid + name,
+        name,
+        group_id: 'g1',
+        created_at: node.createdAt,
+        summary: '',
+        attributes: JSON.stringify({}),
+        name_embedding: null,
+        labels: ['Entity'],
+        score,
+      });
+      neo4j.executeRead
+        .mockResolvedValueOnce([rowFor('A', 0.9), rowFor('B', 0.5)])
+        .mockResolvedValueOnce([rowFor('C', 0.8), rowFor('D', 0.3)]);
+
+      const results = await repo.searchBySimilarity(embedding, ['g1', 'g2'], 3);
+
+      expect(results).toHaveLength(3);
+      expect(results.map((r) => r.name)).toEqual(['A', 'C', 'B']);
+    });
+
+    it('should not include group_id IN $groupIds in query', async () => {
+      neo4j.executeRead.mockResolvedValue([]);
+      await repo.searchBySimilarity(embedding, ['g1'], 5);
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.not.stringContaining('group_id IN $groupIds'),
+        expect.anything(),
+      );
+    });
+  });
+
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
       neo4j.executeRead.mockResolvedValue([]);

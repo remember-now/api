@@ -126,20 +126,16 @@ describe('NodeExtractionService', () => {
     expect(nodes).toEqual([]);
   });
 
-  it('should call attribute extraction LLM when entity type has a schema', async () => {
+  it('does not run attribute extraction (moved to post-resolution step in EpisodeService)', async () => {
     const entityTypes = {
       Person: {
         description: 'A human individual',
         schema: z.object({ age: z.number().optional() }),
       },
     };
-    // First invoke: entity extraction
-    // Second invoke: attribute extraction for the Person node
-    mockRunnable.invoke
-      .mockResolvedValueOnce({
-        extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],
-      })
-      .mockResolvedValueOnce({ age: 30 });
+    mockRunnable.invoke.mockResolvedValue({
+      extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],
+    });
 
     const nodes = await service.extractNodes(
       mockModel,
@@ -148,9 +144,9 @@ describe('NodeExtractionService', () => {
       entityTypes,
     );
 
-    // withStructuredOutput called twice: once for extraction, once for attributes
-    expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(2);
-    expect(nodes[0].attributes).toMatchObject({ age: 30 });
+    // Only the entity-extraction LLM call; attribute extraction happens post-resolution
+    expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(1);
+    expect(nodes[0].attributes).toEqual({});
   });
 
   it('should not call attribute extraction LLM when entity type has no schema', async () => {

@@ -12,6 +12,7 @@ export interface EpisodicNode extends NodeBase {
   sourceDescription: string;
   content: string;
   validAt: Date;
+  entityEdges: string[];
 }
 
 export const EpisodicNodeSchema = NodeBaseSchema.extend({
@@ -19,6 +20,7 @@ export const EpisodicNodeSchema = NodeBaseSchema.extend({
   sourceDescription: z.string(),
   content: z.string(),
   validAt: z.date(),
+  entityEdges: z.array(z.string()),
 });
 
 export function createEpisodicNode(
@@ -32,6 +34,7 @@ export function createEpisodicNode(
     ...createNodeDefaults(),
     source: EpisodeType.text,
     sourceDescription: '',
+    entityEdges: [],
     ...partial,
   };
 }

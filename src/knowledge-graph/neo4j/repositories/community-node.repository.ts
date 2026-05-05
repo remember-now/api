@@ -25,6 +25,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE VECTOR INDEX community_names_embedding IF NOT EXISTS
        FOR (n:Community) ON n.name_embedding
+       WITH [n.group_id]
        OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
       { dims: toNeo4jInt(this.embeddingService.dimensions) },
     );
@@ -199,20 +200,32 @@ export class CommunityNodeRepository implements OnModuleInit {
     limit: number,
     minScore = 0,
   ): Promise<CommunityNode[]> {
-    const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `MATCH (n:Community)
-       SEARCH n IN (
-         VECTOR INDEX community_names_embedding
-         FOR $embedding
-         LIMIT $limit
-       ) SCORE AS score
-       WHERE n.group_id IN $groupIds AND score >= $minScore
-       RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at, n.summary AS summary,
-              n.name_embedding AS name_embedding`,
-      { embedding, groupIds, limit, minScore },
+    if (groupIds.length === 0) return [];
+
+    const perGroup = await Promise.all(
+      groupIds.map((groupId) =>
+        this.neo4j.executeRead<Record<string, unknown>>(
+          /* cypher */ `MATCH (n:Community)
+           SEARCH n IN (
+             VECTOR INDEX community_names_embedding
+             FOR $embedding
+             WHERE n.group_id = $groupId
+             LIMIT $limit
+           ) SCORE AS score
+           WHERE score >= $minScore
+           RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
+                  n.created_at AS created_at, n.summary AS summary,
+                  n.name_embedding AS name_embedding, score`,
+          { embedding, groupId, limit, minScore },
+        ),
+      ),
     );
-    return results.map((r) => this.mapRow(r));
+
+    return perGroup
+      .flat()
+      .sort((a, b) => (b['score'] as number) - (a['score'] as number))
+      .slice(0, limit)
+      .map((r) => this.mapRow(r));
   }
 
   private mapRow(row: Record<string, unknown>): CommunityNode {

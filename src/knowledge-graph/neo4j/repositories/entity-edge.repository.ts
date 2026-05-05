@@ -32,6 +32,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
        FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
+       WITH [r.group_id]
        OPTIONS {indexConfig: {\`vector.dimensions\`: $dims, \`vector.similarity_function\`: 'cosine'}}`,
       { dims: toNeo4jInt(this.embeddingService.dimensions) },
     );
@@ -305,29 +306,41 @@ export class EntityEdgeRepository implements OnModuleInit {
     filters?: SearchFilters,
     minScore = 0,
   ): Promise<EntityEdge[]> {
+    if (groupIds.length === 0) return [];
+
     const { clause, params: filterParams } = filters
       ? buildEdgeFilterClause(filters, 'e')
       : { clause: '', params: {} };
     const whereExtra = clause ? ` AND ${clause}` : '';
 
-    const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `MATCH ()-[e:RELATES_TO]->()
-       SEARCH e IN (
-         VECTOR INDEX edge_facts_embedding
-         FOR $embedding
-         LIMIT $limit
-       ) SCORE AS score
-       WHERE e.group_id IN $groupIds AND score >= $minScore${whereExtra}
-       WITH e, score, startNode(e) AS source, endNode(e) AS target
-       RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
-              e.created_at AS created_at, e.fact AS fact,
-              e.fact_embedding AS fact_embedding, e.episodes AS episodes,
-              e.expired_at AS expired_at, e.valid_at AS valid_at,
-              e.invalid_at AS invalid_at, e.attributes AS attributes,
-              source.uuid AS source_node_uuid, target.uuid AS target_node_uuid`,
-      { embedding, groupIds, limit, minScore, ...filterParams },
+    const perGroup = await Promise.all(
+      groupIds.map((groupId) =>
+        this.neo4j.executeRead<Record<string, unknown>>(
+          /* cypher */ `MATCH ()-[e:RELATES_TO]->()
+           SEARCH e IN (
+             VECTOR INDEX edge_facts_embedding
+             FOR $embedding
+             WHERE e.group_id = $groupId
+             LIMIT $limit
+           ) SCORE AS score
+           WHERE score >= $minScore${whereExtra}
+           WITH e, score, startNode(e) AS source, endNode(e) AS target
+           RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
+                  e.created_at AS created_at, e.fact AS fact,
+                  e.fact_embedding AS fact_embedding, e.episodes AS episodes,
+                  e.expired_at AS expired_at, e.valid_at AS valid_at,
+                  e.invalid_at AS invalid_at, e.attributes AS attributes,
+                  source.uuid AS source_node_uuid, target.uuid AS target_node_uuid, score`,
+          { embedding, groupId, limit, minScore, ...filterParams },
+        ),
+      ),
     );
-    return results.map((r) => this.mapRow(r));
+
+    return perGroup
+      .flat()
+      .sort((a, b) => (b['score'] as number) - (a['score'] as number))
+      .slice(0, limit)
+      .map((r) => this.mapRow(r));
   }
 
   async searchByBfs(

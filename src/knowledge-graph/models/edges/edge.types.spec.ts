@@ -12,11 +12,11 @@ describe('edge.types', () => {
       );
     });
 
-    it('should create defaults with empty groupId and node uuids', () => {
+    it('should create defaults with empty groupId and no node uuids', () => {
       const defaults = createEdgeDefaults();
       expect(defaults.groupId).toBe('');
-      expect(defaults.sourceNodeUuid).toBe('');
-      expect(defaults.targetNodeUuid).toBe('');
+      expect('sourceNodeUuid' in defaults).toBe(false);
+      expect('targetNodeUuid' in defaults).toBe(false);
     });
 
     it('should create defaults with a Date for createdAt', () => {

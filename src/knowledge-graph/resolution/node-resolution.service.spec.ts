@@ -74,10 +74,16 @@ describe('NodeResolutionService', () => {
     });
   });
 
-  it('should resolve single cosine match above threshold without LLM call', async () => {
+  it('should escalate single cosine candidate to LLM', async () => {
     const extracted = [makeNode('Alice Johnson', HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('Alice J.', NEAR_SAME_EMBEDDING)];
     existing[0].uuid = 'cosine-uuid';
+
+    mockRunnable.invoke.mockResolvedValue({
+      entity_resolutions: [
+        { id: 0, name: 'Alice Johnson', duplicate_name: 'Alice J.' },
+      ],
+    });
 
     const result = await service.resolveNodes(
       mockModel,
@@ -86,9 +92,32 @@ describe('NodeResolutionService', () => {
       existing,
     );
 
-    expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    expect(mockModel.withStructuredOutput).toHaveBeenCalled();
     expect(result.uuidMap.get(extracted[0].uuid)).toBe('cosine-uuid');
     expect(result.resolvedNodes).toHaveLength(0);
+  });
+
+  it('should add as new node when LLM rejects single cosine candidate', async () => {
+    const extracted = [makeNode('Alice Johnson', HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('Alice J.', NEAR_SAME_EMBEDDING)];
+    existing[0].uuid = 'cosine-uuid';
+
+    mockRunnable.invoke.mockResolvedValue({
+      entity_resolutions: [
+        { id: 0, name: 'Alice Johnson', duplicate_name: '' },
+      ],
+    });
+
+    const result = await service.resolveNodes(
+      mockModel,
+      baseEpisode,
+      extracted,
+      existing,
+    );
+
+    expect(mockModel.withStructuredOutput).toHaveBeenCalled();
+    expect(result.uuidMap.has(extracted[0].uuid)).toBe(false);
+    expect(result.resolvedNodes).toHaveLength(1);
   });
 
   it('should escalate multiple cosine candidates to LLM', async () => {

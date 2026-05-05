@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
 
 import { LlmService } from '@/llm/llm.service';
 
@@ -10,6 +11,7 @@ import {
   createEpisodicEdge,
   createHasEpisodeEdge,
   createNextEpisodeEdge,
+  EntityEdge,
 } from '../models/edges';
 import {
   createEpisodicNode,
@@ -28,6 +30,7 @@ import {
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
 } from '../neo4j/repositories';
+import { buildExtractEntityAttributesMessages } from '../prompts/extract-entity-attributes.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   AddEpisodeOptions,
@@ -38,6 +41,7 @@ import { buildNodeSummaryMessages } from './node-summary.prompts';
 
 const PREVIOUS_EPISODES_WINDOW = 20;
 const MAX_NODES_PER_SUMMARY_BATCH = 30;
+const CANDIDATE_LIMIT = 10;
 
 @Injectable()
 export class EpisodeService {
@@ -187,13 +191,13 @@ export class EpisodeService {
       );
     }
 
-    // 5. Get existing nodes + embed extracted nodes in parallel
-    // TODO: scalability — loads ALL entity nodes into memory. For large graphs this
-    // should be replaced with a candidate pre-filter (e.g., vector index or BFS).
-    const [existingNodes, embeddedNodes] = await Promise.all([
-      this.entityNodeRepository.getByGroupIds([groupId]),
-      this.embeddingService.embedNodes(extractedNodes),
-    ]);
+    // 5. Embed extracted nodes, then collect search-based candidates
+    const embeddedNodes =
+      await this.embeddingService.embedNodes(extractedNodes);
+    const existingNodes = await this.collectNodeCandidates(
+      embeddedNodes,
+      groupId,
+    );
 
     // 6. Resolve nodes
     const { resolvedNodes, uuidMap } =
@@ -221,11 +225,13 @@ export class EpisodeService {
       customInstructions,
     );
 
-    // 8. Get existing edges + embed extracted edges in parallel
-    const [existingEdges, embeddedEdges] = await Promise.all([
-      this.entityEdgeRepository.getByGroupIds([groupId]),
-      this.embeddingService.embedEdges(extractedEdges),
-    ]);
+    // 8. Embed extracted edges, then collect search-based candidates
+    const embeddedEdges =
+      await this.embeddingService.embedEdges(extractedEdges);
+    const existingEdges = await this.collectEdgeCandidates(
+      embeddedEdges,
+      groupId,
+    );
 
     // 9. Resolve edges
     const { resolvedEdges, invalidatedEdges } =
@@ -239,6 +245,33 @@ export class EpisodeService {
         previousEpisodes,
         customInstructions,
       );
+
+    episode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map(
+      (e) => e.uuid,
+    );
+
+    // 9.5. Extract entity attributes post-resolution (with resolved-edge context)
+    for (const node of resolvedNodes) {
+      const label = node.labels.find((l) => l !== 'Entity');
+      const entityType = label ? entityTypes?.[label] : undefined;
+      if (entityType?.schema) {
+        const nodeEdges = resolvedEdges.filter(
+          (e) =>
+            e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+        );
+        const attrMessages = buildExtractEntityAttributesMessages({
+          episodeContent: episode.content,
+          previousEpisodesContent: previousEpisodes.map((ep) => ep.content),
+          relatedFacts: nodeEdges.map((e) => e.fact),
+          referenceTime: episode.validAt,
+          existingAttributes: node.attributes ?? {},
+        });
+        const attrs = (await model
+          .withStructuredOutput(z.toJSONSchema(entityType.schema))
+          .invoke(attrMessages)) as Record<string, unknown>;
+        node.attributes = { ...node.attributes, ...attrs };
+      }
+    }
 
     // 10. Generate node summaries for newly resolved nodes
     if (resolvedNodes.length > 0) {
@@ -301,6 +334,7 @@ export class EpisodeService {
       this.entityEdgeRepository.saveBulk(resolvedEdges),
       this.entityEdgeRepository.saveBulk(invalidatedEdges),
       this.episodicEdgeRepository.saveBulk(episodicEdges),
+      this.episodicNodeRepository.save(episode),
     ]);
 
     // 13. Saga association
@@ -346,5 +380,61 @@ export class EpisodeService {
       invalidatedEdges,
       episodicEdges,
     };
+  }
+
+  private async collectNodeCandidates(
+    nodes: EntityNode[],
+    groupId: string,
+  ): Promise<EntityNode[]> {
+    const results = await Promise.all(
+      nodes.flatMap((n) => [
+        this.entityNodeRepository.searchByName(
+          n.name,
+          [groupId],
+          CANDIDATE_LIMIT,
+        ),
+        n.nameEmbedding !== null
+          ? this.entityNodeRepository.searchBySimilarity(
+              n.nameEmbedding,
+              [groupId],
+              CANDIDATE_LIMIT,
+            )
+          : Promise.resolve([] as EntityNode[]),
+      ]),
+    );
+    const seen = new Set<string>();
+    return results.flat().filter((n) => {
+      if (seen.has(n.uuid)) return false;
+      seen.add(n.uuid);
+      return true;
+    });
+  }
+
+  private async collectEdgeCandidates(
+    edges: EntityEdge[],
+    groupId: string,
+  ): Promise<EntityEdge[]> {
+    const results = await Promise.all(
+      edges.flatMap((e) => [
+        this.entityEdgeRepository.searchByFact(
+          e.fact,
+          [groupId],
+          CANDIDATE_LIMIT,
+        ),
+        e.factEmbedding !== null
+          ? this.entityEdgeRepository.searchBySimilarity(
+              e.factEmbedding,
+              [groupId],
+              CANDIDATE_LIMIT,
+            )
+          : Promise.resolve([] as EntityEdge[]),
+      ]),
+    );
+    const seen = new Set<string>();
+    return results.flat().filter((e) => {
+      if (seen.has(e.uuid)) return false;
+      seen.add(e.uuid);
+      return true;
+    });
   }
 }

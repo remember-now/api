@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
 
 import { LlmService } from '@/llm/llm.service';
 
@@ -7,7 +8,7 @@ import { EmbeddingService } from '../embedding';
 import { nodeSummaryJsonSchema } from '../episode/episode.types';
 import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { createEpisodicEdge } from '../models/edges';
+import { createEpisodicEdge, EntityEdge } from '../models/edges';
 import { createEpisodicNode, EntityNode } from '../models/nodes';
 import { validateGroupId } from '../neo4j/neo4j-label-validation';
 import {
@@ -16,6 +17,7 @@ import {
   EpisodicEdgeRepository,
   EpisodicNodeRepository,
 } from '../neo4j/repositories';
+import { buildExtractEntityAttributesMessages } from '../prompts/extract-entity-attributes.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,
@@ -32,6 +34,7 @@ import { chunkContent, shouldChunk } from './content-chunking';
 
 const PREVIOUS_EPISODES_WINDOW = 20;
 const MAX_NODES_PER_SUMMARY_BATCH = 30;
+const CANDIDATE_LIMIT = 10;
 
 function reassembleByOffsets<T>(flat: T[], lengths: number[]): T[][] {
   let offset = 0;
@@ -159,13 +162,16 @@ export class BulkEpisodeService {
       extractedNodesPerEpisode.map((a) => a.length),
     );
 
-    // 8. Get all existing nodes once
-    // TODO: scalability — loads ALL entity nodes into memory. For large graphs this
-    // should be replaced with a candidate pre-filter (e.g., vector index or BFS).
+    // 8. Collect search-based node candidates per episode
     const groupIds = [...new Set(episodes.map((e) => e.groupId))];
-    const existingNodes =
-      await this.entityNodeRepository.getByGroupIds(groupIds);
-    const existingNodesMap = new Map(existingNodes.map((n) => [n.uuid, n]));
+    const candidatesPerEpisode = await Promise.all(
+      embeddedPerEpisode.map((nodes, i) =>
+        this.collectNodeCandidates(nodes, episodicNodes[i].groupId),
+      ),
+    );
+    const existingNodesMap = new Map(
+      candidatesPerEpisode.flat().map((n) => [n.uuid, n]),
+    );
 
     // 9. Pass 1 — resolve nodes vs live graph in parallel
     const nodeResolutions = await withConcurrency(
@@ -176,7 +182,7 @@ export class BulkEpisodeService {
             model,
             episodicNodes[i],
             nodes,
-            existingNodes,
+            candidatesPerEpisode[i],
             prevEpisodesPerEpisode[i],
             customInstructions,
           ),
@@ -204,7 +210,7 @@ export class BulkEpisodeService {
           cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >=
             COSINE_SIMILARITY_THRESHOLD
         ) {
-          pass2Pairs.push([a.uuid, b.uuid]);
+          pass2Pairs.push([b.uuid, a.uuid]); // b is alias → a (first-seen) is canonical
         }
       }
     }
@@ -263,9 +269,12 @@ export class BulkEpisodeService {
       pointedEdgesPerEpisode.map((a) => a.length),
     );
 
-    // 15. Get all existing edges once
-    const existingEdges =
-      await this.entityEdgeRepository.getByGroupIds(groupIds);
+    // 15. Collect search-based edge candidates per episode
+    const edgeCandidatesPerEpisode = await Promise.all(
+      embeddedEdgesPerEpisode.map((edges, i) =>
+        this.collectEdgeCandidates(edges, episodicNodes[i].groupId),
+      ),
+    );
 
     // 16. Resolve edges in parallel
     const edgeResolutions = await withConcurrency(
@@ -276,7 +285,7 @@ export class BulkEpisodeService {
             model,
             ep,
             embeddedEdgesPerEpisode[i],
-            existingEdges,
+            edgeCandidatesPerEpisode[i],
             finalUuidMap,
             ep.validAt,
             prevEpisodesPerEpisode[i],
@@ -289,6 +298,13 @@ export class BulkEpisodeService {
     const allInvalidatedEdges = edgeResolutions.flatMap(
       (r) => r.invalidatedEdges,
     );
+
+    edgeResolutions.forEach((res, i) => {
+      episodicNodes[i].entityEdges = [
+        ...res.resolvedEdges,
+        ...res.invalidatedEdges,
+      ].map((e) => e.uuid);
+    });
 
     // 17. Generate node summaries for all new canonical nodes
     const allCanonicalNodes = [
@@ -343,6 +359,48 @@ export class BulkEpisodeService {
       }
     }
 
+    // 17.5. Extract entity attributes for new canonical nodes (post-resolution, with edge context)
+    const nodeToEpisodeCtx = new Map<
+      string,
+      {
+        episode: (typeof episodicNodes)[0];
+        prevEpisodes: (typeof prevEpisodesPerEpisode)[0];
+      }
+    >();
+    canonicalNodesPerEpisode.forEach((nodes, i) => {
+      for (const n of nodes) {
+        if (!nodeToEpisodeCtx.has(n.uuid)) {
+          nodeToEpisodeCtx.set(n.uuid, {
+            episode: episodicNodes[i],
+            prevEpisodes: prevEpisodesPerEpisode[i],
+          });
+        }
+      }
+    });
+    for (const node of newNodesOnly) {
+      const label = node.labels.find((l) => l !== 'Entity');
+      const entityType = label ? entityTypes?.[label] : undefined;
+      if (entityType?.schema) {
+        const ctx = nodeToEpisodeCtx.get(node.uuid);
+        if (!ctx) continue;
+        const nodeEdges = allResolvedEdges.filter(
+          (e) =>
+            e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+        );
+        const attrMessages = buildExtractEntityAttributesMessages({
+          episodeContent: ctx.episode.content,
+          previousEpisodesContent: ctx.prevEpisodes.map((ep) => ep.content),
+          relatedFacts: nodeEdges.map((e) => e.fact),
+          referenceTime: ctx.episode.validAt,
+          existingAttributes: node.attributes ?? {},
+        });
+        const attrs = (await model
+          .withStructuredOutput(z.toJSONSchema(entityType.schema))
+          .invoke(attrMessages)) as Record<string, unknown>;
+        node.attributes = { ...node.attributes, ...attrs };
+      }
+    }
+
     // 18. Create episodic edges
     const allEpisodicEdges = episodicNodes.flatMap((ep, i) =>
       canonicalNodesPerEpisode[i].map((node) =>
@@ -360,6 +418,7 @@ export class BulkEpisodeService {
       this.entityEdgeRepository.saveBulk(allResolvedEdges),
       this.entityEdgeRepository.saveBulk(allInvalidatedEdges),
       this.episodicEdgeRepository.saveBulk(allEpisodicEdges),
+      this.episodicNodeRepository.saveBulk(episodicNodes),
     ]);
 
     // 20. Optional community build
@@ -382,5 +441,61 @@ export class BulkEpisodeService {
       invalidatedEdges: allInvalidatedEdges,
       episodicEdges: allEpisodicEdges,
     };
+  }
+
+  private async collectNodeCandidates(
+    nodes: EntityNode[],
+    groupId: string,
+  ): Promise<EntityNode[]> {
+    const results = await Promise.all(
+      nodes.flatMap((n) => [
+        this.entityNodeRepository.searchByName(
+          n.name,
+          [groupId],
+          CANDIDATE_LIMIT,
+        ),
+        n.nameEmbedding !== null
+          ? this.entityNodeRepository.searchBySimilarity(
+              n.nameEmbedding,
+              [groupId],
+              CANDIDATE_LIMIT,
+            )
+          : Promise.resolve([] as EntityNode[]),
+      ]),
+    );
+    const seen = new Set<string>();
+    return results.flat().filter((n) => {
+      if (seen.has(n.uuid)) return false;
+      seen.add(n.uuid);
+      return true;
+    });
+  }
+
+  private async collectEdgeCandidates(
+    edges: EntityEdge[],
+    groupId: string,
+  ): Promise<EntityEdge[]> {
+    const results = await Promise.all(
+      edges.flatMap((e) => [
+        this.entityEdgeRepository.searchByFact(
+          e.fact,
+          [groupId],
+          CANDIDATE_LIMIT,
+        ),
+        e.factEmbedding !== null
+          ? this.entityEdgeRepository.searchBySimilarity(
+              e.factEmbedding,
+              [groupId],
+              CANDIDATE_LIMIT,
+            )
+          : Promise.resolve([] as EntityEdge[]),
+      ]),
+    );
+    const seen = new Set<string>();
+    return results.flat().filter((e) => {
+      if (seen.has(e.uuid)) return false;
+      seen.add(e.uuid);
+      return true;
+    });
   }
 }

@@ -21,7 +21,7 @@ const WHITELISTED_OPS = new Set<string>(Object.values(TemporalComparison));
  * to db.index.fulltext.queryNodes / queryRelationships.
  */
 export function luceneSanitize(query: string): string {
-  return query.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, '\\$&');
+  return query.replace(/[+\-&|!(){}[\]^"~*?:\\/ORNTAD]/g, '\\$&');
 }
 
 /**

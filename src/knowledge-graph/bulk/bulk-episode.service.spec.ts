@@ -86,7 +86,8 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     mockEpisodicNodeRepo.retrieveEpisodes.mockResolvedValue([]);
     mockNodeExtraction.extractNodes.mockResolvedValue([]);
     mockEmbeddingService.embedNodes.mockResolvedValue([]);
-    mockEntityNodeRepo.getByGroupIds.mockResolvedValue([]);
+    mockEntityNodeRepo.searchByName.mockResolvedValue([]);
+    mockEntityNodeRepo.searchBySimilarity.mockResolvedValue([]);
     mockNodeResolution.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       uuidMap: new Map(),
@@ -94,7 +95,8 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
     mockEdgeExtraction.extractEdges.mockResolvedValue([]);
     mockEmbeddingService.embedEdges.mockResolvedValue([]);
-    mockEntityEdgeRepo.getByGroupIds.mockResolvedValue([]);
+    mockEntityEdgeRepo.searchByFact.mockResolvedValue([]);
+    mockEntityEdgeRepo.searchBySimilarity.mockResolvedValue([]);
     mockEdgeResolution.resolveEdges.mockResolvedValue({
       resolvedEdges: [],
       invalidatedEdges: [],
@@ -166,7 +168,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
         groupId: GROUP_ID,
       });
 
-      mockEntityNodeRepo.getByGroupIds.mockResolvedValue([existingCanonical]);
+      mockEntityNodeRepo.searchByName.mockResolvedValue([existingCanonical]);
       mockNodeExtraction.extractNodes.mockResolvedValue([alias]);
       mockEmbeddingService.embedNodes.mockResolvedValue([alias]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
@@ -403,12 +405,12 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
       });
 
       // nodeB is excluded by pass-1 (resolveNodes returned it as an alias of nodeA).
-      // nodeA and nodeC form a pass-2 pair: allNewNodes iterates ep1 first so
-      // buildDirectedUuidMap maps nodeA → nodeC, making nodeC the canonical and
-      // nodeA the alias. Only nodeC survives.
+      // nodeA and nodeC form a pass-2 pair: pass2Pairs emits [nodeC.uuid, nodeA.uuid]
+      // so buildDirectedUuidMap makes nodeA (first-seen / lower-index) the canonical
+      // and nodeC the alias. Only nodeA survives.
       expect(result.nodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
-      expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeUndefined();
-      expect(result.nodes.find((n) => n.uuid === nodeC.uuid)).toBeDefined();
+      expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
+      expect(result.nodes.find((n) => n.uuid === nodeC.uuid)).toBeUndefined();
     });
   });
 });
