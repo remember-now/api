@@ -9,6 +9,7 @@ import {
   cosineSimilarity,
   LOW_ENTROPY_THRESHOLD,
   MAX_CANDIDATES,
+  normalizeNameForEntropy,
   normalizeString,
   shannonEntropy,
 } from './resolution-utils';
@@ -53,9 +54,12 @@ export class NodeResolutionService {
         continue;
       }
 
-      // Low entropy → skip cosine, go to LLM with all existing as candidates
+      // Low entropy → skip cosine, go to LLM with all existing as candidates.
+      // Mirrors Python: _normalize_name_for_fuzzy strips to [a-z0-9' ] (no spaces)
+      // and _name_entropy computes entropy over that form.
       if (
-        shannonEntropy(normalizedName) < LOW_ENTROPY_THRESHOLD &&
+        shannonEntropy(normalizeNameForEntropy(normalizedName)) <
+          LOW_ENTROPY_THRESHOLD &&
         existingNodes.length > 0
       ) {
         llmCandidates.set(extracted.uuid, existingNodes);

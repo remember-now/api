@@ -11,10 +11,10 @@ export interface EdgeBase {
 }
 
 export const EdgeBaseSchema = z.object({
-  uuid: z.string().uuid(),
+  uuid: z.uuid(),
   groupId: z.string(),
-  sourceNodeUuid: z.string().uuid(),
-  targetNodeUuid: z.string().uuid(),
+  sourceNodeUuid: z.uuid(),
+  targetNodeUuid: z.uuid(),
   createdAt: z.date(),
 });
 

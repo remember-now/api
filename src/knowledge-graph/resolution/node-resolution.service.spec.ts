@@ -241,19 +241,17 @@ describe('NodeResolutionService', () => {
   });
 
   it('should bypass cosine for low-entropy names and go to LLM', async () => {
-    // "NYC" has very low entropy — should skip cosine and go to LLM
-    const extracted = [makeNode('NYC', HIGH_SIM_EMBEDDING)];
+    // "bob" entropy ≈ 0.918 (b:2, o:1) — below the 1.5 threshold → skips cosine
+    const extracted = [makeNode('bob', HIGH_SIM_EMBEDDING)];
     const existing = [
       {
-        ...makeNode('New York City', DIFFERENT_EMBEDDING),
-        uuid: 'nyc-exist',
+        ...makeNode('Bobby', DIFFERENT_EMBEDDING),
+        uuid: 'bob-exist',
       },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'NYC', duplicate_name: 'New York City' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'bob', duplicate_name: 'Bobby' }],
     });
 
     const result = await service.resolveNodes(
@@ -264,7 +262,34 @@ describe('NodeResolutionService', () => {
     );
 
     expect(mockModel.withStructuredOutput).toHaveBeenCalled();
-    expect(result.uuidMap.get(extracted[0].uuid)).toBe('nyc-exist');
+    expect(result.uuidMap.get(extracted[0].uuid)).toBe('bob-exist');
+  });
+
+  it('should use cosine for names with entropy above threshold (e.g. "alice")', async () => {
+    // "alice" entropy ≈ 2.32 (a,l,i,c,e — all distinct) — above the 1.5 threshold → cosine path.
+    // Existing node "alicia" does not exact-match "alice" after normalizeString, so the
+    // cosine scan runs. With DIFFERENT_EMBEDDING the cosine score is below threshold, so
+    // no candidate is found and alice is added as a new node without any LLM call.
+    // Under the old threshold of 3.0 this name would have bypassed cosine and called the LLM.
+    const extracted = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    const existing = [
+      {
+        ...makeNode('alicia', DIFFERENT_EMBEDDING),
+        uuid: 'alicia-exist',
+      },
+    ];
+
+    const result = await service.resolveNodes(
+      mockModel,
+      baseEpisode,
+      extracted,
+      existing,
+    );
+
+    // No LLM call: cosine found no candidates above threshold → alice is a new node.
+    expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    expect(result.resolvedNodes).toHaveLength(1);
+    expect(result.resolvedNodes[0].name).toBe('alice');
   });
 
   it('should return all as new nodes with empty uuidMap when no existing nodes', async () => {

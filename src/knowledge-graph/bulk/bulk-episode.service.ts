@@ -22,6 +22,7 @@ import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
+  normalizeString,
 } from '../resolution/resolution-utils';
 import {
   buildDirectedUuidMap,
@@ -197,19 +198,23 @@ export class BulkEpisodeService {
       ]),
     );
 
-    // 11. Pass 2 — within-batch cosine similarity dedup
+    // 11. Pass 2 — within-batch dedup: exact name match first, then cosine
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
     const pass2Pairs: [string, string][] = [];
     for (let i = 0; i < allNewNodes.length; i++) {
       for (let j = i + 1; j < allNewNodes.length; j++) {
         const a = allNewNodes[i];
         const b = allNewNodes[j];
-        if (
-          a.nameEmbedding &&
-          b.nameEmbedding &&
+
+        const exactMatch = normalizeString(a.name) === normalizeString(b.name);
+        const cosineMatch =
+          !exactMatch &&
+          a.nameEmbedding !== null &&
+          b.nameEmbedding !== null &&
           cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >=
-            COSINE_SIMILARITY_THRESHOLD
-        ) {
+            COSINE_SIMILARITY_THRESHOLD;
+
+        if (exactMatch || cosineMatch) {
           pass2Pairs.push([b.uuid, a.uuid]); // b is alias → a (first-seen) is canonical
         }
       }

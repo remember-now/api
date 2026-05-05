@@ -317,9 +317,9 @@ export class EntityNodeRepository implements OnModuleInit {
     const whereExtra = clause ? ` AND ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
-      /* cypher */ `MATCH (origin:Entity)
+      /* cypher */ `MATCH (origin:Entity|Episodic)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
-       MATCH (origin)-[:RELATES_TO*1..${depth}]-(reachable:Entity)
+       MATCH (origin)-[:RELATES_TO|MENTIONS*1..${depth}]-(reachable:Entity)
        WHERE reachable.group_id IN $groupIds${whereExtra}
        RETURN DISTINCT reachable.uuid AS uuid, reachable.name AS name,
               reachable.group_id AS group_id, reachable.created_at AS created_at,

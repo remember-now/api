@@ -233,9 +233,9 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
   });
 
-  // ── Pass-2: within-batch cosine similarity dedup ─────────────────────────
+  // ── Pass-2: within-batch exact-name + cosine similarity dedup ───────────
 
-  describe('pass-2 dedup (within-batch cosine similarity)', () => {
+  describe('pass-2 dedup (within-batch exact name + cosine similarity)', () => {
     it('exactly one of two nodes with identical embeddings survives as canonical', async () => {
       const nodeA = createEntityNode({
         name: 'Alice',
@@ -313,7 +313,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
       expect(result.nodes.find((n) => n.uuid === nodeB.uuid)).toBeDefined();
     });
 
-    it('node without nameEmbedding is not compared in pass-2', async () => {
+    it('two nodes with identical names and null embeddings are deduplicated by exact match', async () => {
       const nodeA = createEntityNode({
         name: 'Alice',
         groupId: GROUP_ID,
@@ -346,7 +346,81 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
         episodes: [makeRaw('ep1'), makeRaw('ep2')],
       });
 
-      // Both survive because pass-2 skips nodes with null embeddings
+      // nodeA (first-seen) is canonical; nodeB is its alias and must not appear
+      expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
+      expect(result.nodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
+    });
+
+    it('node with null embedding is deduplicated by exact name match against a node that has an embedding', async () => {
+      const nodeA = createEntityNode({
+        name: 'Alice',
+        groupId: GROUP_ID,
+        nameEmbedding: [1, 0],
+      });
+      const nodeB = createEntityNode({
+        name: 'Alice',
+        groupId: GROUP_ID,
+        nameEmbedding: null,
+      });
+
+      mockNodeExtraction.extractNodes
+        .mockResolvedValueOnce([nodeA])
+        .mockResolvedValueOnce([nodeB]);
+      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
+      mockNodeResolution.resolveNodes
+        .mockResolvedValueOnce({
+          resolvedNodes: [nodeA],
+          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          duplicatePairs: [],
+        })
+        .mockResolvedValueOnce({
+          resolvedNodes: [nodeB],
+          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          duplicatePairs: [],
+        });
+
+      const result = await service.addEpisodesBulk({
+        userId: USER_ID,
+        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+      });
+
+      expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
+      expect(result.nodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
+    });
+
+    it('two nodes with different names and null embeddings are both kept', async () => {
+      const nodeA = createEntityNode({
+        name: 'Alice',
+        groupId: GROUP_ID,
+        nameEmbedding: null,
+      });
+      const nodeB = createEntityNode({
+        name: 'Bob',
+        groupId: GROUP_ID,
+        nameEmbedding: null,
+      });
+
+      mockNodeExtraction.extractNodes
+        .mockResolvedValueOnce([nodeA])
+        .mockResolvedValueOnce([nodeB]);
+      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
+      mockNodeResolution.resolveNodes
+        .mockResolvedValueOnce({
+          resolvedNodes: [nodeA],
+          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          duplicatePairs: [],
+        })
+        .mockResolvedValueOnce({
+          resolvedNodes: [nodeB],
+          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          duplicatePairs: [],
+        });
+
+      const result = await service.addEpisodesBulk({
+        userId: USER_ID,
+        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+      });
+
       expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
       expect(result.nodes.find((n) => n.uuid === nodeB.uuid)).toBeDefined();
     });
