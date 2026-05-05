@@ -32,6 +32,10 @@ export class CommunityNodeRepository implements OnModuleInit {
       /* cypher */ `CREATE INDEX community_group_id IF NOT EXISTS FOR (n:Community) ON (n.group_id)`,
       {},
     );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX community_uuid IF NOT EXISTS FOR (n:Community) ON (n.uuid)`,
+      {},
+    );
   }
 
   async save(node: CommunityNode): Promise<string> {

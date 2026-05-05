@@ -1,12 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { HasEpisodeEdge } from '@/knowledge-graph/models/edges/has-episode-edge';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
-export class HasEpisodeEdgeRepository {
+export class HasEpisodeEdgeRepository implements OnModuleInit {
   constructor(private readonly neo4j: Neo4jService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX has_episode_uuid IF NOT EXISTS FOR ()-[e:HAS_EPISODE]-() ON (e.uuid)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX has_episode_group_id IF NOT EXISTS FOR ()-[e:HAS_EPISODE]-() ON (e.group_id)`,
+      {},
+    );
+  }
 
   async save(edge: HasEpisodeEdge): Promise<string> {
     const results = await this.neo4j.executeWrite<{ uuid: string }>(

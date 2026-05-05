@@ -156,7 +156,9 @@ describe('EdgeResolutionService', () => {
     expect(result.invalidatedEdges).toHaveLength(0);
   });
 
-  it('should add existing edge to invalidatedEdges with invalidAt and expiredAt set when LLM returns contradiction', async () => {
+  it('should not invalidate contradicted edges when both lack validAt (no temporal overlap computable)', async () => {
+    // Python resolve_edge_contradictions skips invalidation when validAt is null on
+    // either side — temporal guards require both dates to be present.
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is now CEO at Acme',
@@ -169,7 +171,40 @@ describe('EdgeResolutionService', () => {
     });
     existingEdge.uuid = 'old-edge-uuid';
 
-    // idx 0 is the endpoint edge
+    mockRunnable.invoke.mockResolvedValue({
+      duplicate_facts: [],
+      contradicted_facts: [0],
+    });
+
+    const result = await service.resolveEdges(
+      mockModel,
+      baseEpisode,
+      [edge],
+      [existingEdge],
+      new Map(),
+      referenceTime,
+    );
+
+    expect(result.resolvedEdges).toHaveLength(1);
+    expect(result.invalidatedEdges).toHaveLength(0);
+  });
+
+  it('should invalidate contradicted edge when new edge has later validAt', async () => {
+    // B1: existing edge predates new edge → invalidate with new edge's validAt
+    const edge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice is now CEO at Acme',
+      factEmbedding: HIGH_SIM,
+      validAt: new Date('2024-06-01'),
+    });
+    const existingEdge = makeEdge({
+      name: 'WORKS_AT',
+      fact: 'Alice was an engineer at Acme',
+      factEmbedding: NEAR_HIGH_SIM,
+      validAt: new Date('2023-01-01'),
+    });
+    existingEdge.uuid = 'old-edge-uuid';
+
     mockRunnable.invoke.mockResolvedValue({
       duplicate_facts: [],
       contradicted_facts: [0],
@@ -187,7 +222,9 @@ describe('EdgeResolutionService', () => {
     expect(result.resolvedEdges).toHaveLength(1);
     expect(result.invalidatedEdges).toHaveLength(1);
     expect(result.invalidatedEdges[0].uuid).toBe('old-edge-uuid');
-    expect(result.invalidatedEdges[0].invalidAt).toEqual(referenceTime);
+    expect(result.invalidatedEdges[0].invalidAt).toEqual(
+      new Date('2024-06-01'),
+    );
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });
 

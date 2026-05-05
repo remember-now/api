@@ -1,12 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { SagaNode } from '@/knowledge-graph/models/nodes/saga-node';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
-export class SagaNodeRepository {
+export class SagaNodeRepository implements OnModuleInit {
   constructor(private readonly neo4j: Neo4jService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX saga_uuid IF NOT EXISTS FOR (n:Saga) ON (n.uuid)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX saga_group_id IF NOT EXISTS FOR (n:Saga) ON (n.group_id)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX saga_name IF NOT EXISTS FOR (n:Saga) ON (n.name)`,
+      {},
+    );
+  }
 
   async save(node: SagaNode): Promise<string> {
     const results = await this.neo4j.executeWrite<{ uuid: string }>(

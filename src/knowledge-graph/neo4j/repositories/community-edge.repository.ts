@@ -13,6 +13,10 @@ export class CommunityEdgeRepository implements OnModuleInit {
       /* cypher */ `CREATE INDEX community_edge_group_id IF NOT EXISTS FOR ()-[r:HAS_MEMBER]-() ON (r.group_id)`,
       {},
     );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX has_member_uuid IF NOT EXISTS FOR ()-[e:HAS_MEMBER]-() ON (e.uuid)`,
+      {},
+    );
   }
 
   async save(edge: CommunityEdge): Promise<string> {

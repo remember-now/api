@@ -118,12 +118,7 @@ export class NodeResolutionService {
         name: n.name,
       }));
 
-      // NOTE: Last-write-wins on case-insensitive name collision. If two existing
-      // nodes differ only in case (e.g. "OpenAI" vs "openai"), one silently shadows
-      // the other in this map. No warning is emitted.
-      const existingByName = new Map(
-        existingNodes.map((n) => [n.name.toLowerCase(), n]),
-      );
+      const existingByName = new Map(existingNodes.map((n) => [n.name, n]));
 
       const messages = buildDedupeNodesMessages({
         episode,
@@ -147,9 +142,7 @@ export class NodeResolutionService {
         if (!extractedUuid) continue;
 
         if (resolution.duplicate_name && resolution.duplicate_name !== '') {
-          const canonical = existingByName.get(
-            resolution.duplicate_name.toLowerCase(),
-          );
+          const canonical = existingByName.get(resolution.duplicate_name);
           if (canonical) {
             uuidMap.set(extractedUuid, canonical.uuid);
             duplicatePairs.push({

@@ -13,11 +13,23 @@ export class EpisodicNodeRepository implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE FULLTEXT INDEX episode_content IF NOT EXISTS
-       FOR (n:Episodic) ON EACH [n.content, n.group_id]`,
+       FOR (n:Episodic) ON EACH [n.content, n.source, n.source_description, n.group_id]`,
       {},
     );
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE INDEX episodic_group_id IF NOT EXISTS FOR (n:Episodic) ON (n.group_id)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX episode_uuid IF NOT EXISTS FOR (n:Episodic) ON (n.uuid)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX created_at_episodic_index IF NOT EXISTS FOR (n:Episodic) ON (n.created_at)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX valid_at_episodic_index IF NOT EXISTS FOR (n:Episodic) ON (n.valid_at)`,
       {},
     );
   }

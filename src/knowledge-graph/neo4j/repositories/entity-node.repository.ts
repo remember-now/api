@@ -39,6 +39,18 @@ export class EntityNodeRepository implements OnModuleInit {
       /* cypher */ `CREATE INDEX entity_group_id IF NOT EXISTS FOR (n:Entity) ON (n.group_id)`,
       {},
     );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX entity_uuid IF NOT EXISTS FOR (n:Entity) ON (n.uuid)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX name_entity_index IF NOT EXISTS FOR (n:Entity) ON (n.name)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX created_at_entity_index IF NOT EXISTS FOR (n:Entity) ON (n.created_at)`,
+      {},
+    );
   }
 
   async save(node: EntityNode): Promise<string> {

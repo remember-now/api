@@ -26,7 +26,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
        FOR ()-[r:RELATES_TO]-()
-       ON EACH [r.fact, r.group_id]`,
+       ON EACH [r.name, r.fact, r.group_id]`,
       {},
     );
     await this.neo4j.executeWrite(
@@ -37,6 +37,30 @@ export class EntityEdgeRepository implements OnModuleInit {
     );
     await this.neo4j.executeWrite(
       /* cypher */ `CREATE INDEX entity_edge_group_id IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.group_id)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX relation_uuid IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.uuid)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX name_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.name)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX created_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.created_at)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX expired_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.expired_at)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX valid_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.valid_at)`,
+      {},
+    );
+    await this.neo4j.executeWrite(
+      /* cypher */ `CREATE INDEX invalid_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.invalid_at)`,
       {},
     );
   }
@@ -187,6 +211,9 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getUuidsForEpisodeDeletion(episodeUuid: string): Promise<string[]> {
     const results = await this.neo4j.executeRead<{ uuid: string }>(
+      // episodes[0] is the creating episode — mirrors Python graphiti.py remove_episode:
+      // only edges whose first episode matches are deleted; edges that merely accumulated
+      // this episode as a contributor (episodes[1..]) are intentionally kept.
       /* cypher */ `MATCH ()-[e:RELATES_TO]->()
        WHERE e.episodes[0] = $episodeUuid
        RETURN e.uuid AS uuid`,

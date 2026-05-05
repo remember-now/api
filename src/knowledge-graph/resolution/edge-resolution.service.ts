@@ -159,6 +159,27 @@ export class EdgeResolutionService {
       );
 
       if (!isDuplicate) {
+        if (edge.invalidAt && !edge.expiredAt) {
+          edge.expiredAt = new Date();
+        }
+
+        // Self-expiration — if any contradiction candidate postdates this edge,
+        // the edge is superseded by information already in the graph.
+        if (!edge.expiredAt) {
+          const contradictionCandidates = dedupe.contradicted_facts
+            .map((idx) => idxToEdge.get(idx))
+            .filter((e): e is EntityEdge => e !== undefined)
+            .filter((c) => c.validAt !== null)
+            .sort((a, b) => a.validAt!.getTime() - b.validAt!.getTime());
+          for (const candidate of contradictionCandidates) {
+            if (edge.validAt !== null && candidate.validAt! > edge.validAt) {
+              edge.invalidAt = candidate.validAt;
+              edge.expiredAt = new Date();
+              break;
+            }
+          }
+        }
+
         resolvedEdges.push(edge);
       } else {
         // Append this episode's UUID to the matching existing endpoint edge(s)
@@ -178,13 +199,39 @@ export class EdgeResolutionService {
         }
       }
 
+      // Only invalidate existing edges that genuinely overlap with the new edge's
+      // validity window and predate it. Mirrors Python resolve_edge_contradictions
+      // (edge_operations.py:425-460).
       for (const idx of dedupe.contradicted_facts) {
         const existing = idxToEdge.get(idx);
-        if (existing && !invalidatedEdgesMap.has(existing.uuid)) {
+        if (!existing || invalidatedEdgesMap.has(existing.uuid)) continue;
+
+        const edgeInvalidAt = existing.invalidAt;
+        const resolvedValidAt = edge.validAt;
+        const edgeValidAt = existing.validAt;
+        const resolvedInvalidAt = edge.invalidAt;
+
+        // Skip if there is no temporal overlap between the two edges.
+        if (
+          (edgeInvalidAt !== null &&
+            resolvedValidAt !== null &&
+            edgeInvalidAt <= resolvedValidAt) ||
+          (edgeValidAt !== null &&
+            resolvedInvalidAt !== null &&
+            resolvedInvalidAt <= edgeValidAt)
+        )
+          continue;
+
+        // Only invalidate if the existing edge predates the new edge.
+        if (
+          edgeValidAt !== null &&
+          resolvedValidAt !== null &&
+          edgeValidAt < resolvedValidAt
+        ) {
           invalidatedEdgesMap.set(existing.uuid, {
             ...existing,
-            invalidAt: referenceTime,
-            expiredAt: new Date(),
+            invalidAt: edge.validAt,
+            expiredAt: existing.expiredAt ?? new Date(),
           });
         }
       }
