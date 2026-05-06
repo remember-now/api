@@ -6,8 +6,11 @@ import {
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
-import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import {
+  buildLabelString,
+  groupNodesByLabel,
+} from '@/knowledge-graph/neo4j/node-label.utils';
 import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
@@ -41,8 +44,7 @@ export class CommunityNodeRepository implements OnModuleInit {
   }
 
   async save(node: CommunityNode): Promise<string> {
-    NodeLabelsSchema.parse(node.labels);
-    const labelStr = [...new Set(node.labels)].join(':');
+    const labelStr = buildLabelString(node.labels);
     const props: Record<string, unknown> = {
       name: node.name,
       group_id: node.groupId,
@@ -73,14 +75,7 @@ export class CommunityNodeRepository implements OnModuleInit {
   async saveBulk(nodes: CommunityNode[]): Promise<void> {
     if (nodes.length === 0) return;
 
-    const byLabel = new Map<string, CommunityNode[]>();
-    for (const n of nodes) {
-      const key = [...new Set(n.labels)].sort().join(':');
-      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
-    }
-
-    for (const [labelStr, group] of byLabel) {
-      NodeLabelsSchema.parse(labelStr.split(':'));
+    for (const [labelStr, group] of groupNodesByLabel(nodes)) {
       const withEmbedding = group.filter((n) => n.nameEmbedding);
       const withoutEmbedding = group.filter((n) => !n.nameEmbedding);
 

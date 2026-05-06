@@ -3,8 +3,11 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
-import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import {
+  buildLabelString,
+  groupNodesByLabel,
+} from '@/knowledge-graph/neo4j/node-label.utils';
 import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
@@ -36,9 +39,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async save(node: EpisodicNode): Promise<string> {
-    NodeLabelsSchema.parse(node.labels);
-
-    const labelStr = [...new Set(node.labels)].join(':');
+    const labelStr = buildLabelString(node.labels);
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
       /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
        SET n += $props
@@ -63,15 +64,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
   async saveBulk(nodes: EpisodicNode[]): Promise<void> {
     if (nodes.length === 0) return;
 
-    const byLabel = new Map<string, EpisodicNode[]>();
-    for (const n of nodes) {
-      const key = [...new Set(n.labels)].sort().join(':');
-      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
-    }
-
-    for (const [labelStr, group] of byLabel) {
-      NodeLabelsSchema.parse(labelStr.split(':'));
-
+    for (const [labelStr, group] of groupNodesByLabel(nodes)) {
       await this.neo4j.executeWrite(
         /* cypher */ `UNWIND $nodes AS node
          MERGE (n:${labelStr} {uuid: node.uuid})

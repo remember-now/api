@@ -20,7 +20,7 @@ import {
   EpisodeType,
   EpisodicNode,
 } from '../models/nodes';
-import { GroupIdSchema } from '../neo4j/neo4j.schemas';
+import { GroupIdSchema } from '../neo4j';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,

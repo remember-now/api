@@ -1,4 +1,4 @@
-import { NodeLabelsSchema } from '../neo4j/neo4j.schemas';
+import { NodeLabelsSchema } from '../neo4j';
 import { SearchFilters, TemporalComparison } from './search-filters.types';
 
 export interface FilterClauseResult {

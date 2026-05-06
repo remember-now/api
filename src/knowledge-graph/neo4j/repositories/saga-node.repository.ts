@@ -2,8 +2,11 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { SagaNode } from '@/knowledge-graph/models/nodes/saga-node';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
-import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import {
+  buildLabelString,
+  groupNodesByLabel,
+} from '@/knowledge-graph/neo4j/node-label.utils';
 
 @Injectable()
 export class SagaNodeRepository implements OnModuleInit {
@@ -25,8 +28,7 @@ export class SagaNodeRepository implements OnModuleInit {
   }
 
   async save(node: SagaNode): Promise<string> {
-    NodeLabelsSchema.parse(node.labels);
-    const labelStr = [...new Set(node.labels)].join(':');
+    const labelStr = buildLabelString(node.labels);
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
       /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
        SET n += $props
@@ -46,15 +48,7 @@ export class SagaNodeRepository implements OnModuleInit {
   async saveBulk(nodes: SagaNode[]): Promise<void> {
     if (nodes.length === 0) return;
 
-    const byLabel = new Map<string, SagaNode[]>();
-    for (const n of nodes) {
-      const key = [...new Set(n.labels)].sort().join(':');
-      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
-    }
-
-    for (const [labelStr, group] of byLabel) {
-      NodeLabelsSchema.parse(labelStr.split(':'));
-
+    for (const [labelStr, group] of groupNodesByLabel(nodes)) {
       await this.neo4j.executeWrite(
         /* cypher */ `UNWIND $nodes AS node
          MERGE (n:${labelStr} {uuid: node.uuid})
