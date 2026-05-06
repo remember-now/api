@@ -1,18 +1,14 @@
 import { z } from 'zod';
 
-import { createNodeDefaults, NodeBase, NodeBaseSchema } from './node.types';
-
-export interface EntityNode extends NodeBase {
-  nameEmbedding: number[] | null;
-  summary: string;
-  attributes: Record<string, unknown>;
-}
+import { createNodeDefaults, NodeBaseSchema } from './node.types';
 
 export const EntityNodeSchema = NodeBaseSchema.extend({
   nameEmbedding: z.array(z.number()).nullable(),
   summary: z.string(),
   attributes: z.record(z.string(), z.unknown()),
 });
+
+export type EntityNode = z.infer<typeof EntityNodeSchema>;
 
 export function createEntityNode(
   partial: Partial<EntityNode> & { name: string; groupId: string },

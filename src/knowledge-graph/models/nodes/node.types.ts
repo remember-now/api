@@ -8,14 +8,6 @@ export enum EpisodeType {
   text = 'text',
 }
 
-export interface NodeBase {
-  uuid: string;
-  name: string;
-  groupId: string;
-  labels: string[];
-  createdAt: Date;
-}
-
 export const NodeBaseSchema = z.object({
   uuid: z.uuid(),
   name: z.string().min(1),
@@ -23,6 +15,8 @@ export const NodeBaseSchema = z.object({
   labels: z.array(z.string()),
   createdAt: z.date(),
 });
+
+export type NodeBase = z.infer<typeof NodeBaseSchema>;
 
 export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
   return {

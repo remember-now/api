@@ -2,14 +2,6 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-export interface EdgeBase {
-  uuid: string;
-  groupId: string;
-  sourceNodeUuid: string;
-  targetNodeUuid: string;
-  createdAt: Date;
-}
-
 export const EdgeBaseSchema = z.object({
   uuid: z.uuid(),
   groupId: z.string().min(1),
@@ -17,6 +9,8 @@ export const EdgeBaseSchema = z.object({
   targetNodeUuid: z.uuid(),
   createdAt: z.date(),
 });
+
+export type EdgeBase = z.infer<typeof EdgeBaseSchema>;
 
 export function createEdgeDefaults(): Omit<
   EdgeBase,

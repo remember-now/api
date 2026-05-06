@@ -1,16 +1,13 @@
 import { z } from 'zod';
 
-import { createNodeDefaults, NodeBase, NodeBaseSchema } from './node.types';
-
-export interface CommunityNode extends NodeBase {
-  nameEmbedding: number[] | null;
-  summary: string;
-}
+import { createNodeDefaults, NodeBaseSchema } from './node.types';
 
 export const CommunityNodeSchema = NodeBaseSchema.extend({
   nameEmbedding: z.array(z.number()).nullable(),
   summary: z.string(),
 });
+
+export type CommunityNode = z.infer<typeof CommunityNodeSchema>;
 
 export function createCommunityNode(
   partial: Partial<CommunityNode> & { name: string; groupId: string },

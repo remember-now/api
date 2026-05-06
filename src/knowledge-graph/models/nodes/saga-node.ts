@@ -1,9 +1,10 @@
-import { createNodeDefaults, NodeBase, NodeBaseSchema } from './node.types';
+import { z } from 'zod';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface SagaNode extends NodeBase {}
+import { createNodeDefaults, NodeBaseSchema } from './node.types';
 
 export const SagaNodeSchema = NodeBaseSchema;
+
+export type SagaNode = z.infer<typeof SagaNodeSchema>;
 
 export function createSagaNode(
   partial: Partial<SagaNode> & { name: string; groupId: string },

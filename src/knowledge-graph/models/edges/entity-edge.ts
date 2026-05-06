@@ -1,17 +1,6 @@
 import { z } from 'zod';
 
-import { createEdgeDefaults, EdgeBase, EdgeBaseSchema } from './edge.types';
-
-export interface EntityEdge extends EdgeBase {
-  name: string;
-  fact: string;
-  factEmbedding: number[] | null;
-  episodes: string[];
-  expiredAt: Date | null;
-  validAt: Date | null;
-  invalidAt: Date | null;
-  attributes: Record<string, unknown>;
-}
+import { createEdgeDefaults, EdgeBaseSchema } from './edge.types';
 
 export const EntityEdgeSchema = EdgeBaseSchema.extend({
   name: z.string().min(1),
@@ -23,6 +12,8 @@ export const EntityEdgeSchema = EdgeBaseSchema.extend({
   invalidAt: z.date().nullable(),
   attributes: z.record(z.string(), z.unknown()),
 });
+
+export type EntityEdge = z.infer<typeof EntityEdgeSchema>;
 
 export function createEntityEdge(
   partial: Partial<EntityEdge> & {

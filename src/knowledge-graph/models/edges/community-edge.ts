@@ -1,9 +1,10 @@
-import { createEdgeDefaults, EdgeBase, EdgeBaseSchema } from './edge.types';
+import { z } from 'zod';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface CommunityEdge extends EdgeBase {}
+import { createEdgeDefaults, EdgeBaseSchema } from './edge.types';
 
 export const CommunityEdgeSchema = EdgeBaseSchema;
+
+export type CommunityEdge = z.infer<typeof CommunityEdgeSchema>;
 
 export function createCommunityEdge(
   partial: Partial<CommunityEdge> & {

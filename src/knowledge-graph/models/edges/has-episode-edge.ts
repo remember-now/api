@@ -1,9 +1,10 @@
-import { createEdgeDefaults, EdgeBase, EdgeBaseSchema } from './edge.types';
+import { z } from 'zod';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface HasEpisodeEdge extends EdgeBase {}
+import { createEdgeDefaults, EdgeBaseSchema } from './edge.types';
 
 export const HasEpisodeEdgeSchema = EdgeBaseSchema;
+
+export type HasEpisodeEdge = z.infer<typeof HasEpisodeEdgeSchema>;
 
 export function createHasEpisodeEdge(
   partial: Partial<HasEpisodeEdge> & {
