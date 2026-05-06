@@ -5,8 +5,17 @@ import {
 } from '@langchain/core/messages';
 
 import { EpisodicNode } from '../models';
+import { MAX_SUMMARY_CHARS } from '../utils/text-utils';
 
-const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a concise factual summary (≤ 200 characters) for each entity using the provided episode context. Only summarize entities with relevant information. Skip entities with no context.`;
+const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a factual summary (≤ ${MAX_SUMMARY_CHARS} characters) for each entity using the provided episode context.
+
+Rules:
+- Write 2–6 dense sentences in third person
+- NEVER use meta-language verbs: "mentioned", "discussed", "stated", "noted", "said"
+- Write factual statements that stand alone without referencing the conversation
+- Preserve names, dates, and counts precisely
+- If an existing summary is provided, merge it with new facts; newer facts win on contradiction
+- Skip entities with no relevant context in the episode`;
 
 function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
   if (episodes.length === 0) {

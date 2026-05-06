@@ -4,6 +4,7 @@
       "Bash(npm run lint)",
       "Bash(npm run build:*)",
       "Bash(npm run format)",
+      "Bash(npm run format:diff)",
       "Bash(npm run test)",
       "Bash(npm run test:*)",
       "Bash(git diff:*)",

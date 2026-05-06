@@ -8,6 +8,7 @@ export enum EpisodeType {
   message = 'message',
   json = 'json',
   text = 'text',
+  factTriple = 'fact_triple',
 }
 
 export const NodeBaseSchema = z.object({
@@ -37,7 +38,10 @@ export const CommunityNodeSchema = NodeBaseSchema.extend({
   summary: z.string(),
 });
 
-export const SagaNodeSchema = NodeBaseSchema;
+export const SagaNodeSchema = NodeBaseSchema.extend({
+  summary: z.string(),
+  lastSummarizedAt: z.date().nullable(),
+});
 
 // Types
 
@@ -106,6 +110,8 @@ export function createSagaNode(
   return {
     ...createNodeDefaults(),
     labels: ['Saga'],
+    summary: '',
+    lastSummarizedAt: null,
     ...partial,
   };
 }

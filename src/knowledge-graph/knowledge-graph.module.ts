@@ -7,7 +7,11 @@ import { BulkEpisodeService } from './bulk';
 import { CommunityService } from './community';
 import { EmbeddingService } from './embedding';
 import { EpisodeService } from './episode';
-import { EdgeExtractionService, NodeExtractionService } from './extraction';
+import {
+  CombinedExtractionService,
+  EdgeExtractionService,
+  NodeExtractionService,
+} from './extraction';
 import { Neo4jModule } from './neo4j/neo4j.module';
 import {
   CommunityEdgeRepository,
@@ -35,7 +39,11 @@ const repositories = [
   NextEpisodeEdgeRepository,
 ];
 
-const extractionServices = [NodeExtractionService, EdgeExtractionService];
+const extractionServices = [
+  NodeExtractionService,
+  EdgeExtractionService,
+  CombinedExtractionService,
+];
 
 const resolutionServices = [NodeResolutionService, EdgeResolutionService];
 

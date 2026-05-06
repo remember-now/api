@@ -14,10 +14,12 @@ Your task is to identify meaningful relationships between the provided entities 
 
 Rules:
 - Only use entity names from the provided entities list
-- Extract one fact per edge
-- The fact should be a complete sentence describing the relationship
-- Only extract relationships that are clearly supported by the episode content
+- Extract one fact per edge — a complete sentence describing the relationship
+- Only extract relationships clearly supported by the episode content
 - Do not infer or hallucinate relationships not present in the text
+- Skip semantically redundant facts already captured by other edges in this batch
+- Self-referencing facts (source entity = target entity) are allowed when clearly justified, but two-entity facts are preferred
+- Resolve temporal expressions ("last year", "recently") against REFERENCE_TIME; use precise ISO 8601 datetimes
 
 RELATION TYPE RULES:
 - If FACT_TYPES are provided and the relationship matches one of the types (considering the entity type signature), use that fact_type_name as the relation type
@@ -25,7 +27,17 @@ RELATION TYPE RULES:
 
 DATETIME RULES:
 - validAt: the ISO 8601 datetime when the fact became true; set to the reference time if the fact appears ongoing; leave null if no temporal information is present
-- invalidAt: the ISO 8601 datetime when the fact stopped being true; set only when a change or termination is explicitly expressed; leave null otherwise`;
+- invalidAt: the ISO 8601 datetime when the fact stopped being true; set only when a change or termination is explicitly expressed; leave null otherwise
+
+EPISODE INDICES:
+- If multiple episodes are provided (indexed 0, 1, 2, …), populate episodeIndices with the 0-based indices of the episodes that directly support each fact`;
+
+const TIMESTAMPS_BATCH_SYSTEM_PROMPT = `You are a temporal reasoning assistant. For each fact provided, extract the validity window.
+
+Rules:
+- validAt: ISO 8601 datetime when the fact became true; null if no temporal information
+- invalidAt: ISO 8601 datetime when the fact stopped being true; null if ongoing or unknown
+- Respond with one entry per fact in the same order as the input`;
 
 function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
   if (episodes.length === 0) {
@@ -99,4 +111,20 @@ export function buildExtractEdgesMessages(ctx: {
   }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+export function buildExtractTimestampsBatchMessages(ctx: {
+  facts: string[];
+  referenceTime: Date;
+}): BaseMessage[] {
+  const { facts, referenceTime } = ctx;
+
+  const factsText = facts.map((f, i) => `${i}: "${f}"`).join('\n');
+
+  const humanContent = `REFERENCE TIME: ${referenceTime.toISOString()}\n\nFACTS:\n${factsText}`;
+
+  return [
+    new SystemMessage(TIMESTAMPS_BATCH_SYSTEM_PROMPT),
+    new HumanMessage(humanContent),
+  ];
 }

@@ -31,6 +31,7 @@ export interface AddBulkEpisodeOptions {
   excludedEntityTypes?: string[];
   customInstructions?: string;
   updateCommunities?: boolean;
+  useCombinedExtraction?: boolean;
 }
 
 export interface AddBulkEpisodeResult {

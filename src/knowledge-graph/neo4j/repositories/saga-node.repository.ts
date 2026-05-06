@@ -39,6 +39,11 @@ export class SagaNodeRepository implements OnModuleInit {
           name: node.name,
           group_id: node.groupId,
           created_at: toNeo4jDateTime(node.createdAt),
+          summary: node.summary,
+          last_summarized_at:
+            node.lastSummarizedAt !== null
+              ? toNeo4jDateTime(node.lastSummarizedAt)
+              : null,
         },
       },
     );
@@ -60,6 +65,11 @@ export class SagaNodeRepository implements OnModuleInit {
               name: n.name,
               group_id: n.groupId,
               created_at: toNeo4jDateTime(n.createdAt),
+              summary: n.summary,
+              last_summarized_at:
+                n.lastSummarizedAt !== null
+                  ? toNeo4jDateTime(n.lastSummarizedAt)
+                  : null,
             },
           })),
         },
@@ -92,7 +102,8 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at, labels(n) AS labels`,
+              n.created_at AS created_at, labels(n) AS labels,
+              n.summary AS summary, n.last_summarized_at AS last_summarized_at`,
       { uuid },
     );
     if (!results.length) return null;
@@ -103,7 +114,8 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at, labels(n) AS labels`,
+              n.created_at AS created_at, labels(n) AS labels,
+              n.summary AS summary, n.last_summarized_at AS last_summarized_at`,
       { uuids },
     );
     return results.map((r) => this.mapRow(r));
@@ -124,7 +136,8 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at, labels(n) AS labels
+              n.created_at AS created_at, labels(n) AS labels,
+              n.summary AS summary, n.last_summarized_at AS last_summarized_at
        ORDER BY n.uuid DESC ${limitClause}`,
       params,
     );
@@ -138,6 +151,11 @@ export class SagaNodeRepository implements OnModuleInit {
       groupId: row['group_id'] as string,
       labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
+      summary: (row['summary'] as string | undefined) ?? '',
+      lastSummarizedAt:
+        row['last_summarized_at'] != null
+          ? (row['last_summarized_at'] as Date)
+          : null,
     };
   }
 }

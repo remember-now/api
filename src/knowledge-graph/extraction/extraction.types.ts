@@ -18,6 +18,7 @@ export const ExtractedEdgeSchema = z.object({
   description: z.string(),
   validAt: z.string().nullable().optional(),
   invalidAt: z.string().nullable().optional(),
+  episodeIndices: z.array(z.number()).optional(),
 });
 
 export const ExtractedEdgesSchema = z.object({

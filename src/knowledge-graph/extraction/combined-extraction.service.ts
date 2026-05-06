@@ -1,0 +1,199 @@
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
+
+import {
+  EdgeTypeMap,
+  EdgeTypesMap,
+  EntityTypeMap,
+} from '../episode/episode.types';
+import {
+  createEntityEdge,
+  createEntityNode,
+  EntityEdge,
+  EntityNode,
+  EpisodicNode,
+} from '../models';
+import { buildExtractTimestampsBatchMessages } from '../prompts/extract-edges.prompts';
+import {
+  buildExtractNodesAndEdgesMessages,
+  combinedExtractionJsonSchema,
+} from '../prompts/extract-nodes-and-edges.prompts';
+
+const TimestampsBatchSchema = z.object({
+  facts: z.array(
+    z.object({
+      validAt: z.string().nullable().optional(),
+      invalidAt: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+@Injectable()
+export class CombinedExtractionService {
+  async extractNodesAndEdges(
+    model: BaseChatModel,
+    episodes: EpisodicNode[],
+    entityTypes?: EntityTypeMap,
+    edgeTypes?: EdgeTypesMap,
+    edgeTypeMap?: EdgeTypeMap,
+    customInstructions?: string,
+    excludedEntityTypes?: string[],
+  ): Promise<{
+    nodes: EntityNode[];
+    edges: EntityEdge[];
+    nodeEpisodeIndexMap: Map<string, number[]>;
+  }> {
+    if (episodes.length === 0) {
+      return { nodes: [], edges: [], nodeEpisodeIndexMap: new Map() };
+    }
+
+    const referenceTime = episodes.reduce(
+      (latest, ep) => (ep.validAt > latest ? ep.validAt : latest),
+      episodes[0].validAt,
+    );
+
+    // 1. Single combined LLM call to extract both entities and facts
+    const messages = buildExtractNodesAndEdgesMessages({
+      episodes,
+      referenceTime,
+      entityTypes,
+      edgeTypes,
+      edgeTypeMap,
+      customInstructions,
+    });
+
+    const result = await model
+      .withStructuredOutput(combinedExtractionJsonSchema)
+      .invoke(messages);
+
+    // 2. Collect referenced entity names from facts (case-insensitive)
+    const referencedNames = new Set<string>();
+    for (const fact of result.facts) {
+      referencedNames.add(fact.sourceEntityName.toLowerCase());
+      referencedNames.add(fact.targetEntityName.toLowerCase());
+    }
+
+    // 3. Build EntityNode[] — only entities that appear in at least one fact
+    const nameToNode = new Map<string, EntityNode>();
+    for (const entity of result.entities) {
+      const nameLower = entity.name.toLowerCase();
+      if (!entity.name.trim() || !referencedNames.has(nameLower)) continue;
+
+      // Apply excluded entity types filter
+      const labels = resolveLabels(entity.entityTypeId, entityTypes);
+      if (excludedEntityTypes?.length) {
+        const specificLabel = labels.find((l) => l !== 'Entity') ?? 'Entity';
+        if (excludedEntityTypes.includes(specificLabel)) continue;
+      }
+
+      // First occurrence wins for duplicate names (case-insensitive)
+      if (!nameToNode.has(nameLower)) {
+        nameToNode.set(
+          nameLower,
+          createEntityNode({
+            name: entity.name,
+            groupId: episodes[0].groupId,
+            labels,
+          }),
+        );
+      }
+    }
+
+    // 4. Batch-extract timestamps for facts that have no temporal info
+    const factsNeedingTimestamps = result.facts
+      .map((f, i) => ({ fact: f, idx: i }))
+      .filter((x) => x.fact.validAt === undefined || x.fact.validAt === null);
+
+    const timestampMap = new Map<
+      number,
+      { validAt?: string | null; invalidAt?: string | null }
+    >();
+    if (factsNeedingTimestamps.length > 0) {
+      const tsMessages = buildExtractTimestampsBatchMessages({
+        facts: factsNeedingTimestamps.map((x) => x.fact.fact),
+        referenceTime,
+      });
+      const tsResult = await model
+        .withStructuredOutput(z.toJSONSchema(TimestampsBatchSchema))
+        .invoke(tsMessages);
+      for (let i = 0; i < factsNeedingTimestamps.length; i++) {
+        const original = factsNeedingTimestamps[i];
+        const ts = tsResult.facts[i];
+        if (ts) timestampMap.set(original.idx, ts);
+      }
+    }
+
+    // 5. Build EntityEdge[] and derive nodeEpisodeIndexMap from episodeIndices
+    const nodeEpisodeIndexMap = new Map<string, number[]>();
+    const edges: EntityEdge[] = [];
+    const maxEpIdx = episodes.length - 1;
+
+    for (let i = 0; i < result.facts.length; i++) {
+      const f = result.facts[i];
+      const srcNode = nameToNode.get(f.sourceEntityName.toLowerCase());
+      const tgtNode = nameToNode.get(f.targetEntityName.toLowerCase());
+      if (!srcNode || !tgtNode) continue;
+
+      // Clamp episode indices to valid range
+      const rawIndices = (f.episodeIndices ?? []).filter(
+        (idx) => idx >= 0 && idx <= maxEpIdx,
+      );
+      const epIndices =
+        rawIndices.length > 0
+          ? rawIndices
+          : Array.from({ length: episodes.length }, (_, k) => k);
+
+      // Accumulate node episode attribution
+      for (const [nodeName, node] of [
+        [f.sourceEntityName.toLowerCase(), srcNode],
+        [f.targetEntityName.toLowerCase(), tgtNode],
+      ] as [string, EntityNode][]) {
+        void nodeName;
+        const existing = nodeEpisodeIndexMap.get(node.uuid) ?? [];
+        for (const idx of epIndices) {
+          if (!existing.includes(idx)) existing.push(idx);
+        }
+        nodeEpisodeIndexMap.set(node.uuid, existing);
+      }
+
+      const episodeUuids = epIndices.map((idx) => episodes[idx].uuid);
+
+      const tsOverride = timestampMap.get(i);
+      const rawValidAt = tsOverride?.validAt ?? f.validAt;
+      const rawInvalidAt = tsOverride?.invalidAt ?? f.invalidAt;
+
+      edges.push(
+        createEntityEdge({
+          name: f.relationType,
+          fact: f.fact,
+          groupId: episodes[0].groupId,
+          sourceNodeUuid: srcNode.uuid,
+          targetNodeUuid: tgtNode.uuid,
+          episodes: episodeUuids,
+          validAt: typeof rawValidAt === 'string' ? new Date(rawValidAt) : null,
+          invalidAt:
+            typeof rawInvalidAt === 'string' ? new Date(rawInvalidAt) : null,
+        }),
+      );
+    }
+
+    return {
+      nodes: [...nameToNode.values()],
+      edges,
+      nodeEpisodeIndexMap,
+    };
+  }
+}
+
+function resolveLabels(
+  entityTypeId: number | undefined,
+  entityTypes?: EntityTypeMap,
+): string[] {
+  if (entityTypeId === undefined || !entityTypes) {
+    return ['Entity'];
+  }
+  const labels = Object.keys(entityTypes);
+  const label = labels[entityTypeId];
+  return label ? ['Entity', label] : ['Entity'];
+}

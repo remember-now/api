@@ -11,7 +11,11 @@ import {
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
-import { EdgeExtractionService, NodeExtractionService } from '../extraction';
+import {
+  CombinedExtractionService,
+  EdgeExtractionService,
+  NodeExtractionService,
+} from '../extraction';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -42,6 +46,9 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
   let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
   let mockNodeExtraction: ReturnType<typeof mockDeep<NodeExtractionService>>;
   let mockEdgeExtraction: ReturnType<typeof mockDeep<EdgeExtractionService>>;
+  let mockCombinedExtraction: ReturnType<
+    typeof mockDeep<CombinedExtractionService>
+  >;
   let mockNodeResolution: ReturnType<typeof mockDeep<NodeResolutionService>>;
   let mockEdgeResolution: ReturnType<typeof mockDeep<EdgeResolutionService>>;
   let mockEntityNodeRepo: ReturnType<typeof mockDeep<EntityNodeRepository>>;
@@ -57,6 +64,12 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     mockEmbeddingService = mockDeep<EmbeddingService>();
     mockNodeExtraction = mockDeep<NodeExtractionService>();
     mockEdgeExtraction = mockDeep<EdgeExtractionService>();
+    mockCombinedExtraction = mockDeep<CombinedExtractionService>();
+    mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
+      nodes: [],
+      edges: [],
+      nodeEpisodeIndexMap: new Map(),
+    });
     mockNodeResolution = mockDeep<NodeResolutionService>();
     mockEdgeResolution = mockDeep<EdgeResolutionService>();
     mockEntityNodeRepo = mockDeep<EntityNodeRepository>();
@@ -74,6 +87,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
       mockEmbeddingService,
       mockNodeExtraction,
       mockEdgeExtraction,
+      mockCombinedExtraction,
       mockNodeResolution,
       mockEdgeResolution,
       mockEntityNodeRepo,

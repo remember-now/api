@@ -32,6 +32,10 @@ import {
   buildExtractEdgeAttributesMessages,
   buildExtractEntityAttributesMessages,
 } from '../prompts';
+import {
+  buildSummarizeSagaMessages,
+  sagaSummaryJsonSchema,
+} from '../prompts/summarize-sagas.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   AddEpisodeOptions,
@@ -121,6 +125,54 @@ export class EpisodeService {
   // sequential per-episode deletion.
   async deleteEpisodesByUuid(uuids: string[]): Promise<void> {
     await Promise.all(uuids.map((uuid) => this.deleteEpisode(uuid)));
+  }
+
+  async summarizeSaga(options: {
+    userId: number;
+    sagaUuid: string;
+    groupId: string;
+  }): Promise<string> {
+    const { userId, sagaUuid, groupId } = options;
+
+    const model = await this.llmService.getActiveModel(userId);
+
+    const saga = await this.sagaNodeRepository.getByUuid(sagaUuid);
+    if (!saga) {
+      throw new Error(`Saga not found: ${sagaUuid}`);
+    }
+
+    const referenceTime = saga.lastSummarizedAt ?? new Date(0);
+    const newEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
+      new Date(),
+      100,
+      [groupId],
+      undefined,
+      sagaUuid,
+    );
+
+    const unsummarized = newEpisodes.filter((ep) => ep.validAt > referenceTime);
+
+    if (unsummarized.length === 0) {
+      return saga.summary;
+    }
+
+    const messages = buildSummarizeSagaMessages({
+      existingSummary: saga.summary,
+      newEpisodes: unsummarized,
+    });
+
+    const result = await model
+      .withStructuredOutput(sagaSummaryJsonSchema)
+      .invoke(messages);
+
+    const updatedSaga = {
+      ...saga,
+      summary: result.summary,
+      lastSummarizedAt: new Date(),
+    };
+    await this.sagaNodeRepository.save(updatedSaga);
+
+    return updatedSaga.summary;
   }
 
   async addEpisode(options: AddEpisodeOptions): Promise<AddEpisodeResult> {

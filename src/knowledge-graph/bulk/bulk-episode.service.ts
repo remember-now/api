@@ -11,7 +11,11 @@ import {
   nodeSummaryJsonSchema,
 } from '../episode/episode.types';
 import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
-import { EdgeExtractionService, NodeExtractionService } from '../extraction';
+import {
+  CombinedExtractionService,
+  EdgeExtractionService,
+  NodeExtractionService,
+} from '../extraction';
 import {
   createEpisodicEdge,
   createEpisodicNode,
@@ -65,6 +69,7 @@ export class BulkEpisodeService {
     private readonly embeddingService: EmbeddingService,
     private readonly nodeExtractionService: NodeExtractionService,
     private readonly edgeExtractionService: EdgeExtractionService,
+    private readonly combinedExtractionService: CombinedExtractionService,
     private readonly nodeResolutionService: NodeResolutionService,
     private readonly edgeResolutionService: EdgeResolutionService,
     private readonly entityNodeRepository: EntityNodeRepository,
@@ -85,6 +90,7 @@ export class BulkEpisodeService {
       excludedEntityTypes,
       customInstructions,
       updateCommunities,
+      useCombinedExtraction = false,
     } = options;
 
     const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
@@ -135,10 +141,33 @@ export class BulkEpisodeService {
       ),
     );
 
-    // 6. Extract nodes in parallel (with chunking for large content)
+    // 6. Extract nodes (and edges, if using combined extraction) in parallel
+    // Combined path: single LLM call per episode yields both nodes and edges.
+    // Separate path: node extraction only; edges are extracted later in step 13.
+    let preExtractedEdgesPerEpisode: EntityEdge[][] | null = null;
+
     const extractedNodesPerEpisode = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       episodicNodes.map((ep, i) => async () => {
+        if (useCombinedExtraction) {
+          const { nodes, edges } =
+            await this.combinedExtractionService.extractNodesAndEdges(
+              model,
+              [ep],
+              entityTypes,
+              edgeTypes,
+              effectiveEdgeTypeMap,
+              customInstructions,
+              excludedEntityTypes,
+            );
+          // Stash edges for use in step 13 (index is stable because withConcurrency
+          // preserves order for this mapping pattern).
+          (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill(
+            [],
+          ))[i] = edges;
+          return nodes;
+        }
+
         if (shouldChunk(ep.content)) {
           const chunks = await chunkContent(ep.content, ep.source);
           const perChunk = await Promise.all(
@@ -265,25 +294,29 @@ export class BulkEpisodeService {
       return merged;
     });
 
-    // 13. Extract edges in parallel, then resolve pointers
-    const extractedEdgesPerEpisode = await withConcurrency(
-      LLM_CONCURRENCY_LIMIT,
-      episodicNodes.map(
-        (ep, i) => () =>
-          this.edgeExtractionService.extractEdges(
-            model,
-            ep,
-            canonicalNodesPerEpisode[i],
-            prevEpisodesPerEpisode[i],
-            ep.validAt,
-            customInstructions,
-            edgeTypes,
-            effectiveEdgeTypeMap,
+    // 13. Extract edges in parallel, then resolve pointers.
+    // Combined path: edges were already extracted in step 6; remap node UUIDs via finalUuidMap.
+    // Separate path: extract edges using the canonical nodes resolved above.
+    const rawEdgesPerEpisode = preExtractedEdgesPerEpisode
+      ? preExtractedEdgesPerEpisode
+      : await withConcurrency(
+          LLM_CONCURRENCY_LIMIT,
+          episodicNodes.map(
+            (ep, i) => () =>
+              this.edgeExtractionService.extractEdges(
+                model,
+                ep,
+                canonicalNodesPerEpisode[i],
+                prevEpisodesPerEpisode[i],
+                ep.validAt,
+                customInstructions,
+                edgeTypes,
+                effectiveEdgeTypeMap,
+              ),
           ),
-      ),
-    );
+        );
 
-    const pointedEdgesPerEpisode = extractedEdgesPerEpisode.map((edges) =>
+    const pointedEdgesPerEpisode = rawEdgesPerEpisode.map((edges) =>
       resolveEdgePointers(edges, finalUuidMap),
     );
 
