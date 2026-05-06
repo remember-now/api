@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+// Schemas
+
 export const ExtractedEntitySchema = z.object({
   name: z.string(),
   entityTypeId: z.number().optional(),
@@ -22,8 +24,12 @@ export const ExtractedEdgesSchema = z.object({
   edges: z.array(ExtractedEdgeSchema),
 });
 
+// Types
+
 export type ExtractedEntities = z.infer<typeof ExtractedEntitiesSchema>;
 export type ExtractedEdges = z.infer<typeof ExtractedEdgesSchema>;
+
+// JSON Schemas
 
 export const extractedEntitiesJsonSchema = z.toJSONSchema(
   ExtractedEntitiesSchema,

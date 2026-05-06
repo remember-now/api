@@ -2,6 +2,8 @@ import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { SearchConfig } from './search-config.types';
 import { SearchFilters } from './search-filters.types';
 
+// Interfaces
+
 export interface SearchResults {
   edges: EntityEdge[];
   edgeScores: Map<string, number>;
@@ -24,6 +26,8 @@ export interface SearchOptions {
   /** UUIDs of nodes to start BFS traversal from. */
   originNodeUuids?: string[];
 }
+
+// Helpers
 
 export function emptySearchResults(): SearchResults {
   return {

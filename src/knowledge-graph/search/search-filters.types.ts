@@ -1,3 +1,5 @@
+// Enums
+
 export enum TemporalComparison {
   eq = '=',
   neq = '<>',
@@ -9,11 +11,15 @@ export enum TemporalComparison {
   isNotNull = 'IS NOT NULL',
 }
 
+// Types
+
 export type TemporalField =
   | 'valid_at'
   | 'invalid_at'
   | 'created_at'
   | 'expired_at';
+
+// Interfaces
 
 export interface TemporalFilter {
   field: TemporalField;
