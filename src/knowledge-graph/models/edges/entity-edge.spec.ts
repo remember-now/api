@@ -10,13 +10,15 @@ describe('EntityEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
       expect(edge.name).toBe('KNOWS');
       expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
-      expect(edge.fact).toBe('');
+      expect(edge.fact).toBe('A knows B');
       expect(edge.factEmbedding).toBeNull();
       expect(edge.episodes).toEqual([]);
       expect(edge.expiredAt).toBeNull();
@@ -30,9 +32,10 @@ describe('EntityEdge', () => {
     it('should allow overriding fact', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'Person A knows Person B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
-        fact: 'Person A knows Person B',
       });
       expect(edge.fact).toBe('Person A knows Person B');
     });
@@ -40,6 +43,8 @@ describe('EntityEdge', () => {
     it('should allow setting factEmbedding', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
         factEmbedding: [0.1, 0.2, 0.3],
@@ -51,6 +56,8 @@ describe('EntityEdge', () => {
       const date = new Date('2024-01-01');
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
         validAt: date,
@@ -67,6 +74,8 @@ describe('EntityEdge', () => {
     it('should accept valid entity edge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -76,15 +85,30 @@ describe('EntityEdge', () => {
     it('should reject empty name', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
       expect(() => EntityEdgeSchema.parse({ ...edge, name: '' })).toThrow();
     });
 
+    it('should reject empty groupId', () => {
+      const edge = createEntityEdge({
+        name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      expect(() => EntityEdgeSchema.parse({ ...edge, groupId: '' })).toThrow();
+    });
+
     it('should accept null dates', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'A knows B',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
         validAt: null,

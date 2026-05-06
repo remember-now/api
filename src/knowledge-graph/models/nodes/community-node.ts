@@ -13,7 +13,7 @@ export const CommunityNodeSchema = NodeBaseSchema.extend({
 });
 
 export function createCommunityNode(
-  partial: Partial<CommunityNode> & { name: string },
+  partial: Partial<CommunityNode> & { name: string; groupId: string },
 ): CommunityNode {
   return {
     ...createNodeDefaults(),

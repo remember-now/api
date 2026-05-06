@@ -25,6 +25,7 @@ describe('EpisodicNodeRepository', () => {
     it('should call MERGE on Episodic and return uuid', async () => {
       const node = createEpisodicNode({
         name: 'Episode 1',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
@@ -59,6 +60,7 @@ describe('EpisodicNodeRepository', () => {
     it('should return mapped episodic node when found', async () => {
       const node = createEpisodicNode({
         name: 'Episode 1',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });

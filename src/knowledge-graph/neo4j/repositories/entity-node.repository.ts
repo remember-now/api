@@ -3,11 +3,11 @@ import { z } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityNode } from '@/knowledge-graph/models/nodes/entity-node';
-import { validateNodeLabels } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import {
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
 import {
@@ -55,7 +55,7 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async save(node: EntityNode): Promise<string> {
-    validateNodeLabels(node.labels);
+    NodeLabelsSchema.parse(node.labels);
     const labelStr = [...new Set(node.labels)].join(':');
 
     const props: Record<string, unknown> = {
@@ -68,7 +68,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
@@ -78,7 +78,7 @@ export class EntityNodeRepository implements OnModuleInit {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
@@ -98,12 +98,12 @@ export class EntityNodeRepository implements OnModuleInit {
     }
 
     for (const [labelStr, group] of byLabel) {
-      validateNodeLabels(labelStr.split(':'));
+      NodeLabelsSchema.parse(labelStr.split(':'));
       const withEmbedding = group.filter((n) => n.nameEmbedding);
       const withoutEmbedding = group.filter((n) => !n.nameEmbedding);
 
       if (withoutEmbedding.length > 0) {
-        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         await this.neo4j.executeWrite(
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})
@@ -124,7 +124,7 @@ export class EntityNodeRepository implements OnModuleInit {
       }
 
       if (withEmbedding.length > 0) {
-        // labelStr is safe to interpolate — validateNodeLabels ensures only [A-Za-z_][A-Za-z0-9_]* chars
+        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         await this.neo4j.executeWrite(
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})

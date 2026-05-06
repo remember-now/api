@@ -11,29 +11,60 @@ describe('NextEpisodeEdge', () => {
 
   describe('createNextEpisodeEdge', () => {
     it('should create with correct defaults', () => {
-      const edge = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
       expect(edge.uuid).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.groupId).toBe('');
+      expect(edge.groupId).toBe('test-group');
     });
 
     it('should generate unique uuids', () => {
-      const edge1 = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
-      const edge2 = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge1 = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      const edge2 = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(edge1.uuid).not.toBe(edge2.uuid);
     });
   });
 
   describe('NextEpisodeEdgeSchema', () => {
     it('should accept valid next-episode edge', () => {
-      const edge = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() => NextEpisodeEdgeSchema.parse(edge)).not.toThrow();
     });
 
+    it('should reject empty groupId', () => {
+      const edge = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      expect(() =>
+        NextEpisodeEdgeSchema.parse({ ...edge, groupId: '' }),
+      ).toThrow();
+    });
+
     it('should reject invalid uuid', () => {
-      const edge = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createNextEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() =>
         NextEpisodeEdgeSchema.parse({ ...edge, uuid: 'not-a-uuid' }),
       ).toThrow();

@@ -7,6 +7,7 @@ export const CommunityEdgeSchema = EdgeBaseSchema;
 
 export function createCommunityEdge(
   partial: Partial<CommunityEdge> & {
+    groupId: string;
     sourceNodeUuid: string;
     targetNodeUuid: string;
   },

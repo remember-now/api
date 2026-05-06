@@ -25,7 +25,11 @@ describe('EpisodicEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on MENTIONS and return uuid', async () => {
-      const edge = createEpisodicEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createEpisodicEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -55,7 +59,11 @@ describe('EpisodicEdgeRepository', () => {
     });
 
     it('should return mapped episodic edge when found', async () => {
-      const edge = createEpisodicEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createEpisodicEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,
@@ -75,9 +83,21 @@ describe('EpisodicEdgeRepository', () => {
     it('calls executeWrite exactly once for N edges (single UNWIND round-trip)', async () => {
       neo4j.executeWrite.mockResolvedValue([]);
       const edges = [
-        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
-        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
-        createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+        createEpisodicEdge({
+          sourceNodeUuid,
+          targetNodeUuid,
+          groupId: 'test-group',
+        }),
+        createEpisodicEdge({
+          sourceNodeUuid,
+          targetNodeUuid,
+          groupId: 'test-group',
+        }),
+        createEpisodicEdge({
+          sourceNodeUuid,
+          targetNodeUuid,
+          groupId: 'test-group',
+        }),
       ];
       await repo.saveBulk(edges);
       expect(neo4j.executeWrite).toHaveBeenCalledTimes(1);

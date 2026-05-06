@@ -12,12 +12,6 @@ describe('node.types', () => {
       );
     });
 
-    it('should create defaults with empty name and groupId', () => {
-      const defaults = createNodeDefaults();
-      expect(defaults.name).toBe('');
-      expect(defaults.groupId).toBe('');
-    });
-
     it('should create defaults with a Date for createdAt', () => {
       const defaults = createNodeDefaults();
       expect(defaults.createdAt).toBeInstanceOf(Date);
@@ -50,6 +44,16 @@ describe('node.types', () => {
         uuid: 'not-a-uuid',
         name: 'Test',
         groupId: 'group-1',
+        createdAt: new Date(),
+      };
+      expect(() => NodeBaseSchema.parse(node)).toThrow();
+    });
+
+    it('should reject empty groupId', () => {
+      const node = {
+        uuid: randomUUID(),
+        name: 'Test',
+        groupId: '',
         createdAt: new Date(),
       };
       expect(() => NodeBaseSchema.parse(node)).toThrow();

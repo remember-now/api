@@ -12,9 +12,9 @@ describe('edge.types', () => {
       );
     });
 
-    it('should create defaults with empty groupId and no node uuids', () => {
+    it('should not include groupId or node uuids in defaults', () => {
       const defaults = createEdgeDefaults();
-      expect(defaults.groupId).toBe('');
+      expect('groupId' in defaults).toBe(false);
       expect('sourceNodeUuid' in defaults).toBe(false);
       expect('targetNodeUuid' in defaults).toBe(false);
     });
@@ -54,6 +54,17 @@ describe('edge.types', () => {
         groupId: 'group-1',
         sourceNodeUuid: randomUUID(),
         targetNodeUuid: 'not-a-uuid',
+        createdAt: new Date(),
+      };
+      expect(() => EdgeBaseSchema.parse(edge)).toThrow();
+    });
+
+    it('should reject empty groupId', () => {
+      const edge = {
+        uuid: randomUUID(),
+        groupId: '',
+        sourceNodeUuid: randomUUID(),
+        targetNodeUuid: randomUUID(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();

@@ -18,15 +18,13 @@ export interface NodeBase {
 export const NodeBaseSchema = z.object({
   uuid: z.uuid(),
   name: z.string().min(1),
-  groupId: z.string(),
+  groupId: z.string().min(1),
   createdAt: z.date(),
 });
 
-export function createNodeDefaults(): NodeBase {
+export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
   return {
     uuid: randomUUID(),
-    name: '',
-    groupId: '',
     createdAt: new Date(),
   };
 }

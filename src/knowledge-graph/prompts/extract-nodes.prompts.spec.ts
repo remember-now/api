@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { createEpisodicNode } from '../models/nodes';
 import { EpisodeType } from '../models/nodes/node.types';
 import { buildExtractNodesMessages } from './extract-nodes.prompts';
@@ -65,8 +67,8 @@ describe('buildExtractNodesMessages', () => {
 
   it('should include entity types when provided', () => {
     const entityTypes = {
-      Person: { description: 'A human individual' },
-      Organization: { description: 'A company or group' },
+      Person: { description: 'A human individual', schema: z.object({}) },
+      Organization: { description: 'A company or group', schema: z.object({}) },
     };
     const messages = buildExtractNodesMessages({
       episode: baseEpisode,

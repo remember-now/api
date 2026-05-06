@@ -14,7 +14,7 @@ import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { createEpisodicEdge, EntityEdge } from '../models/edges';
 import { createEpisodicNode, EntityNode } from '../models/nodes';
-import { validateGroupId } from '../neo4j/neo4j-label-validation';
+import { GroupIdSchema } from '../neo4j/neo4j.schemas';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -98,7 +98,7 @@ export class BulkEpisodeService {
       };
     }
     for (const ep of episodes) {
-      validateGroupId(ep.groupId);
+      GroupIdSchema.parse(ep.groupId);
     }
 
     // 2. Get model

@@ -7,6 +7,7 @@ export const HasEpisodeEdgeSchema = EdgeBaseSchema;
 
 export function createHasEpisodeEdge(
   partial: Partial<HasEpisodeEdge> & {
+    groupId: string;
     sourceNodeUuid: string;
     targetNodeUuid: string;
   },

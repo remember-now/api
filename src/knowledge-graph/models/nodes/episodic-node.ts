@@ -26,6 +26,7 @@ export const EpisodicNodeSchema = NodeBaseSchema.extend({
 export function createEpisodicNode(
   partial: Partial<EpisodicNode> & {
     name: string;
+    groupId: string;
     content: string;
     validAt: Date;
   },

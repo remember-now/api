@@ -7,6 +7,7 @@ export const EpisodicEdgeSchema = EdgeBaseSchema;
 
 export function createEpisodicEdge(
   partial: Partial<EpisodicEdge> & {
+    groupId: string;
     sourceNodeUuid: string;
     targetNodeUuid: string;
   },

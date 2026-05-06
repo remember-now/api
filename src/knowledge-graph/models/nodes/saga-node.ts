@@ -6,7 +6,7 @@ export interface SagaNode extends NodeBase {}
 export const SagaNodeSchema = NodeBaseSchema;
 
 export function createSagaNode(
-  partial: Partial<SagaNode> & { name: string },
+  partial: Partial<SagaNode> & { name: string; groupId: string },
 ): SagaNode {
   return {
     ...createNodeDefaults(),

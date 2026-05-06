@@ -8,7 +8,7 @@ import { EntityEdge } from '../models/edges/entity-edge';
 import { CommunityNode } from '../models/nodes/community-node';
 import { EntityNode } from '../models/nodes/entity-node';
 import { EpisodicNode } from '../models/nodes/episodic-node';
-import { validateGroupId } from '../neo4j/neo4j-label-validation';
+import { GroupIdSchema } from '../neo4j/neo4j.schemas';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityNodeRepository,
@@ -92,7 +92,7 @@ export class SearchService {
     } = options;
 
     for (const groupId of groupIds) {
-      validateGroupId(groupId);
+      GroupIdSchema.parse(groupId);
     }
     const limit = config.limit ?? DEFAULT_SEARCH_LIMIT;
     const minScore = config.rerankerMinScore ?? 0;

@@ -8,23 +8,46 @@ describe('CommunityEdge', () => {
 
   describe('createCommunityEdge', () => {
     it('should create with correct defaults', () => {
-      const edge = createCommunityEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createCommunityEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
       expect(edge.uuid).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.groupId).toBe('');
+      expect(edge.groupId).toBe('test-group');
     });
   });
 
   describe('CommunityEdgeSchema', () => {
     it('should accept valid community edge', () => {
-      const edge = createCommunityEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createCommunityEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() => CommunityEdgeSchema.parse(edge)).not.toThrow();
     });
 
+    it('should reject empty groupId', () => {
+      const edge = createCommunityEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      expect(() =>
+        CommunityEdgeSchema.parse({ ...edge, groupId: '' }),
+      ).toThrow();
+    });
+
     it('should reject invalid uuid', () => {
-      const edge = createCommunityEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createCommunityEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() =>
         CommunityEdgeSchema.parse({ ...edge, uuid: 'not-a-uuid' }),
       ).toThrow();

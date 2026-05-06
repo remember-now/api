@@ -5,11 +5,11 @@ import { createSagaNode, SagaNodeSchema } from './saga-node';
 describe('SagaNode', () => {
   describe('createSagaNode', () => {
     it('should create with correct defaults', () => {
-      const node = createSagaNode({ name: 'Saga 1' });
+      const node = createSagaNode({ name: 'Saga 1', groupId: 'test-group' });
       expect(node.name).toBe('Saga 1');
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe('');
+      expect(node.groupId).toBe('test-group');
     });
 
     it('should allow overriding groupId', () => {
@@ -18,15 +18,15 @@ describe('SagaNode', () => {
     });
 
     it('should generate unique uuids', () => {
-      const node1 = createSagaNode({ name: 'Saga1' });
-      const node2 = createSagaNode({ name: 'Saga2' });
+      const node1 = createSagaNode({ name: 'Saga1', groupId: 'test-group' });
+      const node2 = createSagaNode({ name: 'Saga2', groupId: 'test-group' });
       expect(node1.uuid).not.toBe(node2.uuid);
     });
   });
 
   describe('SagaNodeSchema', () => {
     it('should accept valid saga node', () => {
-      const node = createSagaNode({ name: 'Saga' });
+      const node = createSagaNode({ name: 'Saga', groupId: 'test-group' });
       expect(() => SagaNodeSchema.parse(node)).not.toThrow();
     });
 
@@ -34,14 +34,19 @@ describe('SagaNode', () => {
       expect(() =>
         SagaNodeSchema.parse({
           uuid: randomUUID(),
-          groupId: '',
+          groupId: 'test-group',
           createdAt: new Date(),
         }),
       ).toThrow();
     });
 
+    it('should reject empty groupId', () => {
+      const node = createSagaNode({ name: 'Saga', groupId: 'test-group' });
+      expect(() => SagaNodeSchema.parse({ ...node, groupId: '' })).toThrow();
+    });
+
     it('should reject invalid uuid', () => {
-      const node = createSagaNode({ name: 'Saga' });
+      const node = createSagaNode({ name: 'Saga', groupId: 'test-group' });
       expect(() =>
         SagaNodeSchema.parse({ ...node, uuid: 'not-a-uuid' }),
       ).toThrow();

@@ -27,13 +27,14 @@ export const EntityEdgeSchema = EdgeBaseSchema.extend({
 export function createEntityEdge(
   partial: Partial<EntityEdge> & {
     name: string;
+    fact: string;
+    groupId: string;
     sourceNodeUuid: string;
     targetNodeUuid: string;
   },
 ): EntityEdge {
   return {
     ...createEdgeDefaults(),
-    fact: '',
     factEmbedding: null,
     episodes: [],
     expiredAt: null,

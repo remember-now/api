@@ -17,7 +17,7 @@ export const EntityNodeSchema = NodeBaseSchema.extend({
 });
 
 export function createEntityNode(
-  partial: Partial<EntityNode> & { name: string },
+  partial: Partial<EntityNode> & { name: string; groupId: string },
 ): EntityNode {
   return {
     ...createNodeDefaults(),

@@ -28,6 +28,8 @@ describe('EntityEdgeRepository', () => {
     it('should call MERGE on RELATES_TO and return uuid', async () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'test fact',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -43,6 +45,8 @@ describe('EntityEdgeRepository', () => {
     it('should use vector property when factEmbedding is present', async () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'test fact',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
         factEmbedding: [0.1, 0.2],
@@ -58,6 +62,8 @@ describe('EntityEdgeRepository', () => {
     it('should not use vector property when factEmbedding is null', async () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'test fact',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -91,6 +97,8 @@ describe('EntityEdgeRepository', () => {
     it('should return mapped entity edge when found', async () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
+        fact: 'test fact',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -245,6 +253,8 @@ describe('EntityEdgeRepository', () => {
     it('should return mapped entity edges', async () => {
       const edge = createEntityEdge({
         name: 'WORKS_AT',
+        fact: 'test fact',
+        groupId: 'test-group',
         sourceNodeUuid,
         targetNodeUuid,
       });

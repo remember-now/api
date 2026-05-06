@@ -20,7 +20,7 @@ import {
   EpisodeType,
   EpisodicNode,
 } from '../models/nodes';
-import { validateGroupId } from '../neo4j/neo4j-label-validation';
+import { GroupIdSchema } from '../neo4j/neo4j.schemas';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -146,7 +146,7 @@ export class EpisodeService {
       edgeTypeMap ??
       (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
 
-    validateGroupId(groupId);
+    GroupIdSchema.parse(groupId);
 
     // 1. Get active model
     const model = await this.llmService.getActiveModel(userId);

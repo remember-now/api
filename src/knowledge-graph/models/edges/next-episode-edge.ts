@@ -7,6 +7,7 @@ export const NextEpisodeEdgeSchema = EdgeBaseSchema;
 
 export function createNextEpisodeEdge(
   partial: Partial<NextEpisodeEdge> & {
+    groupId: string;
     sourceNodeUuid: string;
     targetNodeUuid: string;
   },

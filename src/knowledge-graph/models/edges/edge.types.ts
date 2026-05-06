@@ -12,7 +12,7 @@ export interface EdgeBase {
 
 export const EdgeBaseSchema = z.object({
   uuid: z.uuid(),
-  groupId: z.string(),
+  groupId: z.string().min(1),
   sourceNodeUuid: z.uuid(),
   targetNodeUuid: z.uuid(),
   createdAt: z.date(),
@@ -20,11 +20,10 @@ export const EdgeBaseSchema = z.object({
 
 export function createEdgeDefaults(): Omit<
   EdgeBase,
-  'sourceNodeUuid' | 'targetNodeUuid'
+  'groupId' | 'sourceNodeUuid' | 'targetNodeUuid'
 > {
   return {
     uuid: randomUUID(),
-    groupId: '',
     createdAt: new Date(),
   };
 }

@@ -25,7 +25,11 @@ describe('NextEpisodeEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on NEXT_EPISODE and return uuid', async () => {
-      const edge = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createNextEpisodeEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -55,7 +59,11 @@ describe('NextEpisodeEdgeRepository', () => {
     });
 
     it('should return mapped next-episode edge when found', async () => {
-      const edge = createNextEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createNextEpisodeEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,

@@ -186,6 +186,7 @@ describe('EpisodeService', () => {
       [prevEpisode],
       undefined,
       undefined,
+      undefined,
     );
   });
 
@@ -244,6 +245,8 @@ describe('EpisodeService', () => {
       expect.arrayContaining([resolvedNode, existingNode]),
       [],
       REFERENCE_TIME,
+      undefined,
+      undefined,
       undefined,
     );
   });

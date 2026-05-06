@@ -1,8 +1,8 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
+import { ZodError } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { createEntityNode } from '@/knowledge-graph/models/nodes/entity-node';
-import { NodeLabelValidationError } from '@/knowledge-graph/neo4j/neo4j-label-validation';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 import { EntityNodeRepository } from './entity-node.repository';
@@ -22,7 +22,7 @@ describe('EntityNodeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on Entity and return uuid', async () => {
-      const node = createEntityNode({ name: 'Test' });
+      const node = createEntityNode({ name: 'Test', groupId: 'test-group' });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -35,6 +35,7 @@ describe('EntityNodeRepository', () => {
     it('should include all labels in MERGE when node has multiple labels', async () => {
       const node = createEntityNode({
         name: 'Test',
+        groupId: 'test-group',
         labels: ['Entity', 'Person'],
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
@@ -45,20 +46,20 @@ describe('EntityNodeRepository', () => {
       );
     });
 
-    it('should throw NodeLabelValidationError for unsafe label', async () => {
+    it('should throw ZodError for unsafe label', async () => {
       const node = createEntityNode({
         name: 'Test',
+        groupId: 'test-group',
         labels: ['Entity) WITH n MATCH (x'],
       });
-      await expect(repo.save(node)).rejects.toBeInstanceOf(
-        NodeLabelValidationError,
-      );
+      await expect(repo.save(node)).rejects.toBeInstanceOf(ZodError);
       expect(neo4j.executeWrite).not.toHaveBeenCalled();
     });
 
     it('should use vector property call when nameEmbedding is present', async () => {
       const node = createEntityNode({
         name: 'Test',
+        groupId: 'test-group',
         nameEmbedding: [0.1, 0.2],
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
@@ -70,7 +71,11 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should not use vector property call when nameEmbedding is null', async () => {
-      const node = createEntityNode({ name: 'Test', nameEmbedding: null });
+      const node = createEntityNode({
+        name: 'Test',
+        groupId: 'test-group',
+        nameEmbedding: null,
+      });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -83,8 +88,8 @@ describe('EntityNodeRepository', () => {
   describe('saveBulk', () => {
     it('should batch nodes of the same label into a single UNWIND call', async () => {
       const nodes = [
-        createEntityNode({ name: 'Test1' }),
-        createEntityNode({ name: 'Test2' }),
+        createEntityNode({ name: 'Test1', groupId: 'test-group' }),
+        createEntityNode({ name: 'Test2', groupId: 'test-group' }),
       ];
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.saveBulk(nodes);
@@ -97,8 +102,16 @@ describe('EntityNodeRepository', () => {
 
     it('should issue separate UNWIND calls per label group', async () => {
       const nodes = [
-        createEntityNode({ name: 'Test1', labels: ['Entity'] }),
-        createEntityNode({ name: 'Test2', labels: ['Entity', 'Person'] }),
+        createEntityNode({
+          name: 'Test1',
+          groupId: 'test-group',
+          labels: ['Entity'],
+        }),
+        createEntityNode({
+          name: 'Test2',
+          groupId: 'test-group',
+          labels: ['Entity', 'Person'],
+        }),
       ];
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.saveBulk(nodes);
@@ -107,8 +120,16 @@ describe('EntityNodeRepository', () => {
 
     it('should use vector property call for nodes with embedding', async () => {
       const nodes = [
-        createEntityNode({ name: 'Test1', nameEmbedding: [0.1, 0.2] }),
-        createEntityNode({ name: 'Test2', nameEmbedding: [0.3, 0.4] }),
+        createEntityNode({
+          name: 'Test1',
+          groupId: 'test-group',
+          nameEmbedding: [0.1, 0.2],
+        }),
+        createEntityNode({
+          name: 'Test2',
+          groupId: 'test-group',
+          nameEmbedding: [0.3, 0.4],
+        }),
       ];
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.saveBulk(nodes);
@@ -165,7 +186,7 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should return mapped entity when found', async () => {
-      const node = createEntityNode({ name: 'Test' });
+      const node = createEntityNode({ name: 'Test', groupId: 'test-group' });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
@@ -203,7 +224,7 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should return mapped entities when found', async () => {
-      const node = createEntityNode({ name: 'Test' });
+      const node = createEntityNode({ name: 'Test', groupId: 'test-group' });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
@@ -246,7 +267,7 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should merge results from all groups, sort by score desc, and slice to limit', async () => {
-      const node = createEntityNode({ name: 'Test' });
+      const node = createEntityNode({ name: 'Test', groupId: 'test-group' });
       const rowFor = (name: string, score: number) => ({
         uuid: node.uuid + name,
         name,

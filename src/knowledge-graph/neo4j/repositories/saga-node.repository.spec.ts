@@ -20,7 +20,7 @@ describe('SagaNodeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on Saga and return uuid', async () => {
-      const node = createSagaNode({ name: 'Saga 1' });
+      const node = createSagaNode({ name: 'Saga 1', groupId: 'test-group' });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('SagaNodeRepository', () => {
     });
 
     it('should return mapped saga node when found', async () => {
-      const node = createSagaNode({ name: 'Test Saga' });
+      const node = createSagaNode({ name: 'Test Saga', groupId: 'test-group' });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,

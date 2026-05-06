@@ -8,23 +8,46 @@ describe('HasEpisodeEdge', () => {
 
   describe('createHasEpisodeEdge', () => {
     it('should create with correct defaults', () => {
-      const edge = createHasEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createHasEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
       expect(edge.uuid).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.groupId).toBe('');
+      expect(edge.groupId).toBe('test-group');
     });
   });
 
   describe('HasEpisodeEdgeSchema', () => {
     it('should accept valid has-episode edge', () => {
-      const edge = createHasEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createHasEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() => HasEpisodeEdgeSchema.parse(edge)).not.toThrow();
     });
 
+    it('should reject empty groupId', () => {
+      const edge = createHasEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
+      expect(() =>
+        HasEpisodeEdgeSchema.parse({ ...edge, groupId: '' }),
+      ).toThrow();
+    });
+
     it('should reject invalid target uuid', () => {
-      const edge = createHasEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createHasEpisodeEdge({
+        groupId: 'test-group',
+        sourceNodeUuid,
+        targetNodeUuid,
+      });
       expect(() =>
         HasEpisodeEdgeSchema.parse({ ...edge, targetNodeUuid: 'not-a-uuid' }),
       ).toThrow();

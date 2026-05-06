@@ -25,7 +25,11 @@ describe('HasEpisodeEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on HAS_EPISODE and return uuid', async () => {
-      const edge = createHasEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createHasEpisodeEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -55,7 +59,11 @@ describe('HasEpisodeEdgeRepository', () => {
     });
 
     it('should return mapped has-episode edge when found', async () => {
-      const edge = createHasEpisodeEdge({ sourceNodeUuid, targetNodeUuid });
+      const edge = createHasEpisodeEdge({
+        sourceNodeUuid,
+        targetNodeUuid,
+        groupId: 'test-group',
+      });
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: edge.uuid,

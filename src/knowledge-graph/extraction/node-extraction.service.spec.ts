@@ -70,8 +70,8 @@ describe('NodeExtractionService', () => {
 
   it('should assign correct labels from entityTypes map', async () => {
     const entityTypes = {
-      Person: { description: 'A human individual' },
-      Organization: { description: 'A company or group' },
+      Person: { description: 'A human individual', schema: z.object({}) },
+      Organization: { description: 'A company or group', schema: z.object({}) },
     };
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [
@@ -92,7 +92,9 @@ describe('NodeExtractionService', () => {
   });
 
   it('should fall back to Entity label for unknown entityTypeId', async () => {
-    const entityTypes = { Person: { description: 'A human individual' } };
+    const entityTypes = {
+      Person: { description: 'A human individual', schema: z.object({}) },
+    };
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [{ name: 'Alice', entityTypeId: 99 }],
     });
@@ -149,9 +151,9 @@ describe('NodeExtractionService', () => {
     expect(nodes[0].attributes).toEqual({});
   });
 
-  it('should not call attribute extraction LLM when entity type has no schema', async () => {
+  it('should not call attribute extraction LLM when entity type has schema but extraction is skipped', async () => {
     const entityTypes = {
-      Person: { description: 'A human individual' },
+      Person: { description: 'A human individual', schema: z.object({}) },
     };
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],

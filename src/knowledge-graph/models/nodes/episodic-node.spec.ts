@@ -8,6 +8,7 @@ describe('EpisodicNode', () => {
     it('should create with correct defaults', () => {
       const node = createEpisodicNode({
         name: 'Episode 1',
+        groupId: 'test-group',
         content: 'Some content',
         validAt,
       });
@@ -18,12 +19,13 @@ describe('EpisodicNode', () => {
       expect(node.sourceDescription).toBe('');
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe('');
+      expect(node.groupId).toBe('test-group');
     });
 
     it('should allow overriding source', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
         source: EpisodeType.message,
@@ -34,6 +36,7 @@ describe('EpisodicNode', () => {
     it('should default entityEdges to empty array', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
@@ -44,6 +47,7 @@ describe('EpisodicNode', () => {
       const uuids = ['uuid-1', 'uuid-2'];
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
         entityEdges: uuids,
@@ -56,6 +60,7 @@ describe('EpisodicNode', () => {
     it('should accept valid episodic node', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
@@ -65,6 +70,7 @@ describe('EpisodicNode', () => {
     it('should reject invalid source enum value', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
@@ -77,6 +83,7 @@ describe('EpisodicNode', () => {
       for (const source of Object.values(EpisodeType)) {
         const node = createEpisodicNode({
           name: 'Episode',
+          groupId: 'test-group',
           content: 'content',
           validAt,
           source,
@@ -88,6 +95,7 @@ describe('EpisodicNode', () => {
     it('should accept empty entityEdges array', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
@@ -97,6 +105,7 @@ describe('EpisodicNode', () => {
     it('should accept entityEdges with string uuid values', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
         entityEdges: ['uuid-a', 'uuid-b'],
@@ -107,11 +116,24 @@ describe('EpisodicNode', () => {
     it('should reject entityEdges with non-string elements', () => {
       const node = createEpisodicNode({
         name: 'Episode',
+        groupId: 'test-group',
         content: 'content',
         validAt,
       });
       expect(() =>
         EpisodicNodeSchema.parse({ ...node, entityEdges: [123] }),
+      ).toThrow();
+    });
+
+    it('should reject empty groupId', () => {
+      const node = createEpisodicNode({
+        name: 'Episode',
+        groupId: 'test-group',
+        content: 'content',
+        validAt,
+      });
+      expect(() =>
+        EpisodicNodeSchema.parse({ ...node, groupId: '' }),
       ).toThrow();
     });
   });

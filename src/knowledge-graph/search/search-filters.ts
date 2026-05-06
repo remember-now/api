@@ -1,4 +1,4 @@
-import { validateNodeLabels } from '../neo4j/neo4j-label-validation';
+import { NodeLabelsSchema } from '../neo4j/neo4j.schemas';
 import { SearchFilters, TemporalComparison } from './search-filters.types';
 
 export interface FilterClauseResult {
@@ -130,7 +130,7 @@ export function buildNodeFilterClause(
   const params: Record<string, unknown> = {};
 
   if (filters.nodeLabels && filters.nodeLabels.length > 0) {
-    validateNodeLabels(filters.nodeLabels);
+    NodeLabelsSchema.parse(filters.nodeLabels);
     conditions.push(
       `ANY(label IN labels(${alias}) WHERE label IN $filterNodeLabels)`,
     );

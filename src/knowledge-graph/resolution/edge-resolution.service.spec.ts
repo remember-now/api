@@ -20,7 +20,7 @@ const HIGH_SIM = [1, 0, 0];
 const NEAR_HIGH_SIM = [0.9999, 0.001, 0];
 
 function makeEdge(
-  overrides: Partial<EntityEdge> & { name: string },
+  overrides: Partial<EntityEdge> & { name: string; fact: string },
 ): EntityEdge {
   return createEntityEdge({
     sourceNodeUuid: 'src-uuid',
