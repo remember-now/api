@@ -1,4 +1,4 @@
-import { EpisodicNode } from '../models/nodes';
+import { EpisodicNode } from '../models';
 
 export interface EpisodeContext {
   name: string;

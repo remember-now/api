@@ -1,7 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
-import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
+import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {

@@ -3,11 +3,13 @@ import {
   EdgeTypesMap,
   EntityTypeMap,
 } from '../episode/episode.types';
-import { EntityEdge } from '../models/edges/entity-edge';
-import { EpisodicEdge } from '../models/edges/episodic-edge';
-import { EntityNode } from '../models/nodes/entity-node';
-import { EpisodicNode } from '../models/nodes/episodic-node';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  EntityEdge,
+  EntityNode,
+  EpisodeType,
+  EpisodicEdge,
+  EpisodicNode,
+} from '../models';
 
 export interface RawEpisode {
   uuid?: string;

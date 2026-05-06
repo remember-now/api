@@ -5,8 +5,7 @@ import {
 } from '@langchain/core/messages';
 
 import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
-import { EntityNode } from '../models/nodes';
-import { EpisodicNode } from '../models/nodes';
+import { EntityNode, EpisodicNode } from '../models';
 import { episodeToContext } from './prompts.types';
 
 const SYSTEM_PROMPT = `You are an expert at extracting relationships between entities from text.

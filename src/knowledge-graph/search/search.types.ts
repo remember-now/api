@@ -1,7 +1,4 @@
-import { EntityEdge } from '../models/edges/entity-edge';
-import { CommunityNode } from '../models/nodes/community-node';
-import { EntityNode } from '../models/nodes/entity-node';
-import { EpisodicNode } from '../models/nodes/episodic-node';
+import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { SearchConfig } from './search-config.types';
 import { SearchFilters } from './search-filters.types';
 

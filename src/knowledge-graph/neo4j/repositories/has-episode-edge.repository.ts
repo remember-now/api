@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import { HasEpisodeEdge } from '@/knowledge-graph/models/edges/has-episode-edge';
+import { HasEpisodeEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 

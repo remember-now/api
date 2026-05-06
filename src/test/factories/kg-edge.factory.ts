@@ -3,23 +3,15 @@ import { randomUUID } from 'node:crypto';
 import {
   CommunityEdge,
   createCommunityEdge,
-} from '@/knowledge-graph/models/edges/community-edge';
-import {
   createEntityEdge,
-  EntityEdge,
-} from '@/knowledge-graph/models/edges/entity-edge';
-import {
   createEpisodicEdge,
-  EpisodicEdge,
-} from '@/knowledge-graph/models/edges/episodic-edge';
-import {
   createHasEpisodeEdge,
-  HasEpisodeEdge,
-} from '@/knowledge-graph/models/edges/has-episode-edge';
-import {
   createNextEpisodeEdge,
+  EntityEdge,
+  EpisodicEdge,
+  HasEpisodeEdge,
   NextEpisodeEdge,
-} from '@/knowledge-graph/models/edges/next-episode-edge';
+} from '@/knowledge-graph/models';
 
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from './kg-constants';
 

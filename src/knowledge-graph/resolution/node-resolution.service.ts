@@ -1,8 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
-import { EntityNode } from '../models/nodes';
-import { EpisodicNode } from '../models/nodes';
+import { EntityNode, EpisodicNode } from '../models';
 import { buildDedupeNodesMessages } from './dedupe-nodes.prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,

@@ -1,2 +1,2 @@
-export * from './edges';
-export * from './nodes';
+export * from './edge.types';
+export * from './node.types';

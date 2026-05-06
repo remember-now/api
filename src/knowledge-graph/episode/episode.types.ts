@@ -1,8 +1,12 @@
 import { z } from 'zod';
 
-import { EntityEdge, EpisodicEdge } from '../models/edges';
-import { EntityNode, EpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  EntityEdge,
+  EntityNode,
+  EpisodeType,
+  EpisodicEdge,
+  EpisodicNode,
+} from '../models';
 
 export type EntityTypeMap = Record<
   string,

@@ -1,6 +1,6 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
+import { EpisodeType } from '@/knowledge-graph/models';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { KG_REFERENCE_TIME, KgNodeFactory } from '@/test/factories';
 

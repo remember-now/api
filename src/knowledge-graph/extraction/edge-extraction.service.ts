@@ -2,8 +2,12 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
-import { createEntityEdge, EntityEdge } from '../models/edges';
-import { EntityNode, EpisodicNode } from '../models/nodes';
+import {
+  createEntityEdge,
+  EntityEdge,
+  EntityNode,
+  EpisodicNode,
+} from '../models';
 import { buildExtractEdgesMessages } from '../prompts';
 import { extractedEdgesJsonSchema } from './extraction.types';
 

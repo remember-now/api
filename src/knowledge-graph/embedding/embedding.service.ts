@@ -3,8 +3,7 @@ import { Injectable } from '@nestjs/common';
 
 import { EmbeddingConfigService } from '@/config/embedding';
 
-import { EntityEdge } from '../models/edges';
-import { EntityNode } from '../models/nodes';
+import { EntityEdge, EntityNode } from '../models';
 
 @Injectable()
 export class EmbeddingService {

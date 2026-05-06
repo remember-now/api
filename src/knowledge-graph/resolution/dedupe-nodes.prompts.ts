@@ -4,7 +4,7 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
-import { EpisodicNode } from '../models/nodes';
+import { EpisodicNode } from '../models';
 import { episodeToContext } from '../prompts/prompts.types';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph deduplication system.

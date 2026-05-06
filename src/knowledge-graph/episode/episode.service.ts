@@ -9,17 +9,15 @@ import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import {
   createEpisodicEdge,
+  createEpisodicNode,
   createHasEpisodeEdge,
   createNextEpisodeEdge,
-  EntityEdge,
-} from '../models/edges';
-import {
-  createEpisodicNode,
   createSagaNode,
+  EntityEdge,
   EntityNode,
   EpisodeType,
   EpisodicNode,
-} from '../models/nodes';
+} from '../models';
 import { GroupIdSchema } from '../neo4j';
 import {
   EntityEdgeRepository,

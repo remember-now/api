@@ -4,10 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
-import { EntityEdge } from '../models/edges/entity-edge';
-import { CommunityNode } from '../models/nodes/community-node';
-import { EntityNode } from '../models/nodes/entity-node';
-import { EpisodicNode } from '../models/nodes/episodic-node';
+import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { GroupIdSchema, Neo4jService } from '../neo4j';
 import {
   CommunityNodeRepository,

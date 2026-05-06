@@ -1,6 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
+import { EpisodeType } from '@/knowledge-graph/models';
 import { LlmService } from '@/llm/llm.service';
 import {
   KG_REFERENCE_TIME,
@@ -11,7 +12,6 @@ import {
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { EpisodeType } from '../models/nodes/node.types';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,

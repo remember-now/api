@@ -2,7 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EntityTypeMap } from '../episode/episode.types';
-import { createEntityNode, EntityNode, EpisodicNode } from '../models/nodes';
+import { createEntityNode, EntityNode, EpisodicNode } from '../models';
 import { buildExtractNodesMessages } from '../prompts';
 import { extractedEntitiesJsonSchema } from './extraction.types';
 

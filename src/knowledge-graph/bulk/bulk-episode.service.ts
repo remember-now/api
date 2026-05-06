@@ -12,8 +12,12 @@ import {
 } from '../episode/episode.types';
 import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { createEpisodicEdge, EntityEdge } from '../models/edges';
-import { createEpisodicNode, EntityNode } from '../models/nodes';
+import {
+  createEpisodicEdge,
+  createEpisodicNode,
+  EntityEdge,
+  EntityNode,
+} from '../models';
 import { GroupIdSchema } from '../neo4j';
 import {
   EntityEdgeRepository,

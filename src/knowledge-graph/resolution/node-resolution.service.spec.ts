@@ -9,7 +9,7 @@ import {
   KgNodeFactory,
 } from '@/test/factories';
 
-import { EntityNode } from '../models/nodes';
+import { EntityNode } from '../models';
 import { NodeResolutionService } from './node-resolution.service';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({

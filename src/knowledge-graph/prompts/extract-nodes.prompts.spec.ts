@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
+import { EpisodeType } from '@/knowledge-graph/models';
 import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
 
-import { EpisodeType } from '../models/nodes/node.types';
 import { buildExtractNodesMessages } from './extract-nodes.prompts';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({

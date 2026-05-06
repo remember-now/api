@@ -1,4 +1,5 @@
-import { EpisodeType } from '../models/nodes/node.types';
+import { EpisodeType } from '@/knowledge-graph/models';
+
 import {
   CHUNK_TOKEN_SIZE,
   chunkContent,

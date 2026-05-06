@@ -1,8 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
-import { EntityEdge } from '../models/edges';
-import { EpisodicNode } from '../models/nodes';
+import { EntityEdge, EpisodicNode } from '../models';
 import { EntityEdgeRepository } from '../neo4j/repositories';
 import { luceneSanitize } from '../search/search-filters';
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';

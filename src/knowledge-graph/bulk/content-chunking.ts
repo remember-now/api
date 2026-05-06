@@ -1,6 +1,6 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
-import { EpisodeType } from '../models/nodes/node.types';
+import { EpisodeType } from '@/knowledge-graph/models';
 
 export const CHUNK_TOKEN_SIZE = 3000;
 export const CHUNK_OVERLAP_TOKENS = 200;

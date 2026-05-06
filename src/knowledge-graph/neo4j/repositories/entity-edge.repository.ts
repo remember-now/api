@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
-import { EntityEdge } from '@/knowledge-graph/models/edges/entity-edge';
+import { EntityEdge } from '@/knowledge-graph/models';
 import {
   toNeo4jDateTime,
   toNeo4jInt,

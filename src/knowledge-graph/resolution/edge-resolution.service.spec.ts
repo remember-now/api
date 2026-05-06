@@ -10,7 +10,7 @@ import {
   KgNodeFactory,
 } from '@/test/factories';
 
-import { EntityEdge } from '../models/edges';
+import { EntityEdge } from '../models';
 import { EntityEdgeRepository } from '../neo4j/repositories';
 import { EdgeResolutionService } from './edge-resolution.service';
 

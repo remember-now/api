@@ -4,7 +4,7 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
-import { EpisodicNode } from '../models/nodes';
+import { EpisodicNode } from '../models';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a concise factual summary (≤ 200 characters) for each entity using the provided episode context. Only summarize entities with relevant information. Skip entities with no context.`;
 

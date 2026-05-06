@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
-import { CommunityNode } from '@/knowledge-graph/models/nodes/community-node';
+import { CommunityNode } from '@/knowledge-graph/models';
 import {
   toNeo4jDateTime,
   toNeo4jInt,

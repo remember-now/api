@@ -4,9 +4,10 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
+import { EpisodeType } from '@/knowledge-graph/models';
+
 import { EntityTypeMap } from '../episode/episode.types';
-import { EpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import { EpisodicNode } from '../models';
 import { episodeToContext } from './prompts.types';
 
 const MESSAGE_SYSTEM_PROMPT = `You are an expert knowledge graph builder. Your task is to extract and classify the speaker and other significant entities from conversational messages.

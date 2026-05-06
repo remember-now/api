@@ -1,20 +1,14 @@
 import {
   CommunityNode,
   createCommunityNode,
-} from '@/knowledge-graph/models/nodes/community-node';
-import {
   createEntityNode,
-  EntityNode,
-} from '@/knowledge-graph/models/nodes/entity-node';
-import {
   createEpisodicNode,
-  EpisodicNode,
-} from '@/knowledge-graph/models/nodes/episodic-node';
-import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
-import {
   createSagaNode,
+  EntityNode,
+  EpisodeType,
+  EpisodicNode,
   SagaNode,
-} from '@/knowledge-graph/models/nodes/saga-node';
+} from '@/knowledge-graph/models';
 
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from './kg-constants';
 

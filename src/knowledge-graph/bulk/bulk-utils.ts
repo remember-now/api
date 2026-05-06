@@ -1,4 +1,4 @@
-import { EntityEdge } from '../models/edges/entity-edge';
+import { EntityEdge } from '@/knowledge-graph/models';
 
 /**
  * Maximum number of concurrent LLM API calls in bulk ingestion.

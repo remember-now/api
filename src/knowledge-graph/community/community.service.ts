@@ -6,8 +6,7 @@ import { z } from 'zod';
 import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
-import { createCommunityEdge } from '../models/edges/community-edge';
-import { createCommunityNode } from '../models/nodes/community-node';
+import { createCommunityEdge, createCommunityNode } from '../models';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityEdgeRepository,
