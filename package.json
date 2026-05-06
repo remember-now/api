@@ -23,6 +23,7 @@
     "build": "nest build",
     "generate": "nest generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:diff": "git status --porcelain | awk '$1 !~ /D/ {print $NF}' | grep -E '\\.(ts)$' | grep -E '^(src|test)/' | xargs --no-run-if-empty prettier --write",
     "start": "nest start",
     "start:dev": "NODE_ENV=dev nest start --watch --exec 'node -r tsconfig-paths/register -r ts-node/register ./src/main.ts'",
     "start:debug": "NODE_ENV=dev nest start --debug --watch --exec 'node -r tsconfig-paths/register -r ts-node/register ./src/main.ts'",
