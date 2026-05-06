@@ -14,6 +14,7 @@ describe('CommunityNode', () => {
       expect(node.name).toBe('Community 1');
       expect(node.nameEmbedding).toBeNull();
       expect(node.summary).toBe('');
+      expect(node.labels).toEqual(['Community']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.groupId).toBe(KG_TEST_GROUP_ID);

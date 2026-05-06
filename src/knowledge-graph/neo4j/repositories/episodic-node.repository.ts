@@ -3,6 +3,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
@@ -35,8 +36,11 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async save(node: EpisodicNode): Promise<string> {
+    NodeLabelsSchema.parse(node.labels);
+
+    const labelStr = [...new Set(node.labels)].join(':');
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
-      /* cypher */ `MERGE (n:Episodic {uuid: $uuid})
+      /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
       {
@@ -58,26 +62,37 @@ export class EpisodicNodeRepository implements OnModuleInit {
 
   async saveBulk(nodes: EpisodicNode[]): Promise<void> {
     if (nodes.length === 0) return;
-    await this.neo4j.executeWrite(
-      /* cypher */ `UNWIND $nodes AS node
-       MERGE (n:Episodic {uuid: node.uuid})
-       SET n += node.props`,
-      {
-        nodes: nodes.map((n) => ({
-          uuid: n.uuid,
-          props: {
-            name: n.name,
-            group_id: n.groupId,
-            created_at: toNeo4jDateTime(n.createdAt),
-            source: n.source,
-            source_description: n.sourceDescription,
-            content: n.content,
-            valid_at: toNeo4jDateTime(n.validAt),
-            entity_edges: n.entityEdges,
-          },
-        })),
-      },
-    );
+
+    const byLabel = new Map<string, EpisodicNode[]>();
+    for (const n of nodes) {
+      const key = [...new Set(n.labels)].sort().join(':');
+      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
+    }
+
+    for (const [labelStr, group] of byLabel) {
+      NodeLabelsSchema.parse(labelStr.split(':'));
+
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $nodes AS node
+         MERGE (n:${labelStr} {uuid: node.uuid})
+         SET n += node.props`,
+        {
+          nodes: group.map((n) => ({
+            uuid: n.uuid,
+            props: {
+              name: n.name,
+              group_id: n.groupId,
+              created_at: toNeo4jDateTime(n.createdAt),
+              source: n.source,
+              source_description: n.sourceDescription,
+              content: n.content,
+              valid_at: toNeo4jDateTime(n.validAt),
+              entity_edges: n.entityEdges,
+            },
+          })),
+        },
+      );
+    }
   }
 
   async delete(uuid: string): Promise<void> {
@@ -107,7 +122,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at, n.entity_edges AS entity_edges`,
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges,
+              labels(n) AS labels`,
       { uuid },
     );
     if (!results.length) return null;
@@ -120,7 +136,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at, n.entity_edges AS entity_edges`,
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges,
+              labels(n) AS labels`,
       { uuids },
     );
     return results.map((r) => this.mapRow(r));
@@ -138,7 +155,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at, n.entity_edges AS entity_edges
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges,
+              labels(n) AS labels
        ${limitClause}`,
       params,
     );
@@ -151,7 +169,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
               e.source_description AS source_description, e.content AS content,
-              e.valid_at AS valid_at, e.entity_edges AS entity_edges`,
+              e.valid_at AS valid_at, e.entity_edges AS entity_edges,
+              labels(e) AS labels`,
       { entityNodeUuid },
     );
     return results.map((r) => this.mapRow(r));
@@ -175,7 +194,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.source AS source,
               e.source_description AS source_description, e.content AS content,
-              e.valid_at AS valid_at, e.entity_edges AS entity_edges`,
+              e.valid_at AS valid_at, e.entity_edges AS entity_edges,
+              labels(e) AS labels`,
       {
         referenceTime: toNeo4jDateTime(referenceTime),
         groupIds: groupIds ?? null,
@@ -207,7 +227,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.source AS source,
               n.source_description AS source_description, n.content AS content,
-              n.valid_at AS valid_at, n.entity_edges AS entity_edges
+              n.valid_at AS valid_at, n.entity_edges AS entity_edges,
+              labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
       { luceneQuery: buildFulltextQuery(query, groupIds), limit },
@@ -220,6 +241,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
+      labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
       source: (row['source'] as EpisodeType) ?? EpisodeType.text,
       sourceDescription: (row['source_description'] as string) ?? '',

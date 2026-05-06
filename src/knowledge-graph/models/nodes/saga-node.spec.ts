@@ -12,6 +12,7 @@ describe('SagaNode', () => {
         groupId: KG_TEST_GROUP_ID,
       });
       expect(node.name).toBe('Saga 1');
+      expect(node.labels).toEqual(['Saga']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.groupId).toBe(KG_TEST_GROUP_ID);

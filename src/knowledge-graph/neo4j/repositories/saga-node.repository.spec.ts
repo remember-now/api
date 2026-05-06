@@ -29,6 +29,12 @@ describe('SagaNodeRepository', () => {
       );
       expect(result).toBe(node.uuid);
     });
+
+    it('should throw before executing query when labels are invalid', async () => {
+      const node = KgNodeFactory.createSagaNode({ labels: [] });
+      await expect(repo.save(node)).rejects.toThrow();
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {
@@ -68,11 +74,13 @@ describe('SagaNodeRepository', () => {
           name: node.name,
           group_id: node.groupId,
           created_at: node.createdAt,
+          labels: ['Saga'],
         },
       ]);
       const result = await repo.getByUuid(node.uuid);
       expect(result?.name).toBe('Test Saga');
       expect(result?.uuid).toBe(node.uuid);
+      expect(result?.labels).toEqual(['Saga']);
     });
   });
 

@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { SagaNode } from '@/knowledge-graph/models/nodes/saga-node';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
@@ -24,8 +25,10 @@ export class SagaNodeRepository implements OnModuleInit {
   }
 
   async save(node: SagaNode): Promise<string> {
+    NodeLabelsSchema.parse(node.labels);
+    const labelStr = [...new Set(node.labels)].join(':');
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
-      /* cypher */ `MERGE (n:Saga {uuid: $uuid})
+      /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
       {
@@ -42,21 +45,32 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async saveBulk(nodes: SagaNode[]): Promise<void> {
     if (nodes.length === 0) return;
-    await this.neo4j.executeWrite(
-      /* cypher */ `UNWIND $nodes AS node
-       MERGE (n:Saga {uuid: node.uuid})
-       SET n += node.props`,
-      {
-        nodes: nodes.map((n) => ({
-          uuid: n.uuid,
-          props: {
-            name: n.name,
-            group_id: n.groupId,
-            created_at: toNeo4jDateTime(n.createdAt),
-          },
-        })),
-      },
-    );
+
+    const byLabel = new Map<string, SagaNode[]>();
+    for (const n of nodes) {
+      const key = [...new Set(n.labels)].sort().join(':');
+      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
+    }
+
+    for (const [labelStr, group] of byLabel) {
+      NodeLabelsSchema.parse(labelStr.split(':'));
+
+      await this.neo4j.executeWrite(
+        /* cypher */ `UNWIND $nodes AS node
+         MERGE (n:${labelStr} {uuid: node.uuid})
+         SET n += node.props`,
+        {
+          nodes: group.map((n) => ({
+            uuid: n.uuid,
+            props: {
+              name: n.name,
+              group_id: n.groupId,
+              created_at: toNeo4jDateTime(n.createdAt),
+            },
+          })),
+        },
+      );
+    }
   }
 
   async delete(uuid: string): Promise<void> {
@@ -84,7 +98,7 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at`,
+              n.created_at AS created_at, labels(n) AS labels`,
       { uuid },
     );
     if (!results.length) return null;
@@ -95,7 +109,7 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at`,
+              n.created_at AS created_at, labels(n) AS labels`,
       { uuids },
     );
     return results.map((r) => this.mapRow(r));
@@ -116,7 +130,7 @@ export class SagaNodeRepository implements OnModuleInit {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
-              n.created_at AS created_at
+              n.created_at AS created_at, labels(n) AS labels
        ORDER BY n.uuid DESC ${limitClause}`,
       params,
     );
@@ -128,6 +142,7 @@ export class SagaNodeRepository implements OnModuleInit {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
+      labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
     };
   }

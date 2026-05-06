@@ -38,6 +38,10 @@ describe('NodeLabelsSchema', () => {
       NodeLabelsSchema.parse(['bad-one', 'Entity', 'bad two']),
     ).toThrow(ZodError);
   });
+
+  it('should throw ZodError for empty array', () => {
+    expect(() => NodeLabelsSchema.parse([])).toThrow(ZodError);
+  });
 });
 
 describe('GroupIdSchema', () => {

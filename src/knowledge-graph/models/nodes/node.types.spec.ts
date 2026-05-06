@@ -16,6 +16,11 @@ describe('node.types', () => {
       const defaults = createNodeDefaults();
       expect(defaults.createdAt).toBeInstanceOf(Date);
     });
+
+    it('should default labels to empty array', () => {
+      const defaults = createNodeDefaults();
+      expect(defaults.labels).toEqual([]);
+    });
   });
 
   describe('NodeBaseSchema', () => {
@@ -24,6 +29,7 @@ describe('node.types', () => {
         uuid: randomUUID(),
         name: 'Test',
         groupId: 'group-1',
+        labels: [],
         createdAt: new Date(),
       };
       expect(() => NodeBaseSchema.parse(node)).not.toThrow();

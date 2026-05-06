@@ -6,6 +6,7 @@ import {
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { NodeLabelsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
@@ -40,6 +41,8 @@ export class CommunityNodeRepository implements OnModuleInit {
   }
 
   async save(node: CommunityNode): Promise<string> {
+    NodeLabelsSchema.parse(node.labels);
+    const labelStr = [...new Set(node.labels)].join(':');
     const props: Record<string, unknown> = {
       name: node.name,
       group_id: node.groupId,
@@ -49,7 +52,7 @@ export class CommunityNodeRepository implements OnModuleInit {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        /* cypher */ `MERGE (n:Community {uuid: $uuid})
+        /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
          RETURN n.uuid AS uuid`,
@@ -58,7 +61,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        /* cypher */ `MERGE (n:Community {uuid: $uuid})
+        /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
         { uuid: node.uuid, props },
@@ -69,48 +72,58 @@ export class CommunityNodeRepository implements OnModuleInit {
 
   async saveBulk(nodes: CommunityNode[]): Promise<void> {
     if (nodes.length === 0) return;
-    const withEmbedding = nodes.filter((n) => n.nameEmbedding);
-    const withoutEmbedding = nodes.filter((n) => !n.nameEmbedding);
 
-    if (withoutEmbedding.length > 0) {
-      await this.neo4j.executeWrite(
-        /* cypher */ `UNWIND $nodes AS node
-         MERGE (n:Community {uuid: node.uuid})
-         SET n += node.props`,
-        {
-          nodes: withoutEmbedding.map((n) => ({
-            uuid: n.uuid,
-            props: {
-              name: n.name,
-              group_id: n.groupId,
-              created_at: toNeo4jDateTime(n.createdAt),
-              summary: n.summary,
-            },
-          })),
-        },
-      );
+    const byLabel = new Map<string, CommunityNode[]>();
+    for (const n of nodes) {
+      const key = [...new Set(n.labels)].sort().join(':');
+      byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
     }
 
-    if (withEmbedding.length > 0) {
-      await this.neo4j.executeWrite(
-        /* cypher */ `UNWIND $nodes AS node
-         MERGE (n:Community {uuid: node.uuid})
-         SET n += node.props
-         WITH n, node
-         CALL db.create.setNodeVectorProperty(n, 'name_embedding', node.nameEmbedding)`,
-        {
-          nodes: withEmbedding.map((n) => ({
-            uuid: n.uuid,
-            props: {
-              name: n.name,
-              group_id: n.groupId,
-              created_at: toNeo4jDateTime(n.createdAt),
-              summary: n.summary,
-            },
-            nameEmbedding: n.nameEmbedding,
-          })),
-        },
-      );
+    for (const [labelStr, group] of byLabel) {
+      NodeLabelsSchema.parse(labelStr.split(':'));
+      const withEmbedding = group.filter((n) => n.nameEmbedding);
+      const withoutEmbedding = group.filter((n) => !n.nameEmbedding);
+
+      if (withoutEmbedding.length > 0) {
+        await this.neo4j.executeWrite(
+          /* cypher */ `UNWIND $nodes AS node
+           MERGE (n:${labelStr} {uuid: node.uuid})
+           SET n += node.props`,
+          {
+            nodes: withoutEmbedding.map((n) => ({
+              uuid: n.uuid,
+              props: {
+                name: n.name,
+                group_id: n.groupId,
+                created_at: toNeo4jDateTime(n.createdAt),
+                summary: n.summary,
+              },
+            })),
+          },
+        );
+      }
+
+      if (withEmbedding.length > 0) {
+        await this.neo4j.executeWrite(
+          /* cypher */ `UNWIND $nodes AS node
+           MERGE (n:${labelStr} {uuid: node.uuid})
+           SET n += node.props
+           WITH n, node
+           CALL db.create.setNodeVectorProperty(n, 'name_embedding', node.nameEmbedding)`,
+          {
+            nodes: withEmbedding.map((n) => ({
+              uuid: n.uuid,
+              props: {
+                name: n.name,
+                group_id: n.groupId,
+                created_at: toNeo4jDateTime(n.createdAt),
+                summary: n.summary,
+              },
+              nameEmbedding: n.nameEmbedding,
+            })),
+          },
+        );
+      }
     }
   }
 
@@ -140,7 +153,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       /* cypher */ `MATCH (n:Community {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
-              n.name_embedding AS name_embedding`,
+              n.name_embedding AS name_embedding, labels(n) AS labels`,
       { uuid },
     );
     if (!results.length) return null;
@@ -152,7 +165,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       /* cypher */ `MATCH (n:Community) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
-              n.name_embedding AS name_embedding`,
+              n.name_embedding AS name_embedding, labels(n) AS labels`,
       { uuids },
     );
     return results.map((r) => this.mapRow(r));
@@ -169,7 +182,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       /* cypher */ `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
-              n.name_embedding AS name_embedding
+              n.name_embedding AS name_embedding, labels(n) AS labels
        ${limitClause}`,
       params,
     );
@@ -186,7 +199,7 @@ export class CommunityNodeRepository implements OnModuleInit {
        YIELD node AS n, score
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
-              n.name_embedding AS name_embedding
+              n.name_embedding AS name_embedding, labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
       { luceneQuery: buildFulltextQuery(query, groupIds), limit },
@@ -215,7 +228,7 @@ export class CommunityNodeRepository implements OnModuleInit {
            WHERE score >= $minScore
            RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
                   n.created_at AS created_at, n.summary AS summary,
-                  n.name_embedding AS name_embedding, score`,
+                  n.name_embedding AS name_embedding, labels(n) AS labels, score`,
           { embedding, groupId, limit, minScore },
         ),
       ),
@@ -233,6 +246,7 @@ export class CommunityNodeRepository implements OnModuleInit {
       uuid: row['uuid'] as string,
       name: row['name'] as string,
       groupId: row['group_id'] as string,
+      labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string) ?? '',
       nameEmbedding: (row['name_embedding'] as number[] | null) ?? null,

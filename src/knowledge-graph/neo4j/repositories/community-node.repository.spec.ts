@@ -31,6 +31,12 @@ describe('CommunityNodeRepository', () => {
       expect(result).toBe(node.uuid);
     });
 
+    it('should throw before executing query when labels are invalid', async () => {
+      const node = KgNodeFactory.createCommunityNode({ labels: [] });
+      await expect(repo.save(node)).rejects.toThrow();
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
+    });
+
     it('should use vector property when nameEmbedding is present', async () => {
       const node = KgNodeFactory.createCommunityNode({
         name: 'Community',
@@ -83,11 +89,13 @@ describe('CommunityNodeRepository', () => {
           created_at: node.createdAt,
           summary: node.summary,
           name_embedding: null,
+          labels: ['Community'],
         },
       ]);
       const result = await repo.getByUuid(node.uuid);
       expect(result?.name).toBe('Test Community');
       expect(result?.nameEmbedding).toBeNull();
+      expect(result?.labels).toEqual(['Community']);
     });
   });
 
@@ -134,6 +142,7 @@ describe('CommunityNodeRepository', () => {
         created_at: node.createdAt,
         summary: '',
         name_embedding: null,
+        labels: ['Community'],
         score,
       });
       neo4j.executeRead

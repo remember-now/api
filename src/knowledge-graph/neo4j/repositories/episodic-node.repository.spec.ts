@@ -33,6 +33,12 @@ describe('EpisodicNodeRepository', () => {
       );
       expect(result).toBe(node.uuid);
     });
+
+    it('should throw before executing query when labels are invalid', async () => {
+      const node = KgNodeFactory.createEpisodicNode({ labels: [] });
+      await expect(repo.save(node)).rejects.toThrow();
+      expect(neo4j.executeWrite).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {
@@ -68,12 +74,14 @@ describe('EpisodicNodeRepository', () => {
           source_description: '',
           content: 'content',
           valid_at: KG_REFERENCE_TIME,
+          labels: ['Episodic'],
         },
       ]);
       const result = await repo.getByUuid(node.uuid);
       expect(result?.name).toBe('Episode 1');
       expect(result?.content).toBe('content');
       expect(result?.source).toBe(EpisodeType.text);
+      expect(result?.labels).toEqual(['Episodic']);
     });
   });
 

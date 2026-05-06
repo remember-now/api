@@ -10,6 +10,7 @@ export function createSagaNode(
 ): SagaNode {
   return {
     ...createNodeDefaults(),
+    labels: ['Saga'],
     ...partial,
   };
 }

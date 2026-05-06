@@ -34,6 +34,7 @@ export class KgNodeFactory {
       content: 'test content',
       validAt: KG_REFERENCE_TIME,
       source: EpisodeType.text,
+      labels: ['Episodic'],
       ...opts,
     });
   }
@@ -42,6 +43,7 @@ export class KgNodeFactory {
     return createCommunityNode({
       name: 'Test Community',
       groupId: KG_TEST_GROUP_ID,
+      labels: ['Community'],
       ...opts,
     });
   }
@@ -50,6 +52,7 @@ export class KgNodeFactory {
     return createSagaNode({
       name: 'Test Saga',
       groupId: KG_TEST_GROUP_ID,
+      labels: ['Saga'],
       ...opts,
     });
   }

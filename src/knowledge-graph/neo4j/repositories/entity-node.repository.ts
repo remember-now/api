@@ -68,7 +68,6 @@ export class EntityNodeRepository implements OnModuleInit {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
@@ -78,7 +77,6 @@ export class EntityNodeRepository implements OnModuleInit {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
-        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
@@ -103,7 +101,6 @@ export class EntityNodeRepository implements OnModuleInit {
       const withoutEmbedding = group.filter((n) => !n.nameEmbedding);
 
       if (withoutEmbedding.length > 0) {
-        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         await this.neo4j.executeWrite(
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})
@@ -124,7 +121,6 @@ export class EntityNodeRepository implements OnModuleInit {
       }
 
       if (withEmbedding.length > 0) {
-        // labelStr is safe to interpolate — NodeLabelsSchema ensures only [A-Za-z_][A-Za-z0-9_]* chars
         await this.neo4j.executeWrite(
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})
@@ -342,7 +338,7 @@ export class EntityNodeRepository implements OnModuleInit {
         ? (JSON.parse(row['attributes'] as string) as Record<string, unknown>)
         : {},
       nameEmbedding: (row['name_embedding'] as number[] | null) ?? null,
-      labels: (row['labels'] as string[]) ?? ['Entity'],
+      labels: row['labels'] as string[],
     };
   }
 }

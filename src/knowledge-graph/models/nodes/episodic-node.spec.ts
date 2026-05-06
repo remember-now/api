@@ -19,6 +19,7 @@ describe('EpisodicNode', () => {
       expect(node.validAt).toBe(validAt);
       expect(node.source).toBe(EpisodeType.text);
       expect(node.sourceDescription).toBe('');
+      expect(node.labels).toEqual(['Episodic']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.groupId).toBe(KG_TEST_GROUP_ID);

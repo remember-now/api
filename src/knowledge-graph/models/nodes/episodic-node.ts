@@ -33,6 +33,7 @@ export function createEpisodicNode(
 ): EpisodicNode {
   return {
     ...createNodeDefaults(),
+    labels: ['Episodic'],
     source: EpisodeType.text,
     sourceDescription: '',
     entityEdges: [],

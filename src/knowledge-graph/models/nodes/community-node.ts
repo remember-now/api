@@ -17,6 +17,7 @@ export function createCommunityNode(
 ): CommunityNode {
   return {
     ...createNodeDefaults(),
+    labels: ['Community'],
     nameEmbedding: null,
     summary: '',
     ...partial,
