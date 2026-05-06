@@ -1,15 +1,14 @@
 import { z } from 'zod';
 
-import { createEpisodicNode } from '../models/nodes';
+import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+
 import { EpisodeType } from '../models/nodes/node.types';
 import { buildExtractNodesMessages } from './extract-nodes.prompts';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and knows Bob.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 describe('buildExtractNodesMessages', () => {
@@ -42,11 +41,11 @@ describe('buildExtractNodesMessages', () => {
   });
 
   it('should include previous episode content when provided', () => {
-    const prev = createEpisodicNode({
+    const prev = KgNodeFactory.createEpisodicNode({
       name: 'Prev Episode',
       content: 'Charlie was here.',
       validAt: new Date('2023-12-01'),
-      groupId: 'group-1',
+      groupId: KG_TEST_GROUP_ID,
     });
     const messages = buildExtractNodesMessages({
       episode: baseEpisode,
@@ -101,7 +100,7 @@ describe('buildExtractNodesMessages', () => {
   });
 
   it('should vary system prompt for message source type', () => {
-    const messageEpisode = createEpisodicNode({
+    const messageEpisode = KgNodeFactory.createEpisodicNode({
       ...baseEpisode,
       source: EpisodeType.message,
     });
@@ -114,7 +113,7 @@ describe('buildExtractNodesMessages', () => {
   });
 
   it('should vary system prompt for json source type', () => {
-    const jsonEpisode = createEpisodicNode({
+    const jsonEpisode = KgNodeFactory.createEpisodicNode({
       ...baseEpisode,
       source: EpisodeType.json,
     });

@@ -2,16 +2,14 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 import { z } from 'zod';
 
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+
 import { NodeExtractionService } from './node-extraction.service';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and knows Bob.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 describe('NodeExtractionService', () => {
@@ -39,7 +37,7 @@ describe('NodeExtractionService', () => {
 
     expect(nodes).toHaveLength(3);
     expect(nodes.map((n) => n.name)).toEqual(['Alice', 'Acme Corp', 'Bob']);
-    nodes.forEach((n) => expect(n.groupId).toBe('group-1'));
+    nodes.forEach((n) => expect(n.groupId).toBe(KG_TEST_GROUP_ID));
   });
 
   it('should filter empty names', async () => {

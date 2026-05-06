@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { KG_TEST_GROUP_ID } from '@/test/factories';
+
 import {
   createNextEpisodeEdge,
   NextEpisodeEdgeSchema,
@@ -12,7 +14,7 @@ describe('NextEpisodeEdge', () => {
   describe('createNextEpisodeEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -20,17 +22,17 @@ describe('NextEpisodeEdge', () => {
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
       expect(edge.uuid).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.groupId).toBe('test-group');
+      expect(edge.groupId).toBe(KG_TEST_GROUP_ID);
     });
 
     it('should generate unique uuids', () => {
       const edge1 = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
       const edge2 = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -41,7 +43,7 @@ describe('NextEpisodeEdge', () => {
   describe('NextEpisodeEdgeSchema', () => {
     it('should accept valid next-episode edge', () => {
       const edge = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -50,7 +52,7 @@ describe('NextEpisodeEdge', () => {
 
     it('should reject empty groupId', () => {
       const edge = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -61,7 +63,7 @@ describe('NextEpisodeEdge', () => {
 
     it('should reject invalid uuid', () => {
       const edge = createNextEpisodeEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });

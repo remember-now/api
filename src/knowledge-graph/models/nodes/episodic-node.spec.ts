@@ -1,14 +1,16 @@
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
+
 import { createEpisodicNode, EpisodicNodeSchema } from './episodic-node';
 import { EpisodeType } from './node.types';
 
 describe('EpisodicNode', () => {
-  const validAt = new Date('2024-01-01T00:00:00Z');
+  const validAt = KG_REFERENCE_TIME;
 
   describe('createEpisodicNode', () => {
     it('should create with correct defaults', () => {
       const node = createEpisodicNode({
         name: 'Episode 1',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'Some content',
         validAt,
       });
@@ -19,13 +21,13 @@ describe('EpisodicNode', () => {
       expect(node.sourceDescription).toBe('');
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe('test-group');
+      expect(node.groupId).toBe(KG_TEST_GROUP_ID);
     });
 
     it('should allow overriding source', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
         source: EpisodeType.message,
@@ -36,7 +38,7 @@ describe('EpisodicNode', () => {
     it('should default entityEdges to empty array', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });
@@ -47,7 +49,7 @@ describe('EpisodicNode', () => {
       const uuids = ['uuid-1', 'uuid-2'];
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
         entityEdges: uuids,
@@ -60,7 +62,7 @@ describe('EpisodicNode', () => {
     it('should accept valid episodic node', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });
@@ -70,7 +72,7 @@ describe('EpisodicNode', () => {
     it('should reject invalid source enum value', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });
@@ -83,7 +85,7 @@ describe('EpisodicNode', () => {
       for (const source of Object.values(EpisodeType)) {
         const node = createEpisodicNode({
           name: 'Episode',
-          groupId: 'test-group',
+          groupId: KG_TEST_GROUP_ID,
           content: 'content',
           validAt,
           source,
@@ -95,7 +97,7 @@ describe('EpisodicNode', () => {
     it('should accept empty entityEdges array', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });
@@ -105,7 +107,7 @@ describe('EpisodicNode', () => {
     it('should accept entityEdges with string uuid values', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
         entityEdges: ['uuid-a', 'uuid-b'],
@@ -116,7 +118,7 @@ describe('EpisodicNode', () => {
     it('should reject entityEdges with non-string elements', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });
@@ -128,7 +130,7 @@ describe('EpisodicNode', () => {
     it('should reject empty groupId', () => {
       const node = createEpisodicNode({
         name: 'Episode',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
       });

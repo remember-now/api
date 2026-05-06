@@ -1,30 +1,30 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
-import { createEntityNode, EntityNode } from '../models/nodes';
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  KG_DIFF_EMBEDDING,
+  KG_HIGH_SIM_EMBEDDING,
+  KG_NEAR_SAME_EMBEDDING,
+  KG_TEST_GROUP_ID,
+  KgNodeFactory,
+} from '@/test/factories';
+
+import { EntityNode } from '../models/nodes';
 import { NodeResolutionService } from './node-resolution.service';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 function makeNode(name: string, embedding: number[] | null = null): EntityNode {
-  return createEntityNode({
+  return KgNodeFactory.createEntityNode({
     name,
-    groupId: 'group-1',
+    groupId: KG_TEST_GROUP_ID,
     nameEmbedding: embedding,
   });
 }
-
-const HIGH_SIM_EMBEDDING = [1, 0, 0];
-const NEAR_SAME_EMBEDDING = [0.9999, 0.001, 0]; // cosine similarity ≈ 0.9999 to HIGH_SIM
-const DIFFERENT_EMBEDDING = [0, 1, 0]; // cosine similarity = 0 to HIGH_SIM
 
 describe('NodeResolutionService', () => {
   let service: NodeResolutionService;
@@ -39,8 +39,8 @@ describe('NodeResolutionService', () => {
   });
 
   it('should resolve exact name match without LLM call', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
-    const existing = [makeNode('alice', HIGH_SIM_EMBEDDING)]; // normalizes to same
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)]; // normalizes to same
     existing[0].uuid = 'existing-uuid';
 
     const result = await service.resolveNodes(
@@ -56,8 +56,8 @@ describe('NodeResolutionService', () => {
   });
 
   it('should add duplicate pair for exact name match', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
-    const existing = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)];
     existing[0].uuid = 'existing-uuid';
 
     const result = await service.resolveNodes(
@@ -75,8 +75,8 @@ describe('NodeResolutionService', () => {
   });
 
   it('should escalate single cosine candidate to LLM', async () => {
-    const extracted = [makeNode('Alice Johnson', HIGH_SIM_EMBEDDING)];
-    const existing = [makeNode('Alice J.', NEAR_SAME_EMBEDDING)];
+    const extracted = [makeNode('Alice Johnson', KG_HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('Alice J.', KG_NEAR_SAME_EMBEDDING)];
     existing[0].uuid = 'cosine-uuid';
 
     mockRunnable.invoke.mockResolvedValue({
@@ -98,8 +98,8 @@ describe('NodeResolutionService', () => {
   });
 
   it('should add as new node when LLM rejects single cosine candidate', async () => {
-    const extracted = [makeNode('Alice Johnson', HIGH_SIM_EMBEDDING)];
-    const existing = [makeNode('Alice J.', NEAR_SAME_EMBEDDING)];
+    const extracted = [makeNode('Alice Johnson', KG_HIGH_SIM_EMBEDDING)];
+    const existing = [makeNode('Alice J.', KG_NEAR_SAME_EMBEDDING)];
     existing[0].uuid = 'cosine-uuid';
 
     mockRunnable.invoke.mockResolvedValue({
@@ -121,10 +121,10 @@ describe('NodeResolutionService', () => {
   });
 
   it('should escalate multiple cosine candidates to LLM', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -145,10 +145,10 @@ describe('NodeResolutionService', () => {
   });
 
   it('should add duplicate pair when LLM returns a duplicate_name match', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -172,10 +172,10 @@ describe('NodeResolutionService', () => {
   });
 
   it('should add node to resolvedNodes when LLM returns empty duplicate_name', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -197,10 +197,10 @@ describe('NodeResolutionService', () => {
   });
 
   it('should map uuid when LLM returns duplicate_name matching an existing node', async () => {
-    const extracted = [makeNode('Alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -220,10 +220,10 @@ describe('NodeResolutionService', () => {
   });
 
   it('should apply canonical name from LLM when different from extracted name', async () => {
-    const extracted = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
+      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -242,10 +242,10 @@ describe('NodeResolutionService', () => {
 
   it('should bypass cosine for low-entropy names and go to LLM', async () => {
     // "bob" entropy ≈ 0.918 (b:2, o:1) — below the 1.5 threshold → skips cosine
-    const extracted = [makeNode('bob', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('bob', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
       {
-        ...makeNode('Bobby', DIFFERENT_EMBEDDING),
+        ...makeNode('Bobby', KG_DIFF_EMBEDDING),
         uuid: 'bob-exist',
       },
     ];
@@ -268,13 +268,13 @@ describe('NodeResolutionService', () => {
   it('should use cosine for names with entropy above threshold (e.g. "alice")', async () => {
     // "alice" entropy ≈ 2.32 (a,l,i,c,e — all distinct) — above the 1.5 threshold → cosine path.
     // Existing node "alicia" does not exact-match "alice" after normalizeString, so the
-    // cosine scan runs. With DIFFERENT_EMBEDDING the cosine score is below threshold, so
+    // cosine scan runs. With KG_DIFF_EMBEDDING the cosine score is below threshold, so
     // no candidate is found and alice is added as a new node without any LLM call.
     // Under the old threshold of 3.0 this name would have bypassed cosine and called the LLM.
-    const extracted = [makeNode('alice', HIGH_SIM_EMBEDDING)];
+    const extracted = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
       {
-        ...makeNode('alicia', DIFFERENT_EMBEDDING),
+        ...makeNode('alicia', KG_DIFF_EMBEDDING),
         uuid: 'alicia-exist',
       },
     ];
@@ -294,8 +294,8 @@ describe('NodeResolutionService', () => {
 
   it('should return all as new nodes with empty uuidMap when no existing nodes', async () => {
     const extracted = [
-      makeNode('Alice', HIGH_SIM_EMBEDDING),
-      makeNode('Bob', HIGH_SIM_EMBEDDING),
+      makeNode('Alice', KG_HIGH_SIM_EMBEDDING),
+      makeNode('Bob', KG_HIGH_SIM_EMBEDDING),
     ];
 
     const result = await service.resolveNodes(

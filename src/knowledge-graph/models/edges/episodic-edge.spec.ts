@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { KG_TEST_GROUP_ID } from '@/test/factories';
+
 import { createEpisodicEdge, EpisodicEdgeSchema } from './episodic-edge';
 
 describe('EpisodicEdge', () => {
@@ -9,7 +11,7 @@ describe('EpisodicEdge', () => {
   describe('createEpisodicEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -17,17 +19,17 @@ describe('EpisodicEdge', () => {
       expect(edge.targetNodeUuid).toBe(targetNodeUuid);
       expect(edge.uuid).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.groupId).toBe('test-group');
+      expect(edge.groupId).toBe(KG_TEST_GROUP_ID);
     });
 
     it('should generate unique uuids', () => {
       const edge1 = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
       const edge2 = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -38,7 +40,7 @@ describe('EpisodicEdge', () => {
   describe('EpisodicEdgeSchema', () => {
     it('should accept valid episodic edge', () => {
       const edge = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -47,7 +49,7 @@ describe('EpisodicEdge', () => {
 
     it('should reject empty groupId', () => {
       const edge = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -58,7 +60,7 @@ describe('EpisodicEdge', () => {
 
     it('should reject invalid source uuid', () => {
       const edge = createEpisodicEdge({
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });

@@ -1,23 +1,32 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
-import { createEntityNode, createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KgNodeFactory,
+} from '@/test/factories';
+
 import { EdgeExtractionService } from './edge-extraction.service';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp. Bob is the CEO of Acme Corp.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
-const referenceTime = new Date('2024-01-01T00:00:00Z');
-
-const aliceNode = createEntityNode({ name: 'Alice', groupId: 'group-1' });
-const bobNode = createEntityNode({ name: 'Bob', groupId: 'group-1' });
-const acmeNode = createEntityNode({ name: 'Acme Corp', groupId: 'group-1' });
+const aliceNode = KgNodeFactory.createEntityNode({
+  name: 'Alice',
+  groupId: KG_TEST_GROUP_ID,
+});
+const bobNode = KgNodeFactory.createEntityNode({
+  name: 'Bob',
+  groupId: KG_TEST_GROUP_ID,
+});
+const acmeNode = KgNodeFactory.createEntityNode({
+  name: 'Acme Corp',
+  groupId: KG_TEST_GROUP_ID,
+});
 const nodes = [aliceNode, bobNode, acmeNode];
 
 describe('EdgeExtractionService', () => {
@@ -49,7 +58,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toHaveLength(1);
@@ -57,7 +66,7 @@ describe('EdgeExtractionService', () => {
     expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
     expect(edges[0].name).toBe('WORKS_AT');
     expect(edges[0].fact).toBe('Alice works at Acme Corp.');
-    expect(edges[0].groupId).toBe('group-1');
+    expect(edges[0].groupId).toBe(KG_TEST_GROUP_ID);
   });
 
   it('should pass validAt/invalidAt from LLM response to edge', async () => {
@@ -79,7 +88,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges[0].validAt).toEqual(new Date('2024-01-01T00:00:00.000Z'));
@@ -103,7 +112,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges[0].validAt).toBeNull();
@@ -133,7 +142,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toHaveLength(1);
@@ -163,7 +172,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toHaveLength(1);
@@ -188,7 +197,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toHaveLength(1);
@@ -213,7 +222,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges[0].episodes).toEqual([baseEpisode.uuid]);
@@ -227,7 +236,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toEqual([]);
@@ -256,7 +265,7 @@ describe('EdgeExtractionService', () => {
       baseEpisode,
       nodes,
       [],
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(edges).toHaveLength(2);

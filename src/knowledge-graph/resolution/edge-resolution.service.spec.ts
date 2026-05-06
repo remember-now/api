@@ -1,31 +1,31 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createEntityEdge, EntityEdge } from '../models/edges';
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  KG_HIGH_SIM_EMBEDDING,
+  KG_NEAR_SAME_EMBEDDING,
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KgEdgeFactory,
+  KgNodeFactory,
+} from '@/test/factories';
+
+import { EntityEdge } from '../models/edges';
 import { EntityEdgeRepository } from '../neo4j/repositories';
 import { EdgeResolutionService } from './edge-resolution.service';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice joined Acme Corp as CEO.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
-
-const referenceTime = new Date('2024-01-01T12:00:00Z');
-const HIGH_SIM = [1, 0, 0];
-const NEAR_HIGH_SIM = [0.9999, 0.001, 0];
 
 function makeEdge(
   overrides: Partial<EntityEdge> & { name: string; fact: string },
 ): EntityEdge {
-  return createEntityEdge({
+  return KgEdgeFactory.createEntityEdge({
     sourceNodeUuid: 'src-uuid',
     targetNodeUuid: 'tgt-uuid',
-    groupId: 'group-1',
     ...overrides,
   });
 }
@@ -49,13 +49,13 @@ describe('EdgeResolutionService', () => {
     const edge1 = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
       episodes: ['ep-1'],
     });
     const edge2 = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme', // same fact
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
       episodes: ['ep-2'],
     });
 
@@ -65,7 +65,7 @@ describe('EdgeResolutionService', () => {
       [edge1, edge2],
       [],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(result.resolvedEdges).toHaveLength(1);
@@ -77,7 +77,7 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
       sourceNodeUuid: 'old-src-uuid',
       targetNodeUuid: 'old-tgt-uuid',
     });
@@ -93,7 +93,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [],
       uuidMap,
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(result.resolvedEdges[0].sourceNodeUuid).toBe('new-src-uuid');
@@ -104,7 +104,7 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
 
     const result = await service.resolveEdges(
@@ -113,7 +113,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
@@ -124,12 +124,12 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
     const existingEdge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme Corp',
-      factEmbedding: NEAR_HIGH_SIM,
+      factEmbedding: KG_NEAR_SAME_EMBEDDING,
     });
     existingEdge.uuid = 'exist-edge-uuid';
 
@@ -145,7 +145,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [existingEdge],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     // The existing edge is returned in resolvedEdges with the episode UUID appended
@@ -162,12 +162,12 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is now CEO at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
     const existingEdge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice was an engineer at Acme',
-      factEmbedding: NEAR_HIGH_SIM,
+      factEmbedding: KG_NEAR_SAME_EMBEDDING,
     });
     existingEdge.uuid = 'old-edge-uuid';
 
@@ -182,7 +182,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [existingEdge],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(result.resolvedEdges).toHaveLength(1);
@@ -194,13 +194,13 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is now CEO at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
       validAt: new Date('2024-06-01'),
     });
     const existingEdge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice was an engineer at Acme',
-      factEmbedding: NEAR_HIGH_SIM,
+      factEmbedding: KG_NEAR_SAME_EMBEDDING,
       validAt: new Date('2023-01-01'),
     });
     existingEdge.uuid = 'old-edge-uuid';
@@ -216,7 +216,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [existingEdge],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(result.resolvedEdges).toHaveLength(1);
@@ -232,12 +232,12 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
     const endpointEdge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is employed at Acme Corp',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
       sourceNodeUuid: 'src-uuid',
       targetNodeUuid: 'tgt-uuid',
     });
@@ -245,7 +245,7 @@ describe('EdgeResolutionService', () => {
     const similarEdge = makeEdge({
       name: 'EMPLOYED_AT',
       fact: 'Alice has a job at Acme',
-      factEmbedding: NEAR_HIGH_SIM,
+      factEmbedding: KG_NEAR_SAME_EMBEDDING,
       sourceNodeUuid: 'other-src',
       targetNodeUuid: 'other-tgt',
     });
@@ -264,7 +264,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [endpointEdge, similarEdge],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     // Similar range idx in duplicate_facts does NOT mark as duplicate
@@ -275,7 +275,7 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
 
     const result = await service.resolveEdges(
@@ -284,10 +284,12 @@ describe('EdgeResolutionService', () => {
       [edge],
       [],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
-    expect(result.resolvedEdges[0].factEmbedding).toEqual(HIGH_SIM);
+    expect(result.resolvedEdges[0].factEmbedding).toEqual(
+      KG_HIGH_SIM_EMBEDDING,
+    );
   });
 
   it('should include keyword-only edge in similar candidates when no factEmbedding', async () => {
@@ -314,7 +316,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     // LLM should have been called with the keyword edge as a candidate
@@ -325,7 +327,7 @@ describe('EdgeResolutionService', () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
-      factEmbedding: HIGH_SIM,
+      factEmbedding: KG_HIGH_SIM_EMBEDDING,
     });
     const endpointEdge = makeEdge({
       name: 'WORKS_AT',
@@ -348,7 +350,7 @@ describe('EdgeResolutionService', () => {
       [edge],
       [endpointEdge],
       new Map(),
-      referenceTime,
+      KG_REFERENCE_TIME,
     );
 
     expect(mockModel.withStructuredOutput).toHaveBeenCalled();

@@ -1,16 +1,14 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createEpisodicNode } from '@/knowledge-graph/models/nodes/episodic-node';
 import { EpisodeType } from '@/knowledge-graph/models/nodes/node.types';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KG_REFERENCE_TIME, KgNodeFactory } from '@/test/factories';
 
 import { EpisodicNodeRepository } from './episodic-node.repository';
 
 describe('EpisodicNodeRepository', () => {
   let repo: EpisodicNodeRepository;
   let neo4j: DeepMockProxy<Neo4jService>;
-
-  const validAt = new Date('2024-01-01T00:00:00Z');
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
@@ -23,11 +21,9 @@ describe('EpisodicNodeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on Episodic and return uuid', async () => {
-      const node = createEpisodicNode({
+      const node = KgNodeFactory.createEpisodicNode({
         name: 'Episode 1',
-        groupId: 'test-group',
         content: 'content',
-        validAt,
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
@@ -58,11 +54,9 @@ describe('EpisodicNodeRepository', () => {
     });
 
     it('should return mapped episodic node when found', async () => {
-      const node = createEpisodicNode({
+      const node = KgNodeFactory.createEpisodicNode({
         name: 'Episode 1',
-        groupId: 'test-group',
         content: 'content',
-        validAt,
       });
       neo4j.executeRead.mockResolvedValue([
         {
@@ -73,7 +67,7 @@ describe('EpisodicNodeRepository', () => {
           source: EpisodeType.text,
           source_description: '',
           content: 'content',
-          valid_at: validAt,
+          valid_at: KG_REFERENCE_TIME,
         },
       ]);
       const result = await repo.getByUuid(node.uuid);

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
+
 import { createEntityEdge, EntityEdgeSchema } from './entity-edge';
 
 describe('EntityEdge', () => {
@@ -11,7 +13,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -33,7 +35,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'Person A knows Person B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -44,7 +46,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
         factEmbedding: [0.1, 0.2, 0.3],
@@ -53,11 +55,11 @@ describe('EntityEdge', () => {
     });
 
     it('should allow setting dates', () => {
-      const date = new Date('2024-01-01');
+      const date = KG_REFERENCE_TIME;
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
         validAt: date,
@@ -75,7 +77,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -86,7 +88,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -97,7 +99,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
       });
@@ -108,7 +110,7 @@ describe('EntityEdge', () => {
       const edge = createEntityEdge({
         name: 'KNOWS',
         fact: 'A knows B',
-        groupId: 'test-group',
+        groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
         targetNodeUuid,
         validAt: null,

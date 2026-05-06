@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createCommunityEdge } from '@/knowledge-graph/models/edges/community-edge';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KgEdgeFactory } from '@/test/factories';
 
 import { CommunityEdgeRepository } from './community-edge.repository';
 
@@ -25,10 +25,9 @@ describe('CommunityEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on HAS_MEMBER and return uuid', async () => {
-      const edge = createCommunityEdge({
+      const edge = KgEdgeFactory.createCommunityEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
@@ -59,10 +58,9 @@ describe('CommunityEdgeRepository', () => {
     });
 
     it('should return mapped community edge when found', async () => {
-      const edge = createCommunityEdge({
+      const edge = KgEdgeFactory.createCommunityEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeRead.mockResolvedValue([
         {

@@ -1,22 +1,25 @@
-import { createEntityNode, createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KgNodeFactory,
+} from '@/test/factories';
+
 import { buildExtractEdgesMessages } from './extract-edges.prompts';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp. Bob is the CEO of Acme Corp.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 const nodes = [
-  createEntityNode({ name: 'Alice', groupId: 'group-1' }),
-  createEntityNode({ name: 'Bob', groupId: 'group-1' }),
-  createEntityNode({ name: 'Acme Corp', groupId: 'group-1' }),
+  KgNodeFactory.createEntityNode({ name: 'Alice', groupId: KG_TEST_GROUP_ID }),
+  KgNodeFactory.createEntityNode({ name: 'Bob', groupId: KG_TEST_GROUP_ID }),
+  KgNodeFactory.createEntityNode({
+    name: 'Acme Corp',
+    groupId: KG_TEST_GROUP_ID,
+  }),
 ];
-
-const referenceTime = new Date('2024-01-01T00:00:00Z');
 
 describe('buildExtractEdgesMessages', () => {
   it('should return system and human messages', () => {
@@ -24,7 +27,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     expect(messages).toHaveLength(2);
     expect(messages[0].getType()).toBe('system');
@@ -36,7 +39,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain(baseEpisode.content);
@@ -47,7 +50,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('Alice');
@@ -56,17 +59,17 @@ describe('buildExtractEdgesMessages', () => {
   });
 
   it('should include previous episode content when provided', () => {
-    const prev = createEpisodicNode({
+    const prev = KgNodeFactory.createEpisodicNode({
       name: 'Prev Episode',
       content: 'Alice joined Acme in 2020.',
       validAt: new Date('2023-12-01'),
-      groupId: 'group-1',
+      groupId: KG_TEST_GROUP_ID,
     });
     const messages = buildExtractEdgesMessages({
       episode: baseEpisode,
       nodes,
       previousEpisodes: [prev],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('Alice joined Acme in 2020.');
@@ -77,7 +80,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('PREVIOUS EPISODES:\nNone');
@@ -88,7 +91,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
       customInstructions: 'Only extract employment relationships.',
     });
     const human = messages.find((m) => m.getType() === 'human');
@@ -100,7 +103,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes,
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('ENTITIES:');
@@ -111,7 +114,7 @@ describe('buildExtractEdgesMessages', () => {
       episode: baseEpisode,
       nodes: [],
       previousEpisodes: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages.find((m) => m.getType() === 'human');
     expect(human?.content).toContain('ENTITIES:');

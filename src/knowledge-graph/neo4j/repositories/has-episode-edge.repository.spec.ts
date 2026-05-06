@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createHasEpisodeEdge } from '@/knowledge-graph/models/edges/has-episode-edge';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KgEdgeFactory } from '@/test/factories';
 
 import { HasEpisodeEdgeRepository } from './has-episode-edge.repository';
 
@@ -25,10 +25,9 @@ describe('HasEpisodeEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on HAS_EPISODE and return uuid', async () => {
-      const edge = createHasEpisodeEdge({
+      const edge = KgEdgeFactory.createHasEpisodeEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
@@ -59,10 +58,9 @@ describe('HasEpisodeEdgeRepository', () => {
     });
 
     it('should return mapped has-episode edge when found', async () => {
-      const edge = createHasEpisodeEdge({
+      const edge = KgEdgeFactory.createHasEpisodeEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeRead.mockResolvedValue([
         {

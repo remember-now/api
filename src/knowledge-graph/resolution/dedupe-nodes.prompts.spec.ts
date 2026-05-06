@@ -1,13 +1,11 @@
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+
 import { buildDedupeNodesMessages } from './dedupe-nodes.prompts';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 const extractedNodes = [
@@ -90,11 +88,11 @@ describe('buildDedupeNodesMessages', () => {
   });
 
   it('should include previous episode content when provided', () => {
-    const prev = createEpisodicNode({
+    const prev = KgNodeFactory.createEpisodicNode({
       name: 'Prev Episode',
       content: 'Bob was here.',
       validAt: new Date('2023-12-01'),
-      groupId: 'group-1',
+      groupId: KG_TEST_GROUP_ID,
     });
     const messages = buildDedupeNodesMessages({
       episode: baseEpisode,

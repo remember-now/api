@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createEpisodicEdge } from '@/knowledge-graph/models/edges/episodic-edge';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KgEdgeFactory } from '@/test/factories';
 
 import { EpisodicEdgeRepository } from './episodic-edge.repository';
 
@@ -25,10 +25,9 @@ describe('EpisodicEdgeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on MENTIONS and return uuid', async () => {
-      const edge = createEpisodicEdge({
+      const edge = KgEdgeFactory.createEpisodicEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
@@ -59,10 +58,9 @@ describe('EpisodicEdgeRepository', () => {
     });
 
     it('should return mapped episodic edge when found', async () => {
-      const edge = createEpisodicEdge({
+      const edge = KgEdgeFactory.createEpisodicEdge({
         sourceNodeUuid,
         targetNodeUuid,
-        groupId: 'test-group',
       });
       neo4j.executeRead.mockResolvedValue([
         {
@@ -83,21 +81,9 @@ describe('EpisodicEdgeRepository', () => {
     it('calls executeWrite exactly once for N edges (single UNWIND round-trip)', async () => {
       neo4j.executeWrite.mockResolvedValue([]);
       const edges = [
-        createEpisodicEdge({
-          sourceNodeUuid,
-          targetNodeUuid,
-          groupId: 'test-group',
-        }),
-        createEpisodicEdge({
-          sourceNodeUuid,
-          targetNodeUuid,
-          groupId: 'test-group',
-        }),
-        createEpisodicEdge({
-          sourceNodeUuid,
-          targetNodeUuid,
-          groupId: 'test-group',
-        }),
+        KgEdgeFactory.createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+        KgEdgeFactory.createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
+        KgEdgeFactory.createEpisodicEdge({ sourceNodeUuid, targetNodeUuid }),
       ];
       await repo.saveBulk(edges);
       expect(neo4j.executeWrite).toHaveBeenCalledTimes(1);

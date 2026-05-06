@@ -1,8 +1,8 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
-import { createCommunityNode } from '@/knowledge-graph/models/nodes/community-node';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KgNodeFactory } from '@/test/factories';
 
 import { CommunityNodeRepository } from './community-node.repository';
 
@@ -21,10 +21,7 @@ describe('CommunityNodeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on Community and return uuid', async () => {
-      const node = createCommunityNode({
-        name: 'Community 1',
-        groupId: 'test-group',
-      });
+      const node = KgNodeFactory.createCommunityNode({ name: 'Community 1' });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -35,9 +32,8 @@ describe('CommunityNodeRepository', () => {
     });
 
     it('should use vector property when nameEmbedding is present', async () => {
-      const node = createCommunityNode({
+      const node = KgNodeFactory.createCommunityNode({
         name: 'Community',
-        groupId: 'test-group',
         nameEmbedding: [0.1, 0.2],
       });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
@@ -49,10 +45,7 @@ describe('CommunityNodeRepository', () => {
     });
 
     it('should not use vector property when nameEmbedding is null', async () => {
-      const node = createCommunityNode({
-        name: 'Community',
-        groupId: 'test-group',
-      });
+      const node = KgNodeFactory.createCommunityNode({ name: 'Community' });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -81,10 +74,7 @@ describe('CommunityNodeRepository', () => {
     });
 
     it('should return mapped community node when found', async () => {
-      const node = createCommunityNode({
-        name: 'Test Community',
-        groupId: 'test-group',
-      });
+      const node = KgNodeFactory.createCommunityNode();
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,
@@ -136,7 +126,7 @@ describe('CommunityNodeRepository', () => {
     });
 
     it('should merge results from all groups, sort by score desc, and slice to limit', async () => {
-      const node = createCommunityNode({ name: 'Base', groupId: 'test-group' });
+      const node = KgNodeFactory.createCommunityNode({ name: 'Base' });
       const rowFor = (name: string, score: number) => ({
         uuid: `uuid-${name}`,
         name,

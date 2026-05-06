@@ -1,7 +1,7 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { createSagaNode } from '@/knowledge-graph/models/nodes/saga-node';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { KgNodeFactory } from '@/test/factories';
 
 import { SagaNodeRepository } from './saga-node.repository';
 
@@ -20,7 +20,7 @@ describe('SagaNodeRepository', () => {
 
   describe('save', () => {
     it('should call MERGE on Saga and return uuid', async () => {
-      const node = createSagaNode({ name: 'Saga 1', groupId: 'test-group' });
+      const node = KgNodeFactory.createSagaNode({ name: 'Saga 1' });
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('SagaNodeRepository', () => {
     });
 
     it('should return mapped saga node when found', async () => {
-      const node = createSagaNode({ name: 'Test Saga', groupId: 'test-group' });
+      const node = KgNodeFactory.createSagaNode();
       neo4j.executeRead.mockResolvedValue([
         {
           uuid: node.uuid,

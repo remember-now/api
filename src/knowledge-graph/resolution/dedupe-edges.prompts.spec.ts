@@ -1,13 +1,15 @@
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import {
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KgNodeFactory,
+} from '@/test/factories';
+
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice joined Acme Corp as CEO.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 const newEdge = {
@@ -31,8 +33,6 @@ const similarEdges = [
   },
 ];
 
-const referenceTime = new Date('2024-01-01T12:00:00Z');
-
 describe('buildDedupeEdgesMessages', () => {
   it('should return system and human messages', () => {
     const messages = buildDedupeEdgesMessages({
@@ -41,7 +41,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: endpointEdges,
       similarEdges,
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     expect(messages).toHaveLength(2);
     expect(messages[0].getType()).toBe('system');
@@ -55,7 +55,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: [],
       similarEdges: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages[1];
     expect(human.content).toContain('WORKS_AT');
@@ -69,10 +69,10 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: [],
       similarEdges: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages[1];
-    expect(human.content).toContain(referenceTime.toISOString());
+    expect(human.content).toContain(KG_REFERENCE_TIME.toISOString());
   });
 
   it('should list existing endpoint edges with idx in human message', () => {
@@ -82,7 +82,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: endpointEdges,
       similarEdges: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages[1];
     expect(human.content).toContain('idx: 0');
@@ -96,7 +96,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: [],
       similarEdges: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages[1];
     expect(human.content).toContain('None');
@@ -109,7 +109,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: [],
       similarEdges,
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
     });
     const human = messages[1];
     expect(human.content).toContain('idx: 1');
@@ -125,7 +125,7 @@ describe('buildDedupeEdgesMessages', () => {
       newEdge,
       existingEndpointEdges: [],
       similarEdges: [],
-      referenceTime,
+      referenceTime: KG_REFERENCE_TIME,
       customInstructions: 'Be conservative with contradictions.',
     });
     const human = messages[1];

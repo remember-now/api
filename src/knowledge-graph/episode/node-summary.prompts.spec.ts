@@ -1,13 +1,11 @@
-import { createEpisodicNode } from '../models/nodes';
-import { EpisodeType } from '../models/nodes/node.types';
+import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+
 import { buildNodeSummaryMessages } from './node-summary.prompts';
 
-const baseEpisode = createEpisodicNode({
+const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and manages Bob.',
-  validAt: new Date('2024-01-01'),
-  source: EpisodeType.text,
-  groupId: 'group-1',
+  groupId: KG_TEST_GROUP_ID,
 });
 
 const baseNodes = [
@@ -81,11 +79,11 @@ describe('buildNodeSummaryMessages', () => {
   });
 
   it('should include previous episode content when provided', () => {
-    const prev = createEpisodicNode({
+    const prev = KgNodeFactory.createEpisodicNode({
       name: 'Prev Episode',
       content: 'Charlie was at the office.',
       validAt: new Date('2023-12-01'),
-      groupId: 'group-1',
+      groupId: KG_TEST_GROUP_ID,
     });
     const messages = buildNodeSummaryMessages({
       episode: baseEpisode,

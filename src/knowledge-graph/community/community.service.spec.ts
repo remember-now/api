@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
 import { LlmService } from '@/llm/llm.service';
+import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
 import { Neo4jService } from '../neo4j/neo4j.service';
@@ -14,9 +15,6 @@ import {
   CommunityService,
   communitySummaryJsonSchema,
 } from './community.service';
-
-const GROUP_ID = 'group-1';
-const USER_ID = 42;
 
 describe('CommunityService', () => {
   let service: CommunityService;
@@ -76,7 +74,7 @@ describe('CommunityService', () => {
     });
 
     it('should return early without projecting GDS graph', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       // Only the guard query should be called
       expect(mockNeo4jService.executeRead).toHaveBeenCalledTimes(1);
@@ -85,10 +83,10 @@ describe('CommunityService', () => {
     });
 
     it('should call deleteByGroupId to clean up stale community data', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       expect(mockCommunityNodeRepository.deleteByGroupId).toHaveBeenCalledWith(
-        GROUP_ID,
+        KG_TEST_GROUP_ID,
       );
     });
   });
@@ -112,22 +110,22 @@ describe('CommunityService', () => {
     });
 
     it('should call GDS graph project cypher', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const projectCall = mockNeo4jService.executeWrite.mock.calls[0];
       expect(projectCall[0]).toContain('gds.graph.project');
-      expect(projectCall[1]).toMatchObject({ groupId: GROUP_ID });
+      expect(projectCall[1]).toMatchObject({ groupId: KG_TEST_GROUP_ID });
     });
 
     it('should call Leiden stream cypher', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const leidenCall = mockNeo4jService.executeRead.mock.calls[1];
       expect(leidenCall[0]).toContain('gds.leiden.stream');
     });
 
     it('should call gds.graph.drop in finally', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
       expect(dropCall[0]).toContain('gds.graph.drop');
@@ -143,23 +141,23 @@ describe('CommunityService', () => {
         .mockResolvedValueOnce([]) // GDS project
         .mockResolvedValueOnce([]); // graph drop (in finally)
 
-      await expect(service.buildCommunities(USER_ID, GROUP_ID)).rejects.toThrow(
-        'Leiden failed',
-      );
+      await expect(
+        service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID),
+      ).rejects.toThrow('Leiden failed');
 
       const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
       expect(dropCall[0]).toContain('gds.graph.drop');
     });
 
     it('should call LLM once per community', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       // 2 communities: communityId 0 and communityId 1
       expect(mockRunnable.invoke).toHaveBeenCalledTimes(2);
     });
 
     it('should call withStructuredOutput with communitySummaryJsonSchema', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       expect(mockModel.withStructuredOutput).toHaveBeenCalledWith(
         communitySummaryJsonSchema,
@@ -171,7 +169,7 @@ describe('CommunityService', () => {
         .mockResolvedValueOnce({ name: 'Tech Cluster', summary: 'Tech folks' })
         .mockResolvedValueOnce({ name: 'Biz Cluster', summary: 'Biz folks' });
 
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const savedNodes = mockCommunityNodeRepository.saveBulk.mock.calls[0][0];
       const names = savedNodes.map((n: { name: string }) => n.name);
@@ -181,7 +179,7 @@ describe('CommunityService', () => {
     });
 
     it('should save community edges (HAS_MEMBER) for all member uuids', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const savedEdges = mockCommunityEdgeRepository.saveBulk.mock.calls[0][0];
       const targetUuids = savedEdges.map(
@@ -193,7 +191,7 @@ describe('CommunityService', () => {
     });
 
     it('should call deleteByGroupId before saveBulk', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const deleteOrder =
         mockCommunityNodeRepository.deleteByGroupId.mock.invocationCallOrder[0];
@@ -203,7 +201,7 @@ describe('CommunityService', () => {
     });
 
     it('should save community nodes before community edges', async () => {
-      await service.buildCommunities(USER_ID, GROUP_ID);
+      await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
       const nodeOrder =
         mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];

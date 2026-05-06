@@ -2,11 +2,15 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
 import { LlmService } from '@/llm/llm.service';
+import {
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KgNodeFactory,
+} from '@/test/factories';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { createEntityNode } from '../models/nodes/entity-node';
 import { EpisodeType } from '../models/nodes/node.types';
 import {
   EntityEdgeRepository,
@@ -18,9 +22,7 @@ import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { BulkEpisodeService } from './bulk-episode.service';
 import { RawEpisode } from './bulk.types';
 
-const GROUP_ID = 'test-group';
 const USER_ID = 1;
-const REFERENCE_TIME = new Date('2024-01-01T00:00:00Z');
 
 function makeRaw(name: string): RawEpisode {
   return {
@@ -28,8 +30,8 @@ function makeRaw(name: string): RawEpisode {
     content: `Content: ${name}`,
     source: EpisodeType.text,
     sourceDescription: 'test',
-    referenceTime: REFERENCE_TIME,
-    groupId: GROUP_ID,
+    referenceTime: KG_REFERENCE_TIME,
+    groupId: KG_TEST_GROUP_ID,
   };
 }
 
@@ -125,10 +127,13 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
   describe('pass-1 dedup (vs live graph)', () => {
     it('alias node is excluded from saved nodes when resolveNodes returns a duplicate pair', async () => {
-      const canonical = createEntityNode({ name: 'Alice', groupId: GROUP_ID });
-      const alias = createEntityNode({
+      const canonical = KgNodeFactory.createEntityNode({
+        name: 'Alice',
+        groupId: KG_TEST_GROUP_ID,
+      });
+      const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       });
 
       mockNodeExtraction.extractNodes
@@ -159,13 +164,13 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
 
     it('existing node referenced as canonical target is pulled into the result', async () => {
-      const existingCanonical = createEntityNode({
+      const existingCanonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       });
-      const alias = createEntityNode({
+      const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       });
 
       mockEntityNodeRepo.searchByName.mockResolvedValue([existingCanonical]);
@@ -194,10 +199,13 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     it('canonical node appears exactly once in saveBulk when extracted by two episodes', async () => {
       // Mirrors Python test_dedupe_nodes_bulk_reuses_canonical_nodes:
       // episode 1 extracts canonical; episode 2 extracts an alias of the same entity
-      const canonical = createEntityNode({ name: 'Alice', groupId: GROUP_ID });
-      const alias = createEntityNode({
+      const canonical = KgNodeFactory.createEntityNode({
+        name: 'Alice',
+        groupId: KG_TEST_GROUP_ID,
+      });
+      const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       });
 
       mockNodeExtraction.extractNodes
@@ -237,14 +245,14 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
   describe('pass-2 dedup (within-batch exact name + cosine similarity)', () => {
     it('exactly one of two nodes with identical embeddings survives as canonical', async () => {
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0],
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alicia',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0], // cosine([1,0],[1,0]) = 1.0 ≥ 0.9 threshold
       });
 
@@ -277,14 +285,14 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
 
     it('two nodes with orthogonal embeddings are both kept (below threshold)', async () => {
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0],
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Bob',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [0, 1], // cosine([1,0],[0,1]) = 0 < 0.9
       });
 
@@ -314,14 +322,14 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
 
     it('two nodes with identical names and null embeddings are deduplicated by exact match', async () => {
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: null,
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: null,
       });
 
@@ -352,14 +360,14 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
 
     it('node with null embedding is deduplicated by exact name match against a node that has an embedding', async () => {
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0],
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: null,
       });
 
@@ -389,14 +397,14 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     });
 
     it('two nodes with different names and null embeddings are both kept', async () => {
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: null,
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Bob',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: null,
       });
 
@@ -433,19 +441,19 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
       // nodeA: canonical (from ep1, no duplicates)
       // nodeB: pass-1 alias of nodeA (ep2 resolveNodes returns duplicatePairs)
       // nodeC: pass-2 alias of nodeA (same embedding as nodeA)
-      const nodeA = createEntityNode({
+      const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0],
       });
-      const nodeB = createEntityNode({
+      const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [0, 1], // different embedding → not a pass-2 pair
       });
-      const nodeC = createEntityNode({
+      const nodeC = KgNodeFactory.createEntityNode({
         name: 'Alicia',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
         nameEmbedding: [1, 0], // same embedding as nodeA → pass-2 pair
       });
 

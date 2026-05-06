@@ -2,12 +2,17 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
 import { LlmService } from '@/llm/llm.service';
+import {
+  KG_REFERENCE_TIME,
+  KG_TEST_GROUP_ID,
+  KG_TEST_USER_ID,
+  KgEdgeFactory,
+  KgNodeFactory,
+} from '@/test/factories';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { createEntityEdge } from '../models/edges';
-import { createEntityNode, createEpisodicNode } from '../models/nodes';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -20,40 +25,13 @@ import {
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { EpisodeService } from './episode.service';
 
-const GROUP_ID = 'group-1';
-const USER_ID = 42;
-const REFERENCE_TIME = new Date('2024-06-01T00:00:00Z');
-
 const baseOptions = {
-  userId: USER_ID,
+  userId: KG_TEST_USER_ID,
   name: 'Test Episode',
   content: 'Alice works at Acme Corp.',
-  groupId: GROUP_ID,
-  referenceTime: REFERENCE_TIME,
+  groupId: KG_TEST_GROUP_ID,
+  referenceTime: KG_REFERENCE_TIME,
 };
-
-function makeEpisode() {
-  return createEpisodicNode({
-    name: 'Test Episode',
-    content: 'Alice works at Acme Corp.',
-    validAt: REFERENCE_TIME,
-    groupId: GROUP_ID,
-  });
-}
-
-function makeNode(name: string) {
-  return createEntityNode({ name, groupId: GROUP_ID });
-}
-
-function makeEdge(sourceUuid: string, targetUuid: string) {
-  return createEntityEdge({
-    name: 'WORKS_AT',
-    sourceNodeUuid: sourceUuid,
-    targetNodeUuid: targetUuid,
-    groupId: GROUP_ID,
-    fact: 'Alice works at Acme Corp',
-  });
-}
 
 describe('EpisodeService', () => {
   let service: EpisodeService;
@@ -173,7 +151,12 @@ describe('EpisodeService', () => {
   });
 
   it('should call extractNodes with model, episode, and previousEpisodes', async () => {
-    const prevEpisode = makeEpisode();
+    const prevEpisode = KgNodeFactory.createEpisodicNode({
+      name: 'Test Episode',
+      content: 'Alice works at Acme Corp.',
+      validAt: KG_REFERENCE_TIME,
+      groupId: KG_TEST_GROUP_ID,
+    });
     mockEpisodicNodeRepository.retrieveEpisodes.mockResolvedValue([
       prevEpisode,
     ]);
@@ -182,7 +165,10 @@ describe('EpisodeService', () => {
 
     expect(mockNodeExtractionService.extractNodes).toHaveBeenCalledWith(
       mockModel,
-      expect.objectContaining({ name: 'Test Episode', groupId: GROUP_ID }),
+      expect.objectContaining({
+        name: 'Test Episode',
+        groupId: KG_TEST_GROUP_ID,
+      }),
       [prevEpisode],
       undefined,
       undefined,
@@ -191,7 +177,7 @@ describe('EpisodeService', () => {
   });
 
   it('should call embedNodes with extracted nodes', async () => {
-    const node = makeNode('Alice');
+    const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
     mockNodeExtractionService.extractNodes.mockResolvedValue([node]);
 
     await service.addEpisode(baseOptions);
@@ -200,8 +186,8 @@ describe('EpisodeService', () => {
   });
 
   it('should call resolveNodes with embedded nodes and search-based candidates', async () => {
-    const extracted = makeNode('Alice');
-    const existing = makeNode('Bob');
+    const extracted = KgNodeFactory.createEntityNode({ name: 'Alice' });
+    const existing = KgNodeFactory.createEntityNode({ name: 'Bob' });
     const embedded = { ...extracted, nameEmbedding: [1, 0, 0] };
 
     mockNodeExtractionService.extractNodes.mockResolvedValue([extracted]);
@@ -221,8 +207,11 @@ describe('EpisodeService', () => {
   });
 
   it('should call extractEdges with canonical nodes (resolved + matched existing)', async () => {
-    const resolvedNode = makeNode('Alice');
-    const existingNode = { ...makeNode('Bob'), uuid: 'existing-bob-uuid' };
+    const resolvedNode = KgNodeFactory.createEntityNode({ name: 'Alice' });
+    const existingNode = {
+      ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
+      uuid: 'existing-bob-uuid',
+    };
     const uuidMap = new Map([['temp-uuid', existingNode.uuid]]);
 
     // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
@@ -244,7 +233,7 @@ describe('EpisodeService', () => {
       expect.anything(),
       expect.arrayContaining([resolvedNode, existingNode]),
       [],
-      REFERENCE_TIME,
+      KG_REFERENCE_TIME,
       undefined,
       undefined,
       undefined,
@@ -252,8 +241,13 @@ describe('EpisodeService', () => {
   });
 
   it('should call embedEdges with extracted edges', async () => {
-    const node = makeNode('Alice');
-    const edge = makeEdge(node.uuid, 'target-uuid');
+    const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
+    const edge = KgEdgeFactory.createEntityEdge({
+      name: 'WORKS_AT',
+      sourceNodeUuid: node.uuid,
+      targetNodeUuid: 'target-uuid',
+      fact: 'Alice works at Acme Corp',
+    });
     mockEdgeExtractionService.extractEdges.mockResolvedValue([edge]);
 
     await service.addEpisode(baseOptions);
@@ -262,9 +256,19 @@ describe('EpisodeService', () => {
   });
 
   it('should call resolveEdges with embedded edges and uuidMap', async () => {
-    const edge = makeEdge('src', 'tgt');
+    const edge = KgEdgeFactory.createEntityEdge({
+      name: 'WORKS_AT',
+      sourceNodeUuid: 'src',
+      targetNodeUuid: 'tgt',
+      fact: 'Alice works at Acme Corp',
+    });
     const embeddedEdge = { ...edge, factEmbedding: [1, 0, 0] };
-    const existingEdge = makeEdge('src2', 'tgt2');
+    const existingEdge = KgEdgeFactory.createEntityEdge({
+      name: 'WORKS_AT',
+      sourceNodeUuid: 'src2',
+      targetNodeUuid: 'tgt2',
+      fact: 'Alice works at Acme Corp',
+    });
     const uuidMap = new Map<string, string>();
 
     mockEmbeddingService.embedEdges.mockResolvedValue([embeddedEdge]);
@@ -283,14 +287,14 @@ describe('EpisodeService', () => {
       [embeddedEdge],
       [existingEdge],
       uuidMap,
-      REFERENCE_TIME,
+      KG_REFERENCE_TIME,
       [],
       undefined,
     );
   });
 
   it('should call withStructuredOutput for node summaries when resolved nodes exist', async () => {
-    const node = makeNode('Alice');
+    const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
       uuidMap: new Map(),
@@ -306,7 +310,7 @@ describe('EpisodeService', () => {
   });
 
   it('should apply returned summaries to resolved nodes before save', async () => {
-    const node = makeNode('Alice');
+    const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
       uuidMap: new Map(),
@@ -323,7 +327,12 @@ describe('EpisodeService', () => {
   });
 
   it('should save invalidated edges via entityEdgeRepository.saveBulk', async () => {
-    const invalidated = makeEdge('src', 'tgt');
+    const invalidated = KgEdgeFactory.createEntityEdge({
+      name: 'WORKS_AT',
+      sourceNodeUuid: 'src',
+      targetNodeUuid: 'tgt',
+      fact: 'Alice works at Acme Corp',
+    });
     mockEdgeResolutionService.resolveEdges.mockResolvedValue({
       resolvedEdges: [],
       invalidatedEdges: [invalidated],
@@ -339,8 +348,11 @@ describe('EpisodeService', () => {
   });
 
   it('should create episodic edges for all canonical nodes and save them', async () => {
-    const resolvedNode = makeNode('Alice');
-    const existingNode = { ...makeNode('Bob'), uuid: 'bob-uuid' };
+    const resolvedNode = KgNodeFactory.createEntityNode({ name: 'Alice' });
+    const existingNode = {
+      ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
+      uuid: 'bob-uuid',
+    };
     const uuidMap = new Map([['some-uuid', existingNode.uuid]]);
 
     // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
@@ -377,13 +389,18 @@ describe('EpisodeService', () => {
     expect(mockHasEpisodeEdgeRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceNodeUuid: 'my-saga',
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       }),
     );
   });
 
   it('should call nextEpisodeEdgeRepository.save when previous episode exists in saga', async () => {
-    const prevEpisode = makeEpisode();
+    const prevEpisode = KgNodeFactory.createEpisodicNode({
+      name: 'Test Episode',
+      content: 'Alice works at Acme Corp.',
+      validAt: KG_REFERENCE_TIME,
+      groupId: KG_TEST_GROUP_ID,
+    });
     prevEpisode.uuid = 'prev-episode-uuid';
 
     mockSagaNodeRepository.save.mockResolvedValue('saga-uuid');
@@ -399,7 +416,7 @@ describe('EpisodeService', () => {
     expect(mockNextEpisodeEdgeRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceNodeUuid: prevEpisode.uuid,
-        groupId: GROUP_ID,
+        groupId: KG_TEST_GROUP_ID,
       }),
     );
   });
@@ -418,8 +435,13 @@ describe('EpisodeService', () => {
   });
 
   it('should return episode, nodes, edges, and episodicEdges', async () => {
-    const node = makeNode('Alice');
-    const edge = makeEdge(node.uuid, 'target');
+    const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
+    const edge = KgEdgeFactory.createEntityEdge({
+      name: 'WORKS_AT',
+      sourceNodeUuid: node.uuid,
+      targetNodeUuid: 'target',
+      fact: 'Alice works at Acme Corp',
+    });
 
     mockNodeResolutionService.resolveNodes.mockResolvedValue({
       resolvedNodes: [node],
@@ -464,8 +486,8 @@ describe('EpisodeService', () => {
     await service.addEpisode({ ...baseOptions, updateCommunities: true });
 
     expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
-      USER_ID,
-      GROUP_ID,
+      KG_TEST_USER_ID,
+      KG_TEST_GROUP_ID,
     );
   });
 
