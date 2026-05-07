@@ -359,6 +359,233 @@
         ]
       }
     },
+    "/agent/test/ingest": {
+      "post": {
+        "operationId": "AgentController_testIngest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestIngestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "[TEST] Ingest an episode into the knowledge graph",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/agent/test/search": {
+      "post": {
+        "operationId": "AgentController_testSearch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "[TEST] Search the knowledge graph",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/llms": {
+      "get": {
+        "operationId": "LlmController_listProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All providers with config status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProvidersList_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List all LLM providers and their config status",
+        "tags": [
+          "LLMs"
+        ]
+      }
+    },
+    "/llms/active": {
+      "put": {
+        "operationId": "LlmController_setActiveProvider",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetActiveProvider"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Active provider updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveProviderResponse_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set the active LLM provider",
+        "tags": [
+          "LLMs"
+        ]
+      }
+    },
+    "/llms/{provider}": {
+      "get": {
+        "operationId": "LlmController_getProviderConfig",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/UserLlmProvider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmConfigResponse_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get config for a specific provider",
+        "tags": [
+          "LLMs"
+        ]
+      },
+      "put": {
+        "operationId": "LlmController_saveProviderConfig",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/UserLlmProvider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveLlmConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved provider configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmConfigResponse_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save config for a provider",
+        "tags": [
+          "LLMs"
+        ]
+      },
+      "delete": {
+        "operationId": "LlmController_deleteProviderConfig",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/UserLlmProvider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Provider config successfully deleted"
+          }
+        },
+        "summary": "Delete config for a provider",
+        "tags": [
+          "LLMs"
+        ]
+      }
+    },
+    "/llms/{provider}/test": {
+      "post": {
+        "operationId": "LlmController_testProviderConfig",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/UserLlmProvider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConfigResponse_Output"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Test connectivity for a provider",
+        "tags": [
+          "LLMs"
+        ]
+      }
+    },
     "/messages/history": {
       "get": {
         "operationId": "MessagesController_getMessages",
@@ -561,183 +788,6 @@
         "summary": "Delete a memory block",
         "tags": [
           "Memories"
-        ]
-      }
-    },
-    "/llms": {
-      "get": {
-        "operationId": "LlmController_listProviders",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "All providers with config status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LlmProvidersList_Output"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List all LLM providers and their config status",
-        "tags": [
-          "LLMs"
-        ]
-      }
-    },
-    "/llms/active": {
-      "put": {
-        "operationId": "LlmController_setActiveProvider",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetActiveProvider"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Active provider updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ActiveProviderResponse_Output"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Set the active LLM provider",
-        "tags": [
-          "LLMs"
-        ]
-      }
-    },
-    "/llms/{provider}": {
-      "get": {
-        "operationId": "LlmController_getProviderConfig",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/UserLlmProvider"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Provider configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LlmConfigResponse_Output"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get config for a specific provider",
-        "tags": [
-          "LLMs"
-        ]
-      },
-      "put": {
-        "operationId": "LlmController_saveProviderConfig",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/UserLlmProvider"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveLlmConfig"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Saved provider configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LlmConfigResponse_Output"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Save config for a provider",
-        "tags": [
-          "LLMs"
-        ]
-      },
-      "delete": {
-        "operationId": "LlmController_deleteProviderConfig",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/UserLlmProvider"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Provider config successfully deleted"
-          }
-        },
-        "summary": "Delete config for a provider",
-        "tags": [
-          "LLMs"
-        ]
-      }
-    },
-    "/llms/{provider}/test": {
-      "post": {
-        "operationId": "LlmController_testProviderConfig",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/UserLlmProvider"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Test result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TestConfigResponse_Output"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Test connectivity for a provider",
-        "tags": [
-          "LLMs"
         ]
       }
     }
@@ -1200,66 +1250,53 @@
         "id": "LogoutResponse_Output",
         "additionalProperties": false
       },
-      "ChatRequestDto": {
+      "TestIngestDto": {
         "type": "object",
         "properties": {
-          "message": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "message",
+              "json",
+              "text",
+              "fact_triple"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "content",
+          "groupId"
+        ]
+      },
+      "TestSearchDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "groupId": {
             "type": "string",
             "minLength": 1
           }
         },
         "required": [
-          "message"
+          "query",
+          "groupId"
         ]
-      },
-      "CreateMemoryBlockDto": {
-        "type": "object",
-        "properties": {
-          "label": {
-            "type": "string",
-            "minLength": 1
-          },
-          "value": {
-            "default": "",
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": "string"
-          },
-          "limit": {
-            "default": 20000,
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 50000
-          },
-          "readOnly": {
-            "default": false,
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "label"
-        ]
-      },
-      "UpdateMemoryBlockDto": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
-          },
-          "readOnly": {
-            "type": "boolean"
-          }
-        }
       },
       "LlmConfigResponse_Output": {
         "oneOf": [
@@ -1503,6 +1540,67 @@
         ],
         "id": "TestConfigResponse_Output",
         "additionalProperties": false
+      },
+      "ChatRequestDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "CreateMemoryBlockDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "default": "",
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "limit": {
+            "default": 20000,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 50000
+          },
+          "readOnly": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "UpdateMemoryBlockDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "readOnly": {
+            "type": "boolean"
+          }
+        }
       },
       "UserLlmProvider": {
         "type": "string",
