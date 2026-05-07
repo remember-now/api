@@ -2,6 +2,12 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { SagaNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsWithCursorParams,
+  GroupId,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   buildLabelString,
@@ -77,28 +83,28 @@ export class SagaNodeRepository implements OnModuleInit {
     }
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Saga {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Saga) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
-  async deleteByGroupId(groupId: string): Promise<void> {
+  async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Saga {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
-  async getByUuid(uuid: string): Promise<SagaNode | null> {
+  async getByUuid(uuid: Uuid): Promise<SagaNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -110,7 +116,7 @@ export class SagaNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<SagaNode[]> {
+  async getByUuids(uuids: UuidArray): Promise<SagaNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -122,24 +128,23 @@ export class SagaNodeRepository implements OnModuleInit {
   }
 
   async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-    uuidCursor?: string,
+    params: GetByGroupIdsWithCursorParams,
   ): Promise<SagaNode[]> {
+    const { groupIds, limit, uuidCursor } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND n.uuid < $uuidCursor' : '';
-    const params: Record<string, unknown> = {
+    const queryParams: Record<string, unknown> = {
       groupIds,
       uuidCursor: uuidCursor ?? null,
     };
-    if (limit !== undefined) params['limit'] = limit;
+    if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, labels(n) AS labels,
               n.summary AS summary, n.last_summarized_at AS last_summarized_at
        ORDER BY n.uuid DESC ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }

@@ -1,7 +1,8 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
+import { GetByGroupIdsWithCursorParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KgNodeFactory } from '@/test/factories';
+import { KG_TEST_UUID_CURSOR, KgNodeFactory } from '@/test/factories';
 
 import { SagaNodeRepository } from './saga-node.repository';
 
@@ -87,7 +88,9 @@ describe('SagaNodeRepository', () => {
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1']);
+      await repo.getByGroupIds(
+        GetByGroupIdsWithCursorParamsSchema.parse({ groupIds: ['group-1'] }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
@@ -96,16 +99,28 @@ describe('SagaNodeRepository', () => {
 
     it('should apply uuid less-than cursor clause when uuidCursor is provided', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
+      await repo.getByGroupIds(
+        GetByGroupIdsWithCursorParamsSchema.parse({
+          groupIds: ['group-1'],
+          limit: 10,
+          uuidCursor: KG_TEST_UUID_CURSOR,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('n.uuid < $uuidCursor'),
-        expect.objectContaining({ uuidCursor: 'cursor-uuid' }),
+        expect.objectContaining({ uuidCursor: KG_TEST_UUID_CURSOR }),
       );
     });
 
     it('should include ORDER BY n.uuid DESC', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1'], 10, 'cursor-uuid');
+      await repo.getByGroupIds(
+        GetByGroupIdsWithCursorParamsSchema.parse({
+          groupIds: ['group-1'],
+          limit: 10,
+          uuidCursor: KG_TEST_UUID_CURSOR,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('ORDER BY n.uuid DESC'),
         expect.anything(),
@@ -114,7 +129,9 @@ describe('SagaNodeRepository', () => {
 
     it('should not include cursor clause when uuidCursor is omitted', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1']);
+      await repo.getByGroupIds(
+        GetByGroupIdsWithCursorParamsSchema.parse({ groupIds: ['group-1'] }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.not.stringContaining('$uuidCursor'),
         expect.anything(),

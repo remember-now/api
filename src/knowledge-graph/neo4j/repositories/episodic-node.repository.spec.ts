@@ -1,6 +1,8 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
+import neoDriver from 'neo4j-driver';
 
 import { EpisodeType } from '@/knowledge-graph/models';
+import { RetrieveEpisodesParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { KG_REFERENCE_TIME, KgNodeFactory } from '@/test/factories';
 
@@ -99,16 +101,27 @@ describe('EpisodicNodeRepository', () => {
   describe('retrieveEpisodes', () => {
     it('should query with referenceTime and lastN', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.retrieveEpisodes(new Date(), 10);
+      await repo.retrieveEpisodes(
+        RetrieveEpisodesParamsSchema.parse({
+          referenceTime: new Date(),
+          lastN: 10,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('ORDER BY e.valid_at DESC'),
-        expect.objectContaining({ lastN: 10 }),
+        expect.objectContaining({ lastN: neoDriver.int(10) }),
       );
     });
 
     it('should pass groupIds when provided', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.retrieveEpisodes(new Date(), 5, ['group-1']);
+      await repo.retrieveEpisodes(
+        RetrieveEpisodesParamsSchema.parse({
+          referenceTime: new Date(),
+          lastN: 5,
+          groupIds: ['group-1'],
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ groupIds: ['group-1'] }),
@@ -117,7 +130,12 @@ describe('EpisodicNodeRepository', () => {
 
     it('should pass null groupIds when not provided', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.retrieveEpisodes(new Date(), 5);
+      await repo.retrieveEpisodes(
+        RetrieveEpisodesParamsSchema.parse({
+          referenceTime: new Date(),
+          lastN: 5,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ groupIds: null }),

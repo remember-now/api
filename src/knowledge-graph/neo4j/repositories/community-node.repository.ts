@@ -3,15 +3,24 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { CommunityNode } from '@/knowledge-graph/models';
 import {
+  fromNeo4jInt,
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsParams,
+  GroupId,
+  SearchBySimilarityParams,
+  SearchByTextParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   buildLabelString,
   groupNodesByLabel,
 } from '@/knowledge-graph/neo4j/node-label.utils';
-import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class CommunityNodeRepository implements OnModuleInit {
@@ -122,28 +131,28 @@ export class CommunityNodeRepository implements OnModuleInit {
     }
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
-  async deleteByGroupId(groupId: string): Promise<void> {
+  async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
-  async getByUuid(uuid: string): Promise<CommunityNode | null> {
+  async getByUuid(uuid: Uuid): Promise<CommunityNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -155,7 +164,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<CommunityNode[]> {
+  async getByUuids(uuids: UuidArray): Promise<CommunityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -166,29 +175,24 @@ export class CommunityNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-  ): Promise<CommunityNode[]> {
+  async getByGroupIds(params: GetByGroupIdsParams): Promise<CommunityNode[]> {
+    const { groupIds, limit } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
-    const params: Record<string, unknown> = { groupIds };
-    if (limit !== undefined) params['limit'] = limit;
+    const queryParams: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
               n.name_embedding AS name_embedding, labels(n) AS labels
        ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }
 
-  async searchByName(
-    query: string,
-    groupIds: string[],
-    limit: number,
-  ): Promise<CommunityNode[]> {
+  async searchByName(params: SearchByTextParams): Promise<CommunityNode[]> {
+    const { query, groupIds, limit } = params;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryNodes('community_names', $luceneQuery)
        YIELD node AS n, score
@@ -197,17 +201,18 @@ export class CommunityNodeRepository implements OnModuleInit {
               n.name_embedding AS name_embedding, labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
-      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
+      {
+        luceneQuery: buildFulltextQuery(query, groupIds),
+        limit,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }
 
   async searchBySimilarity(
-    embedding: number[],
-    groupIds: string[],
-    limit: number,
-    minScore = 0,
+    params: SearchBySimilarityParams,
   ): Promise<CommunityNode[]> {
+    const { embedding, groupIds, limit, minScore } = params;
     if (groupIds.length === 0) return [];
 
     const perGroup = await Promise.all(
@@ -224,7 +229,12 @@ export class CommunityNodeRepository implements OnModuleInit {
            RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
                   n.created_at AS created_at, n.summary AS summary,
                   n.name_embedding AS name_embedding, labels(n) AS labels, score`,
-          { embedding, groupId, limit, minScore },
+          {
+            embedding,
+            groupId,
+            limit,
+            minScore,
+          },
         ),
       ),
     );
@@ -232,7 +242,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     return perGroup
       .flat()
       .sort((a, b) => (b['score'] as number) - (a['score'] as number))
-      .slice(0, limit)
+      .slice(0, fromNeo4jInt(limit))
       .map((r) => this.mapRow(r));
   }
 

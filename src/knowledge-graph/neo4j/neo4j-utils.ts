@@ -39,3 +39,23 @@ export function convertRecord(
   }
   return result;
 }
+
+/**
+ * Escapes Lucene special characters in a query string so it is safe to pass
+ * to db.index.fulltext.queryNodes / queryRelationships.
+ */
+export function luceneSanitize(query: string): string {
+  return query.replace(/[+\-&|!(){}[\]^"~*?:\\/ORNTAD]/g, '\\$&');
+}
+
+/**
+ * Builds a Lucene query string that combines free-text search with a
+ * group_id filter.
+ */
+export function buildFulltextQuery(query: string, groupIds: string[]): string {
+  const sanitized = luceneSanitize(query);
+  const groupPart = groupIds
+    .map((id) => `group_id:"${luceneSanitize(id)}"`)
+    .join(' OR ');
+  return sanitized ? `(${sanitized}) AND (${groupPart})` : `(${groupPart})`;
+}

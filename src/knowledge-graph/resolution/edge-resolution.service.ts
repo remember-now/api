@@ -2,8 +2,8 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EntityEdge, EpisodicNode } from '../models';
+import { SearchByTextParamsSchema } from '../neo4j';
 import { EntityEdgeRepository } from '../neo4j/repositories';
-import { luceneSanitize } from '../search/search-filters';
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 import {
   cosineSimilarity,
@@ -98,9 +98,11 @@ export class EdgeResolutionService {
 
       // Keyword candidates (BM25 via Neo4j fulltext)
       const keywordEdges = await this.edgeRepo.searchByFact(
-        luceneSanitize(edge.fact),
-        [edge.groupId],
-        MAX_KEYWORD_CANDIDATES,
+        SearchByTextParamsSchema.parse({
+          query: edge.fact,
+          groupIds: [edge.groupId],
+          limit: MAX_KEYWORD_CANDIDATES,
+        }),
       );
 
       // Merge: cosine-first, then keyword-only additions (deduped, endpoint-excluded)

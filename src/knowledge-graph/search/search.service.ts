@@ -5,7 +5,13 @@ import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import { GroupIdSchema, Neo4jService } from '../neo4j';
+import {
+  GroupIdSchema,
+  Neo4jService,
+  SearchByBfsParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '../neo4j';
 import {
   CommunityNodeRepository,
   EntityEdgeRepository,
@@ -29,7 +35,6 @@ import {
   NodeSearchMethod,
   SearchConfig,
 } from './search-config.types';
-import { luceneSanitize } from './search-filters';
 import { SearchFilters } from './search-filters.types';
 import {
   crossEncoderReranker,
@@ -230,7 +235,9 @@ export class SearchService {
     if (config.searchMethods.includes(EdgeSearchMethod.bm25)) {
       tasks.push(
         this.entityEdgeRepository
-          .searchByFact(luceneSanitize(query), groupIds, fetch)
+          .searchByFact(
+            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
+          )
           .then((edges) => {
             for (const e of edges) edgeMap.set(e.uuid, e);
             bm25Uuids.push(...edges.map((e) => e.uuid));
@@ -245,11 +252,13 @@ export class SearchService {
       tasks.push(
         this.entityEdgeRepository
           .searchBySimilarity(
-            queryVector,
-            groupIds,
-            fetch,
+            SearchBySimilarityParamsSchema.parse({
+              embedding: queryVector,
+              groupIds,
+              limit: fetch,
+              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+            }),
             filters,
-            config.simMinScore ?? DEFAULT_MIN_SCORE,
           )
           .then((edges) => {
             for (const e of edges) edgeMap.set(e.uuid, e);
@@ -268,11 +277,13 @@ export class SearchService {
 
       if (origins.length > 0) {
         const bfsEdges = await this.entityEdgeRepository.searchByBfs(
-          origins,
-          groupIds,
-          fetch,
+          SearchByBfsParamsSchema.parse({
+            originNodeUuids: origins,
+            groupIds,
+            limit: fetch,
+            maxDepth: config.maxDepth,
+          }),
           filters,
-          config.maxDepth,
         );
         for (const e of bfsEdges) edgeMap.set(e.uuid, e);
         bfsUuids = bfsEdges.map((e) => e.uuid);
@@ -396,7 +407,10 @@ export class SearchService {
     if (config.searchMethods.includes(NodeSearchMethod.bm25)) {
       tasks.push(
         this.entityNodeRepository
-          .searchByName(luceneSanitize(query), groupIds, fetch, filters)
+          .searchByName(
+            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
+            filters,
+          )
           .then((nodes) => {
             for (const n of nodes) nodeMap.set(n.uuid, n);
             bm25Uuids.push(...nodes.map((n) => n.uuid));
@@ -411,11 +425,13 @@ export class SearchService {
       tasks.push(
         this.entityNodeRepository
           .searchBySimilarity(
-            queryVector,
-            groupIds,
-            fetch,
+            SearchBySimilarityParamsSchema.parse({
+              embedding: queryVector,
+              groupIds,
+              limit: fetch,
+              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+            }),
             filters,
-            config.simMinScore ?? DEFAULT_MIN_SCORE,
           )
           .then((nodes) => {
             for (const n of nodes) nodeMap.set(n.uuid, n);
@@ -434,11 +450,13 @@ export class SearchService {
 
       if (origins.length > 0) {
         const bfsNodes = await this.entityNodeRepository.searchByBfs(
-          origins,
-          groupIds,
-          fetch,
+          SearchByBfsParamsSchema.parse({
+            originNodeUuids: origins,
+            groupIds,
+            limit: fetch,
+            maxDepth: config.maxDepth,
+          }),
           filters,
-          config.maxDepth,
         );
         for (const n of bfsNodes) nodeMap.set(n.uuid, n);
         bfsUuids = bfsNodes.map((n) => n.uuid);
@@ -526,9 +544,7 @@ export class SearchService {
 
     const bm25Episodes = config.searchMethods.includes(EpisodeSearchMethod.bm25)
       ? await this.episodicNodeRepository.searchByContent(
-          luceneSanitize(query),
-          groupIds,
-          fetch,
+          SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
         )
       : [];
 
@@ -585,7 +601,9 @@ export class SearchService {
     if (config.searchMethods.includes(CommunitySearchMethod.bm25)) {
       tasks.push(
         this.communityNodeRepository
-          .searchByName(luceneSanitize(query), groupIds, fetch)
+          .searchByName(
+            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
+          )
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.uuid, n);
             bm25Uuids.push(...nodes.map((n) => n.uuid));
@@ -600,10 +618,12 @@ export class SearchService {
       tasks.push(
         this.communityNodeRepository
           .searchBySimilarity(
-            queryVector,
-            groupIds,
-            fetch,
-            config.simMinScore ?? DEFAULT_MIN_SCORE,
+            SearchBySimilarityParamsSchema.parse({
+              embedding: queryVector,
+              groupIds,
+              limit: fetch,
+              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+            }),
           )
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.uuid, n);

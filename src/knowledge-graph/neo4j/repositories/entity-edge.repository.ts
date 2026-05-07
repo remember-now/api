@@ -1,18 +1,24 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { z } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityEdge } from '@/knowledge-graph/models';
+import { buildEdgeFilterClause } from '@/knowledge-graph/neo4j/cypher-filter-builders';
 import {
+  fromNeo4jInt,
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsParams,
+  SearchByBfsParams,
+  SearchBySimilarityParams,
+  SearchByTextParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
-import {
-  buildEdgeFilterClause,
-  buildFulltextQuery,
-} from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
@@ -166,21 +172,21 @@ export class EntityEdgeRepository implements OnModuleInit {
     }
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:RELATES_TO {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:RELATES_TO]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
   }
 
-  async getByUuid(uuid: string): Promise<EntityEdge | null> {
+  async getByUuid(uuid: Uuid): Promise<EntityEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO {uuid: $uuid}]->(target:Entity)
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -195,7 +201,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<EntityEdge[]> {
+  async getByUuids(uuids: UuidArray): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.uuid IN $uuids
@@ -210,7 +216,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getUuidsForEpisodeDeletion(episodeUuid: string): Promise<string[]> {
+  async getUuidsForEpisodeDeletion(episodeUuid: Uuid): Promise<string[]> {
     const results = await this.neo4j.executeRead<{ uuid: string }>(
       // episodes[0] is the creating episode — mirrors Python graphiti.py remove_episode:
       // only edges whose first episode matches are deleted; edges that merely accumulated
@@ -223,13 +229,11 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => r.uuid);
   }
 
-  async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-  ): Promise<EntityEdge[]> {
+  async getByGroupIds(params: GetByGroupIdsParams): Promise<EntityEdge[]> {
+    const { groupIds, limit } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
-    const params: Record<string, unknown> = { groupIds };
-    if (limit !== undefined) params['limit'] = limit;
+    const queryParams: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.group_id IN $groupIds
@@ -240,14 +244,14 @@ export class EntityEdgeRepository implements OnModuleInit {
               e.invalid_at AS invalid_at, e.attributes AS attributes,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }
 
   async getBetweenNodes(
-    sourceUuid: string,
-    targetUuid: string,
+    sourceUuid: Uuid,
+    targetUuid: Uuid,
   ): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity {uuid: $sourceUuid})-[e:RELATES_TO]->(target:Entity {uuid: $targetUuid})
@@ -262,7 +266,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByNodeUuid(nodeUuid: string): Promise<EntityEdge[]> {
+  async getByNodeUuid(nodeUuid: Uuid): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE source.uuid = $nodeUuid OR target.uuid = $nodeUuid
@@ -277,11 +281,8 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async searchByFact(
-    query: string,
-    groupIds: string[],
-    limit: number,
-  ): Promise<EntityEdge[]> {
+  async searchByFact(params: SearchByTextParams): Promise<EntityEdge[]> {
+    const { query, groupIds, limit } = params;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryRelationships('edge_facts', $luceneQuery)
        YIELD relationship AS e, score
@@ -294,18 +295,19 @@ export class EntityEdgeRepository implements OnModuleInit {
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ORDER BY score DESC
        LIMIT $limit`,
-      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
+      {
+        luceneQuery: buildFulltextQuery(query, groupIds),
+        limit,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }
 
   async searchBySimilarity(
-    embedding: number[],
-    groupIds: string[],
-    limit: number,
+    params: SearchBySimilarityParams,
     filters?: SearchFilters,
-    minScore = 0,
   ): Promise<EntityEdge[]> {
+    const { embedding, groupIds, limit, minScore } = params;
     if (groupIds.length === 0) return [];
 
     const { clause, params: filterParams } = filters
@@ -331,7 +333,13 @@ export class EntityEdgeRepository implements OnModuleInit {
                   e.expired_at AS expired_at, e.valid_at AS valid_at,
                   e.invalid_at AS invalid_at, e.attributes AS attributes,
                   source.uuid AS source_node_uuid, target.uuid AS target_node_uuid, score`,
-          { embedding, groupId, limit, minScore, ...filterParams },
+          {
+            embedding,
+            groupId,
+            limit,
+            minScore,
+            ...filterParams,
+          },
         ),
       ),
     );
@@ -339,25 +347,19 @@ export class EntityEdgeRepository implements OnModuleInit {
     return perGroup
       .flat()
       .sort((a, b) => (b['score'] as number) - (a['score'] as number))
-      .slice(0, limit)
+      .slice(0, fromNeo4jInt(limit))
       .map((r) => this.mapRow(r));
   }
 
   async searchByBfs(
-    originNodeUuids: string[],
-    groupIds: string[],
-    limit: number,
+    params: SearchByBfsParams,
     filters?: SearchFilters,
-    maxDepth?: number,
   ): Promise<EntityEdge[]> {
+    const { originNodeUuids, groupIds, limit, maxDepth } = params;
     if (originNodeUuids.length === 0) return [];
 
-    const depth = z
-      .number()
-      .int()
-      .positive()
-      .default(MAX_SEARCH_DEPTH)
-      .parse(maxDepth ?? MAX_SEARCH_DEPTH);
+    const depth =
+      maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
 
     const { clause, params: filterParams } = filters
       ? buildEdgeFilterClause(filters, 'e')
@@ -381,7 +383,12 @@ export class EntityEdgeRepository implements OnModuleInit {
               e.invalid_at AS invalid_at, e.attributes AS attributes,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        LIMIT $limit`,
-      { originNodeUuids, groupIds, limit, ...filterParams },
+      {
+        originNodeUuids,
+        groupIds,
+        limit,
+        ...filterParams,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }

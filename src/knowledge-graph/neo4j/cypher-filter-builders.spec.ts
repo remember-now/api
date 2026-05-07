@@ -1,9 +1,9 @@
+import { TemporalComparison } from '../search/search-filters.types';
 import {
   buildEdgeFilterClause,
   buildNodeFilterClause,
-  luceneSanitize,
-} from './search-filters';
-import { TemporalComparison } from './search-filters.types';
+} from './cypher-filter-builders';
+import { luceneSanitize } from './neo4j-utils';
 
 // ─── luceneSanitize ───────────────────────────────────────────────────────────
 

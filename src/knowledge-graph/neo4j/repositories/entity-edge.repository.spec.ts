@@ -3,6 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
+import {
+  GetByGroupIdsParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { KgEdgeFactory } from '@/test/factories';
 
@@ -153,7 +158,9 @@ describe('EntityEdgeRepository', () => {
   describe('getByGroupIds', () => {
     it('should query with group ids', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByGroupIds(['group-1']);
+      await repo.getByGroupIds(
+        GetByGroupIdsParamsSchema.parse({ groupIds: ['group-1'] }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
@@ -165,14 +172,26 @@ describe('EntityEdgeRepository', () => {
     const embedding = [0.1, 0.2, 0.3];
 
     it('should return empty array when groupIds is empty', async () => {
-      const result = await repo.searchBySimilarity(embedding, [], 10);
+      const result = await repo.searchBySimilarity(
+        SearchBySimilarityParamsSchema.parse({
+          embedding,
+          groupIds: [],
+          limit: 10,
+        }),
+      );
       expect(result).toEqual([]);
       expect(neo4j.executeRead).not.toHaveBeenCalled();
     });
 
     it('should issue one query per groupId with in-index group_id filter', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.searchBySimilarity(embedding, ['g1', 'g2'], 5);
+      await repo.searchBySimilarity(
+        SearchBySimilarityParamsSchema.parse({
+          embedding,
+          groupIds: ['g1', 'g2'],
+          limit: 5,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledTimes(2);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('WHERE e.group_id = $groupId'),
@@ -205,7 +224,13 @@ describe('EntityEdgeRepository', () => {
         .mockResolvedValueOnce([rowFor('A', 0.9), rowFor('B', 0.5)])
         .mockResolvedValueOnce([rowFor('C', 0.8), rowFor('D', 0.3)]);
 
-      const results = await repo.searchBySimilarity(embedding, ['g1', 'g2'], 3);
+      const results = await repo.searchBySimilarity(
+        SearchBySimilarityParamsSchema.parse({
+          embedding,
+          groupIds: ['g1', 'g2'],
+          limit: 3,
+        }),
+      );
 
       expect(results).toHaveLength(3);
       expect(results.map((r) => r.name)).toEqual(['A', 'C', 'B']);
@@ -213,7 +238,13 @@ describe('EntityEdgeRepository', () => {
 
     it('should not include group_id IN $groupIds in query', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.searchBySimilarity(embedding, ['g1'], 5);
+      await repo.searchBySimilarity(
+        SearchBySimilarityParamsSchema.parse({
+          embedding,
+          groupIds: ['g1'],
+          limit: 5,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.not.stringContaining('group_id IN $groupIds'),
         expect.anything(),
@@ -235,7 +266,13 @@ describe('EntityEdgeRepository', () => {
   describe('searchByFact', () => {
     it('should use fulltext queryRelationships procedure with Lucene query', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.searchByFact('Alice works', ['group-1'], 10);
+      await repo.searchByFact(
+        SearchByTextParamsSchema.parse({
+          query: 'Alice works',
+          groupIds: ['group-1'],
+          limit: 10,
+        }),
+      );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('db.index.fulltext.queryRelationships'),
         expect.objectContaining({
@@ -270,14 +307,26 @@ describe('EntityEdgeRepository', () => {
           target_node_uuid: targetNodeUuid,
         },
       ]);
-      const results = await repo.searchByFact('Alice works', ['group-1'], 10);
+      const results = await repo.searchByFact(
+        SearchByTextParamsSchema.parse({
+          query: 'Alice works',
+          groupIds: ['group-1'],
+          limit: 10,
+        }),
+      );
       expect(results).toHaveLength(1);
       expect(results[0].fact).toBe('Alice works at Acme');
     });
 
     it('should return empty array when no results', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const results = await repo.searchByFact('nonexistent', ['group-1'], 10);
+      const results = await repo.searchByFact(
+        SearchByTextParamsSchema.parse({
+          query: 'nonexistent',
+          groupIds: ['group-1'],
+          limit: 10,
+        }),
+      );
       expect(results).toEqual([]);
     });
   });

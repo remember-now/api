@@ -2,12 +2,20 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsParams,
+  GroupId,
+  RetrieveEpisodesParams,
+  SearchByTextParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   buildLabelString,
   groupNodesByLabel,
 } from '@/knowledge-graph/neo4j/node-label.utils';
-import { buildFulltextQuery } from '@/knowledge-graph/search/search-filters';
 
 @Injectable()
 export class EpisodicNodeRepository implements OnModuleInit {
@@ -87,28 +95,28 @@ export class EpisodicNodeRepository implements OnModuleInit {
     }
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
-  async deleteByGroupId(groupId: string): Promise<void> {
+  async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
-  async getByUuid(uuid: string): Promise<EpisodicNode | null> {
+  async getByUuid(uuid: Uuid): Promise<EpisodicNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -122,7 +130,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<EpisodicNode[]> {
+  async getByUuids(uuids: UuidArray): Promise<EpisodicNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -135,13 +143,11 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-  ): Promise<EpisodicNode[]> {
+  async getByGroupIds(params: GetByGroupIdsParams): Promise<EpisodicNode[]> {
+    const { groupIds, limit } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
-    const params: Record<string, unknown> = { groupIds };
-    if (limit !== undefined) params['limit'] = limit;
+    const queryParams: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Episodic) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -150,12 +156,12 @@ export class EpisodicNodeRepository implements OnModuleInit {
               n.valid_at AS valid_at, n.entity_edges AS entity_edges,
               labels(n) AS labels
        ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByEntityNodeUuid(entityNodeUuid: string): Promise<EpisodicNode[]> {
+  async getByEntityNodeUuid(entityNodeUuid: Uuid): Promise<EpisodicNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (e:Episodic)-[:MENTIONS]->(:Entity {uuid: $entityNodeUuid})
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -169,12 +175,9 @@ export class EpisodicNodeRepository implements OnModuleInit {
   }
 
   async retrieveEpisodes(
-    referenceTime: Date,
-    lastN: number,
-    groupIds?: string[],
-    source?: EpisodeType,
-    sagaUuid?: string,
+    params: RetrieveEpisodesParams,
   ): Promise<EpisodicNode[]> {
+    const { referenceTime, groupIds, source, sagaUuid, lastN } = params;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (e:Episodic)
        WHERE e.valid_at <= $referenceTime
@@ -189,7 +192,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
               e.valid_at AS valid_at, e.entity_edges AS entity_edges,
               labels(e) AS labels`,
       {
-        referenceTime: toNeo4jDateTime(referenceTime),
+        referenceTime,
         groupIds: groupIds ?? null,
         source: source ?? null,
         sagaUuid: sagaUuid ?? null,
@@ -199,7 +202,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getMentionedEntityUuids(episodeUuid: string): Promise<string[]> {
+  async getMentionedEntityUuids(episodeUuid: Uuid): Promise<string[]> {
     const results = await this.neo4j.executeRead<{ uuid: string }>(
       /* cypher */ `MATCH (ep:Episodic {uuid: $episodeUuid})-[:MENTIONS]->(n:Entity)
        RETURN n.uuid AS uuid`,
@@ -208,11 +211,9 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => r.uuid);
   }
 
-  async searchByContent(
-    query: string,
-    groupIds: string[],
-    limit: number,
-  ): Promise<EpisodicNode[]> {
+  async searchByContent(params: SearchByTextParams): Promise<EpisodicNode[]> {
+    const { query, groupIds, limit } = params;
+
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `CALL db.index.fulltext.queryNodes('episode_content', $luceneQuery)
        YIELD node AS n, score
@@ -223,7 +224,10 @@ export class EpisodicNodeRepository implements OnModuleInit {
               labels(n) AS labels
        ORDER BY score DESC
        LIMIT $limit`,
-      { luceneQuery: buildFulltextQuery(query, groupIds), limit },
+      {
+        luceneQuery: buildFulltextQuery(query, groupIds),
+        limit,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }

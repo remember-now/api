@@ -2,6 +2,11 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { NextEpisodeEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsWithCursorParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
@@ -57,21 +62,21 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
     );
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
   }
 
-  async getByUuid(uuid: string): Promise<NextEpisodeEdge | null> {
+  async getByUuid(uuid: Uuid): Promise<NextEpisodeEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE {uuid: $uuid}]->(target:Episodic)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
@@ -82,7 +87,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<NextEpisodeEdge[]> {
+  async getByUuids(uuids: UuidArray): Promise<NextEpisodeEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.uuid IN $uuids
@@ -94,24 +99,23 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
   }
 
   async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-    uuidCursor?: string,
+    params: GetByGroupIdsWithCursorParams,
   ): Promise<NextEpisodeEdge[]> {
+    const { groupIds, limit, uuidCursor } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';
-    const params: Record<string, unknown> = {
+    const queryParams: Record<string, unknown> = {
       groupIds,
       uuidCursor: uuidCursor ?? null,
     };
-    if (limit !== undefined) params['limit'] = limit;
+    if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid
        ORDER BY e.uuid DESC ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }

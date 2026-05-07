@@ -2,6 +2,11 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { CommunityEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
@@ -39,6 +44,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async saveBulk(edges: CommunityEdge[]): Promise<void> {
     if (edges.length === 0) return;
+
     await this.neo4j.executeWrite(
       /* cypher */ `UNWIND $edges AS edge
        MATCH (community:Community {uuid: edge.sourceNodeUuid})
@@ -57,21 +63,21 @@ export class CommunityEdgeRepository implements OnModuleInit {
     );
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:HAS_MEMBER {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:HAS_MEMBER]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
   }
 
-  async getByUuid(uuid: string): Promise<CommunityEdge | null> {
+  async getByUuid(uuid: Uuid): Promise<CommunityEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity:Entity)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
@@ -82,7 +88,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<CommunityEdge[]> {
+  async getByUuids(uuids: UuidArray): Promise<CommunityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.uuid IN $uuids
@@ -93,20 +99,20 @@ export class CommunityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-  ): Promise<CommunityEdge[]> {
+  async getByGroupIds(params: GetByGroupIdsParams): Promise<CommunityEdge[]> {
+    const { groupIds, limit } = params;
+
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
-    const params: Record<string, unknown> = { groupIds };
-    if (limit !== undefined) params['limit'] = limit;
+    const queryParams: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) queryParams['limit'] = limit;
+
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid
        ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }

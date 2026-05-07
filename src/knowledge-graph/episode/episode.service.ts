@@ -18,7 +18,12 @@ import {
   EpisodeType,
   EpisodicNode,
 } from '../models';
-import { GroupIdSchema } from '../neo4j';
+import {
+  GroupIdSchema,
+  RetrieveEpisodesParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '../neo4j';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -84,11 +89,13 @@ export class EpisodeService {
       sagaUuid,
     } = options;
     return this.episodicNodeRepository.retrieveEpisodes(
-      referenceTime,
-      lastN,
-      groupIds,
-      source,
-      sagaUuid,
+      RetrieveEpisodesParamsSchema.parse({
+        referenceTime,
+        lastN,
+        groupIds,
+        source,
+        sagaUuid,
+      }),
     );
   }
 
@@ -143,11 +150,12 @@ export class EpisodeService {
 
     const referenceTime = saga.lastSummarizedAt ?? new Date(0);
     const newEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
-      new Date(),
-      100,
-      [groupId],
-      undefined,
-      sagaUuid,
+      RetrieveEpisodesParamsSchema.parse({
+        referenceTime: new Date(),
+        lastN: 100,
+        groupIds: [groupId],
+        sagaUuid,
+      }),
     );
 
     const unsummarized = newEpisodes.filter((ep) => ep.validAt > referenceTime);
@@ -203,9 +211,11 @@ export class EpisodeService {
 
     // 2. Retrieve previous episodes
     const previousEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
-      referenceTime,
-      PREVIOUS_EPISODES_WINDOW,
-      [groupId],
+      RetrieveEpisodesParamsSchema.parse({
+        referenceTime,
+        lastN: PREVIOUS_EPISODES_WINDOW,
+        groupIds: [groupId],
+      }),
     );
 
     // 3. Create + save episode
@@ -449,11 +459,11 @@ export class EpisodeService {
       );
 
       const [prevEpisode] = await this.episodicNodeRepository.retrieveEpisodes(
-        referenceTime,
-        1,
-        undefined,
-        undefined,
-        sagaUuid,
+        RetrieveEpisodesParamsSchema.parse({
+          referenceTime,
+          lastN: 1,
+          sagaUuid,
+        }),
       );
       if (prevEpisode && prevEpisode.uuid !== episode.uuid) {
         await this.nextEpisodeEdgeRepository.save(
@@ -487,15 +497,19 @@ export class EpisodeService {
     const results = await Promise.all(
       nodes.flatMap((n) => [
         this.entityNodeRepository.searchByName(
-          n.name,
-          [groupId],
-          CANDIDATE_LIMIT,
+          SearchByTextParamsSchema.parse({
+            query: n.name,
+            groupIds: [groupId],
+            limit: CANDIDATE_LIMIT,
+          }),
         ),
         n.nameEmbedding !== null
           ? this.entityNodeRepository.searchBySimilarity(
-              n.nameEmbedding,
-              [groupId],
-              CANDIDATE_LIMIT,
+              SearchBySimilarityParamsSchema.parse({
+                embedding: n.nameEmbedding,
+                groupIds: [groupId],
+                limit: CANDIDATE_LIMIT,
+              }),
             )
           : Promise.resolve([] as EntityNode[]),
       ]),
@@ -515,15 +529,19 @@ export class EpisodeService {
     const results = await Promise.all(
       edges.flatMap((e) => [
         this.entityEdgeRepository.searchByFact(
-          e.fact,
-          [groupId],
-          CANDIDATE_LIMIT,
+          SearchByTextParamsSchema.parse({
+            query: e.fact,
+            groupIds: [groupId],
+            limit: CANDIDATE_LIMIT,
+          }),
         ),
         e.factEmbedding !== null
           ? this.entityEdgeRepository.searchBySimilarity(
-              e.factEmbedding,
-              [groupId],
-              CANDIDATE_LIMIT,
+              SearchBySimilarityParamsSchema.parse({
+                embedding: e.factEmbedding,
+                groupIds: [groupId],
+                limit: CANDIDATE_LIMIT,
+              }),
             )
           : Promise.resolve([] as EntityEdge[]),
       ]),

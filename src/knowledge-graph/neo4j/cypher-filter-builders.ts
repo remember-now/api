@@ -1,5 +1,8 @@
-import { NodeLabelsSchema } from '../neo4j';
-import { SearchFilters, TemporalComparison } from './search-filters.types';
+import {
+  SearchFilters,
+  TemporalComparison,
+} from '../search/search-filters.types';
+import { NodeLabelsSchema } from './neo4j.schemas';
 
 export interface FilterClauseResult {
   /** Zero or more AND-joined conditions (no leading WHERE/AND keyword). */
@@ -15,26 +18,6 @@ const TEMPORAL_FIELDS = new Set([
 ]);
 
 const WHITELISTED_OPS = new Set<string>(Object.values(TemporalComparison));
-
-/**
- * Escapes Lucene special characters in a query string so it is safe to pass
- * to db.index.fulltext.queryNodes / queryRelationships.
- */
-export function luceneSanitize(query: string): string {
-  return query.replace(/[+\-&|!(){}[\]^"~*?:\\/ORNTAD]/g, '\\$&');
-}
-
-/**
- * Builds a Lucene query string that combines free-text search with a
- * group_id filter.
- */
-export function buildFulltextQuery(query: string, groupIds: string[]): string {
-  const sanitized = luceneSanitize(query);
-  const groupPart = groupIds
-    .map((id) => `group_id:"${luceneSanitize(id)}"`)
-    .join(' OR ');
-  return sanitized ? `(${sanitized}) AND (${groupPart})` : `(${groupPart})`;
-}
 
 /**
  * Builds temporal WHERE conditions from OR-groups of AND-joined filters.
@@ -80,7 +63,6 @@ function buildTemporalConditions(
       );
     }
   }
-
   if (groupClauses.length === 0) return [];
   if (groupClauses.length === 1) return [groupClauses[0]];
   return [`(${groupClauses.join(' OR ')})`];
@@ -103,16 +85,13 @@ export function buildEdgeFilterClause(
     conditions.push(`${alias}.uuid IN $filterEdgeUuids`);
     params['filterEdgeUuids'] = filters.edgeUuids;
   }
-
   if (filters.edgeTypes && filters.edgeTypes.length > 0) {
     conditions.push(`${alias}.name IN $filterEdgeTypes`);
     params['filterEdgeTypes'] = filters.edgeTypes;
   }
-
   conditions.push(
     ...buildTemporalConditions(filters.temporalFilters, alias, params),
   );
-
   return { clause: conditions.join(' AND '), params };
 }
 
@@ -136,10 +115,8 @@ export function buildNodeFilterClause(
     );
     params['filterNodeLabels'] = filters.nodeLabels;
   }
-
   conditions.push(
     ...buildTemporalConditions(filters.temporalFilters, alias, params),
   );
-
   return { clause: conditions.join(' AND '), params };
 }

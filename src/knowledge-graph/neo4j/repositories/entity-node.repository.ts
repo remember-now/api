@@ -1,22 +1,29 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { z } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityNode } from '@/knowledge-graph/models';
+import { buildNodeFilterClause } from '@/knowledge-graph/neo4j/cypher-filter-builders';
 import {
+  fromNeo4jInt,
   toNeo4jDateTime,
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
+import {
+  GetByGroupIdsParams,
+  GroupId,
+  SearchByBfsParams,
+  SearchBySimilarityParams,
+  SearchByTextParams,
+  Uuid,
+  UuidArray,
+} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   buildLabelString,
   groupNodesByLabel,
 } from '@/knowledge-graph/neo4j/node-label.utils';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
-import {
-  buildFulltextQuery,
-  buildNodeFilterClause,
-} from '@/knowledge-graph/search/search-filters';
 import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
 
 @Injectable()
@@ -140,21 +147,21 @@ export class EntityNodeRepository implements OnModuleInit {
     }
   }
 
-  async delete(uuid: string): Promise<void> {
+  async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
       { uuid },
     );
   }
 
-  async deleteByUuids(uuids: string[]): Promise<void> {
+  async deleteByUuids(uuids: UuidArray): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
   }
 
-  async deleteIfSoleMentioned(nodeUuid: string): Promise<void> {
+  async deleteIfSoleMentioned(nodeUuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       /* cypher */ `MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: $nodeUuid})
        WITH n, count(ep) AS cnt
@@ -164,14 +171,14 @@ export class EntityNodeRepository implements OnModuleInit {
     );
   }
 
-  async deleteByGroupId(groupId: string): Promise<void> {
+  async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
   }
 
-  async getByUuid(uuid: string): Promise<EntityNode | null> {
+  async getByUuid(uuid: Uuid): Promise<EntityNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -184,7 +191,7 @@ export class EntityNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: string[]): Promise<EntityNode[]> {
+  async getByUuids(uuids: UuidArray): Promise<EntityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -196,13 +203,13 @@ export class EntityNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    groupIds: string[],
-    limit?: number,
-  ): Promise<EntityNode[]> {
+  async getByGroupIds(params: GetByGroupIdsParams): Promise<EntityNode[]> {
+    const { groupIds, limit } = params;
+
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
-    const params: Record<string, unknown> = { groupIds };
-    if (limit !== undefined) params['limit'] = limit;
+    const queryParams: Record<string, unknown> = { groupIds };
+    if (limit !== undefined) queryParams['limit'] = limit;
+
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -210,17 +217,16 @@ export class EntityNodeRepository implements OnModuleInit {
               n.attributes AS attributes, n.name_embedding AS name_embedding,
               labels(n) AS labels
        ${limitClause}`,
-      params,
+      queryParams,
     );
     return results.map((r) => this.mapRow(r));
   }
 
   async searchByName(
-    query: string,
-    groupIds: string[],
-    limit: number,
+    params: SearchByTextParams,
     filters?: SearchFilters,
   ): Promise<EntityNode[]> {
+    const { query, groupIds, limit } = params;
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'n')
       : { clause: '', params: {} };
@@ -246,12 +252,10 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async searchBySimilarity(
-    embedding: number[],
-    groupIds: string[],
-    limit: number,
+    params: SearchBySimilarityParams,
     filters?: SearchFilters,
-    minScore = 0,
   ): Promise<EntityNode[]> {
+    const { embedding, groupIds, limit, minScore } = params;
     if (groupIds.length === 0) return [];
 
     const { clause, params: filterParams } = filters
@@ -274,7 +278,13 @@ export class EntityNodeRepository implements OnModuleInit {
                   n.created_at AS created_at, n.summary AS summary,
                   n.attributes AS attributes, n.name_embedding AS name_embedding,
                   labels(n) AS labels, score`,
-          { embedding, groupId, limit, minScore, ...filterParams },
+          {
+            embedding,
+            groupId,
+            limit,
+            minScore,
+            ...filterParams,
+          },
         ),
       ),
     );
@@ -282,25 +292,19 @@ export class EntityNodeRepository implements OnModuleInit {
     return perGroup
       .flat()
       .sort((a, b) => (b['score'] as number) - (a['score'] as number))
-      .slice(0, limit)
+      .slice(0, fromNeo4jInt(limit))
       .map((r) => this.mapRow(r));
   }
 
   async searchByBfs(
-    originNodeUuids: string[],
-    groupIds: string[],
-    limit: number,
+    params: SearchByBfsParams,
     filters?: SearchFilters,
-    maxDepth?: number,
   ): Promise<EntityNode[]> {
+    const { originNodeUuids, groupIds, limit, maxDepth } = params;
     if (originNodeUuids.length === 0) return [];
 
-    const depth = z
-      .number()
-      .int()
-      .positive()
-      .default(MAX_SEARCH_DEPTH)
-      .parse(maxDepth ?? MAX_SEARCH_DEPTH);
+    const depth =
+      maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
 
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'reachable')
@@ -317,7 +321,12 @@ export class EntityNodeRepository implements OnModuleInit {
               reachable.summary AS summary, reachable.attributes AS attributes,
               reachable.name_embedding AS name_embedding, labels(reachable) AS labels
        LIMIT $limit`,
-      { originNodeUuids, groupIds, limit, ...filterParams },
+      {
+        originNodeUuids,
+        groupIds,
+        limit,
+        ...filterParams,
+      },
     );
     return results.map((r) => this.mapRow(r));
   }

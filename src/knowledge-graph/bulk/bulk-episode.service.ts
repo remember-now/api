@@ -22,7 +22,12 @@ import {
   EntityEdge,
   EntityNode,
 } from '../models';
-import { GroupIdSchema } from '../neo4j';
+import {
+  GroupIdSchema,
+  RetrieveEpisodesParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '../neo4j';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -134,9 +139,11 @@ export class BulkEpisodeService {
     const prevEpisodesPerEpisode = await Promise.all(
       episodicNodes.map((ep) =>
         this.episodicNodeRepository.retrieveEpisodes(
-          ep.validAt,
-          PREVIOUS_EPISODES_WINDOW,
-          [ep.groupId],
+          RetrieveEpisodesParamsSchema.parse({
+            referenceTime: ep.validAt,
+            lastN: PREVIOUS_EPISODES_WINDOW,
+            groupIds: [ep.groupId],
+          }),
         ),
       ),
     );
@@ -565,15 +572,19 @@ export class BulkEpisodeService {
     const results = await Promise.all(
       nodes.flatMap((n) => [
         this.entityNodeRepository.searchByName(
-          n.name,
-          [groupId],
-          CANDIDATE_LIMIT,
+          SearchByTextParamsSchema.parse({
+            query: n.name,
+            groupIds: [groupId],
+            limit: CANDIDATE_LIMIT,
+          }),
         ),
         n.nameEmbedding !== null
           ? this.entityNodeRepository.searchBySimilarity(
-              n.nameEmbedding,
-              [groupId],
-              CANDIDATE_LIMIT,
+              SearchBySimilarityParamsSchema.parse({
+                embedding: n.nameEmbedding,
+                groupIds: [groupId],
+                limit: CANDIDATE_LIMIT,
+              }),
             )
           : Promise.resolve([] as EntityNode[]),
       ]),
@@ -593,15 +604,19 @@ export class BulkEpisodeService {
     const results = await Promise.all(
       edges.flatMap((e) => [
         this.entityEdgeRepository.searchByFact(
-          e.fact,
-          [groupId],
-          CANDIDATE_LIMIT,
+          SearchByTextParamsSchema.parse({
+            query: e.fact,
+            groupIds: [groupId],
+            limit: CANDIDATE_LIMIT,
+          }),
         ),
         e.factEmbedding !== null
           ? this.entityEdgeRepository.searchBySimilarity(
-              e.factEmbedding,
-              [groupId],
-              CANDIDATE_LIMIT,
+              SearchBySimilarityParamsSchema.parse({
+                embedding: e.factEmbedding,
+                groupIds: [groupId],
+                limit: CANDIDATE_LIMIT,
+              }),
             )
           : Promise.resolve([] as EntityEdge[]),
       ]),
