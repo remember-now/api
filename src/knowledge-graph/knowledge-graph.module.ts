@@ -20,6 +20,7 @@ import {
   EntityNodeRepository,
   EpisodicEdgeRepository,
   EpisodicNodeRepository,
+  GdsCommunityRepository,
   HasEpisodeEdgeRepository,
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
@@ -37,6 +38,7 @@ const repositories = [
   CommunityEdgeRepository,
   HasEpisodeEdgeRepository,
   NextEpisodeEdgeRepository,
+  GdsCommunityRepository,
 ];
 
 const extractionServices = [

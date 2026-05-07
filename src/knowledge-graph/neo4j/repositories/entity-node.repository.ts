@@ -331,6 +331,29 @@ export class EntityNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
+  async getNodeDistanceScores(
+    nodeUuids: UuidArray,
+    centerNodeUuid: Uuid,
+  ): Promise<{ uuid: string; score: number }[]> {
+    return this.neo4j.executeRead<{ uuid: string; score: number }>(
+      /* cypher */ `UNWIND $nodeUuids AS nodeUuid
+       MATCH (center:Entity {uuid: $centerUuid})-[:RELATES_TO]-(n:Entity {uuid: nodeUuid})
+       RETURN 1 AS score, nodeUuid AS uuid`,
+      { nodeUuids, centerUuid: centerNodeUuid },
+    );
+  }
+
+  async getEpisodeMentionCounts(
+    nodeUuids: UuidArray,
+  ): Promise<{ uuid: string; score: number }[]> {
+    return this.neo4j.executeRead<{ uuid: string; score: number }>(
+      /* cypher */ `UNWIND $nodeUuids AS nodeUuid
+       MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: nodeUuid})
+       RETURN count(*) AS score, n.uuid AS uuid`,
+      { nodeUuids },
+    );
+  }
+
   private mapRow(row: Record<string, unknown>): EntityNode {
     return {
       uuid: row['uuid'] as string,

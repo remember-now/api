@@ -5,11 +5,12 @@ import { LlmService } from '@/llm/llm.service';
 import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
-import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
+  EntityEdgeRepository,
   EntityNodeRepository,
+  GdsCommunityRepository,
 } from '../neo4j/repositories';
 import {
   CommunityService,
@@ -21,7 +22,9 @@ describe('CommunityService', () => {
 
   let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
   let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
-  let mockNeo4jService: ReturnType<typeof mockDeep<Neo4jService>>;
+  let mockEntityEdgeRepository: ReturnType<
+    typeof mockDeep<EntityEdgeRepository>
+  >;
   let mockEntityNodeRepository: ReturnType<
     typeof mockDeep<EntityNodeRepository>
   >;
@@ -31,6 +34,9 @@ describe('CommunityService', () => {
   let mockCommunityEdgeRepository: ReturnType<
     typeof mockDeep<CommunityEdgeRepository>
   >;
+  let mockGdsCommunityRepository: ReturnType<
+    typeof mockDeep<GdsCommunityRepository>
+  >;
 
   let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
   let mockRunnable: { invoke: jest.Mock };
@@ -38,10 +44,11 @@ describe('CommunityService', () => {
   beforeEach(() => {
     mockLlmService = mockDeep<LlmService>();
     mockEmbeddingService = mockDeep<EmbeddingService>();
-    mockNeo4jService = mockDeep<Neo4jService>();
+    mockEntityEdgeRepository = mockDeep<EntityEdgeRepository>();
     mockEntityNodeRepository = mockDeep<EntityNodeRepository>();
     mockCommunityNodeRepository = mockDeep<CommunityNodeRepository>();
     mockCommunityEdgeRepository = mockDeep<CommunityEdgeRepository>();
+    mockGdsCommunityRepository = mockDeep<GdsCommunityRepository>();
 
     mockModel = mockDeep<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
@@ -51,10 +58,11 @@ describe('CommunityService', () => {
     service = new CommunityService(
       mockLlmService,
       mockEmbeddingService,
-      mockNeo4jService,
+      mockEntityEdgeRepository,
       mockEntityNodeRepository,
       mockCommunityNodeRepository,
       mockCommunityEdgeRepository,
+      mockGdsCommunityRepository,
     );
 
     mockLlmService.getActiveModel.mockResolvedValue(mockModel);
@@ -70,15 +78,16 @@ describe('CommunityService', () => {
 
   describe('guard: no Entity edges exist', () => {
     beforeEach(() => {
-      mockNeo4jService.executeRead.mockResolvedValue([{ hasEdges: false }]);
+      mockEntityEdgeRepository.hasRelatesEdgesForGroup.mockResolvedValue(false);
     });
 
     it('should return early without projecting GDS graph', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      // Only the guard query should be called
-      expect(mockNeo4jService.executeRead).toHaveBeenCalledTimes(1);
-      expect(mockNeo4jService.executeWrite).not.toHaveBeenCalled();
+      expect(
+        mockEntityEdgeRepository.hasRelatesEdgesForGroup,
+      ).toHaveBeenCalledTimes(1);
+      expect(mockGdsCommunityRepository.projectGraph).not.toHaveBeenCalled();
       expect(mockLlmService.getActiveModel).not.toHaveBeenCalled();
     });
 
@@ -99,54 +108,47 @@ describe('CommunityService', () => {
     ];
 
     beforeEach(() => {
-      // guard + Leiden stream go through executeRead (calls[0] and calls[1])
-      mockNeo4jService.executeRead
-        .mockResolvedValueOnce([{ hasEdges: true }]) // guard
-        .mockResolvedValueOnce(leidenResults); // Leiden stream
-      // GDS project + graph drop go through executeWrite (calls[0] and calls[1])
-      mockNeo4jService.executeWrite
-        .mockResolvedValueOnce([]) // GDS project
-        .mockResolvedValueOnce([]); // graph drop
+      mockEntityEdgeRepository.hasRelatesEdgesForGroup.mockResolvedValue(true);
+      mockGdsCommunityRepository.projectGraph.mockResolvedValue(undefined);
+      mockGdsCommunityRepository.runLeiden.mockResolvedValue(leidenResults);
+      mockGdsCommunityRepository.dropGraph.mockResolvedValue(undefined);
     });
 
-    it('should call GDS graph project cypher', async () => {
+    it('should call GDS graph project with groupId', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      const projectCall = mockNeo4jService.executeWrite.mock.calls[0];
-      expect(projectCall[0]).toContain('gds.graph.project');
-      expect(projectCall[1]).toMatchObject({ groupId: KG_TEST_GROUP_ID });
+      expect(mockGdsCommunityRepository.projectGraph).toHaveBeenCalledWith(
+        expect.any(String),
+        KG_TEST_GROUP_ID,
+      );
     });
 
-    it('should call Leiden stream cypher', async () => {
+    it('should call Leiden stream', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      const leidenCall = mockNeo4jService.executeRead.mock.calls[1];
-      expect(leidenCall[0]).toContain('gds.leiden.stream');
+      expect(mockGdsCommunityRepository.runLeiden).toHaveBeenCalledWith(
+        expect.any(String),
+      );
     });
 
     it('should call gds.graph.drop in finally', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
-      expect(dropCall[0]).toContain('gds.graph.drop');
+      expect(mockGdsCommunityRepository.dropGraph).toHaveBeenCalledWith(
+        expect.any(String),
+      );
     });
 
     it('should drop graph even if Leiden throws', async () => {
-      mockNeo4jService.executeRead.mockReset();
-      mockNeo4jService.executeWrite.mockReset();
-      mockNeo4jService.executeRead
-        .mockResolvedValueOnce([{ hasEdges: true }])
-        .mockRejectedValueOnce(new Error('Leiden failed'));
-      mockNeo4jService.executeWrite
-        .mockResolvedValueOnce([]) // GDS project
-        .mockResolvedValueOnce([]); // graph drop (in finally)
+      mockGdsCommunityRepository.runLeiden.mockRejectedValueOnce(
+        new Error('Leiden failed'),
+      );
 
       await expect(
         service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID),
       ).rejects.toThrow('Leiden failed');
 
-      const dropCall = mockNeo4jService.executeWrite.mock.calls[1];
-      expect(dropCall[0]).toContain('gds.graph.drop');
+      expect(mockGdsCommunityRepository.dropGraph).toHaveBeenCalled();
     });
 
     it('should call LLM once per community', async () => {

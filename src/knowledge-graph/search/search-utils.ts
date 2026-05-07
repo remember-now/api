@@ -2,7 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
-import { Neo4jService } from '../neo4j/neo4j.service';
+import { EntityNodeRepository } from '../neo4j/repositories';
 import { DEFAULT_MMR_LAMBDA } from './search-config.types';
 
 // ─── RRF ─────────────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export function mmr(
  * Returns 1/score so closer nodes rank higher.
  */
 export async function nodeDistanceReranker(
-  neo4j: Neo4jService,
+  repo: EntityNodeRepository,
   nodeUuids: string[],
   centerNodeUuid: string,
   minScore = 0,
@@ -108,11 +108,9 @@ export async function nodeDistanceReranker(
   const scores = new Map<string, number>();
 
   if (filteredUuids.length > 0) {
-    const results = await neo4j.executeRead<{ uuid: string; score: number }>(
-      /* cypher */ `UNWIND $nodeUuids AS nodeUuid
-       MATCH (center:Entity {uuid: $centerUuid})-[:RELATES_TO]-(n:Entity {uuid: nodeUuid})
-       RETURN 1 AS score, nodeUuid AS uuid`,
-      { nodeUuids: filteredUuids, centerUuid: centerNodeUuid },
+    const results = await repo.getNodeDistanceScores(
+      filteredUuids,
+      centerNodeUuid,
     );
     for (const row of results) {
       scores.set(row.uuid, row.score);
@@ -152,7 +150,7 @@ export async function nodeDistanceReranker(
  * so the most-mentioned nodes rank highest.
  */
 export async function episodeMentionsReranker(
-  neo4j: Neo4jService,
+  repo: EntityNodeRepository,
   nodeUuidLists: string[][],
   minScore = 0,
 ): Promise<[string[], number[]]> {
@@ -160,12 +158,7 @@ export async function episodeMentionsReranker(
   const scores = new Map<string, number>();
 
   if (sortedUuids.length > 0) {
-    const results = await neo4j.executeRead<{ uuid: string; score: number }>(
-      /* cypher */ `UNWIND $nodeUuids AS nodeUuid
-       MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: nodeUuid})
-       RETURN count(*) AS score, n.uuid AS uuid`,
-      { nodeUuids: sortedUuids },
-    );
+    const results = await repo.getEpisodeMentionCounts(sortedUuids);
     for (const row of results) {
       scores.set(row.uuid, Number(row.score));
     }

@@ -11,6 +11,7 @@ import {
 import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
   GetByGroupIdsParams,
+  GroupId,
   SearchByBfsParams,
   SearchBySimilarityParams,
   SearchByTextParams,
@@ -391,6 +392,14 @@ export class EntityEdgeRepository implements OnModuleInit {
       },
     );
     return results.map((r) => this.mapRow(r));
+  }
+
+  async hasRelatesEdgesForGroup(groupId: GroupId): Promise<boolean> {
+    const results = await this.neo4j.executeRead<{ hasEdges: boolean }>(
+      /* cypher */ `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
+      { groupId },
+    );
+    return results[0]?.hasEdges ?? false;
   }
 
   private mapRow(row: Record<string, unknown>): EntityEdge {

@@ -343,4 +343,29 @@ describe('EntityNodeRepository', () => {
       );
     });
   });
+
+  describe('getNodeDistanceScores', () => {
+    it('should call executeRead with RELATES_TO match and correct params', async () => {
+      neo4j.executeRead.mockResolvedValue([]);
+      const nodeUuids = ['uuid-a', 'uuid-b'];
+      const centerUuid = 'uuid-center';
+      await repo.getNodeDistanceScores(nodeUuids, centerUuid);
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.stringContaining('RELATES_TO'),
+        { nodeUuids, centerUuid },
+      );
+    });
+  });
+
+  describe('getEpisodeMentionCounts', () => {
+    it('should call executeRead with MENTIONS match and correct params', async () => {
+      neo4j.executeRead.mockResolvedValue([]);
+      const nodeUuids = ['uuid-a', 'uuid-b'];
+      await repo.getEpisodeMentionCounts(nodeUuids);
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.stringContaining('MENTIONS'),
+        { nodeUuids },
+      );
+    });
+  });
 });

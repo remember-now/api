@@ -7,11 +7,12 @@ import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
 import { createCommunityEdge, createCommunityNode } from '../models';
-import { Neo4jService } from '../neo4j/neo4j.service';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
+  EntityEdgeRepository,
   EntityNodeRepository,
+  GdsCommunityRepository,
 } from '../neo4j/repositories';
 import { buildCommunitySummaryMessages } from './community-summary.prompts';
 
@@ -29,22 +30,19 @@ export class CommunityService {
   constructor(
     private readonly llmService: LlmService,
     private readonly embeddingService: EmbeddingService,
-    private readonly neo4jService: Neo4jService,
+    private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly communityNodeRepository: CommunityNodeRepository,
     private readonly communityEdgeRepository: CommunityEdgeRepository,
+    private readonly gdsCommunityRepository: GdsCommunityRepository,
   ) {}
 
   async buildCommunities(userId: number, groupId: string): Promise<void> {
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
-    const guardResult = await this.neo4jService.executeRead<{
-      hasEdges: boolean;
-    }>(
-      /* cypher */ `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
-      { groupId },
-    );
+    const hasEdges =
+      await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
 
-    if (!guardResult[0]?.hasEdges) {
+    if (!hasEdges) {
       await this.communityNodeRepository.deleteByGroupId(groupId);
       return;
     }
@@ -54,26 +52,14 @@ export class CommunityService {
 
     // 3. Project GDS graph
     const graphName = `community-${randomUUID()}`;
-    await this.neo4jService.executeWrite(
-      /* cypher */ `MATCH (source:Entity {group_id: $groupId})-[r:RELATES_TO]-(target:Entity {group_id: $groupId})
-       WITH gds.graph.project($graphName, source, target) AS g
-       RETURN g.graphName, g.nodeCount, g.relationshipCount`,
-      { groupId, graphName },
-    );
+    await this.gdsCommunityRepository.projectGraph(graphName, groupId);
 
     let communityMap!: Map<number, string[]>;
 
     try {
       // 4. Run Leiden
-      const leidenResults = await this.neo4jService.executeRead<{
-        uuid: string;
-        communityId: number;
-      }>(
-        /* cypher */ `CALL gds.leiden.stream($graphName, { randomSeed: 42 })
-         YIELD nodeId, communityId
-         RETURN gds.util.asNode(nodeId).uuid AS uuid, communityId`,
-        { graphName },
-      );
+      const leidenResults =
+        await this.gdsCommunityRepository.runLeiden(graphName);
 
       // 5. Group entity UUIDs by communityId
       communityMap = new Map<number, string[]>();
@@ -84,10 +70,7 @@ export class CommunityService {
       }
     } finally {
       // 6. Drop projection (always)
-      await this.neo4jService.executeWrite(
-        /* cypher */ `CALL gds.graph.drop($graphName, false)`,
-        { graphName },
-      );
+      await this.gdsCommunityRepository.dropGraph(graphName);
     }
 
     // 7. Delete old communities for this group

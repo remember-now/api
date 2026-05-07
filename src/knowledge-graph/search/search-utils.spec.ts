@@ -1,7 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
-import { Neo4jService } from '../neo4j/neo4j.service';
+import { EntityNodeRepository } from '../neo4j/repositories';
 import {
   crossEncoderReranker,
   episodeMentionsReranker,
@@ -134,20 +134,20 @@ describe('mmr', () => {
 // ─── nodeDistanceReranker ─────────────────────────────────────────────────────
 
 describe('nodeDistanceReranker', () => {
-  let neo4j: ReturnType<typeof mockDeep<Neo4jService>>;
+  let repo: ReturnType<typeof mockDeep<EntityNodeRepository>>;
 
   beforeEach(() => {
-    neo4j = mockDeep<Neo4jService>();
+    repo = mockDeep<EntityNodeRepository>();
   });
 
   afterEach(() => jest.clearAllMocks());
 
   it('places a directly connected node above an unconnected node', async () => {
     // 'b' is connected (DB returns score=1), 'c' is not (absent from DB)
-    neo4j.executeRead.mockResolvedValue([{ uuid: 'b', score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: 'b', score: 1 }]);
 
     const [uuids, scores] = await nodeDistanceReranker(
-      neo4j,
+      repo,
       ['b', 'c'],
       'center',
     );
@@ -158,10 +158,10 @@ describe('nodeDistanceReranker', () => {
   });
 
   it('prepends the center node at rank 1 when it is in the input list', async () => {
-    neo4j.executeRead.mockResolvedValue([{ uuid: 'b', score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: 'b', score: 1 }]);
 
     const [uuids, scores] = await nodeDistanceReranker(
-      neo4j,
+      repo,
       ['center', 'b', 'c'],
       'center',
     );
@@ -170,64 +170,59 @@ describe('nodeDistanceReranker', () => {
   });
 
   it('does not prepend the center node when it is absent from the input list', async () => {
-    neo4j.executeRead.mockResolvedValue([{ uuid: 'b', score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: 'b', score: 1 }]);
 
-    const [uuids] = await nodeDistanceReranker(neo4j, ['b', 'c'], 'center');
+    const [uuids] = await nodeDistanceReranker(repo, ['b', 'c'], 'center');
     expect(uuids[0]).toBe('b');
     expect(uuids).not.toContain('center');
   });
 
   it('filters unconnected nodes when minScore > 0', async () => {
-    neo4j.executeRead.mockResolvedValue([{ uuid: 'b', score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: 'b', score: 1 }]);
 
     // unconnected 'c' gets score 0, which is below minScore=0.5
-    const [uuids] = await nodeDistanceReranker(
-      neo4j,
-      ['b', 'c'],
-      'center',
-      0.5,
-    );
+    const [uuids] = await nodeDistanceReranker(repo, ['b', 'c'], 'center', 0.5);
     expect(uuids).not.toContain('c');
     expect(uuids).toContain('b');
   });
 
   it('returns empty and makes no DB call when nodeUuids is empty', async () => {
-    const [uuids, scores] = await nodeDistanceReranker(neo4j, [], 'center');
+    const [uuids, scores] = await nodeDistanceReranker(repo, [], 'center');
     expect(uuids).toEqual([]);
     expect(scores).toEqual([]);
-    expect(neo4j.executeRead).not.toHaveBeenCalled();
+    expect(repo.getNodeDistanceScores).not.toHaveBeenCalled();
   });
 
   it('returns only the center node and makes no DB call when it is the only input', async () => {
     const [uuids, scores] = await nodeDistanceReranker(
-      neo4j,
+      repo,
       ['center'],
       'center',
     );
     expect(uuids).toEqual(['center']);
     expect(scores[0]).toBeCloseTo(10); // 1 / 0.1
-    expect(neo4j.executeRead).not.toHaveBeenCalled();
+    expect(repo.getNodeDistanceScores).not.toHaveBeenCalled();
   });
 });
 
 // ─── episodeMentionsReranker ──────────────────────────────────────────────────
 
 describe('episodeMentionsReranker', () => {
-  let neo4j: ReturnType<typeof mockDeep<Neo4jService>>;
+  let repo: ReturnType<typeof mockDeep<EntityNodeRepository>>;
 
   beforeEach(() => {
-    neo4j = mockDeep<Neo4jService>();
+    repo = mockDeep<EntityNodeRepository>();
   });
 
   afterEach(() => jest.clearAllMocks());
 
   it('ranks the most-mentioned node first', async () => {
-    neo4j.executeRead.mockResolvedValue([
+    repo.getEpisodeMentionCounts.mockResolvedValue([
       { uuid: 'node-a', score: 20 },
       { uuid: 'node-b', score: 5 },
     ]);
 
-    const [uuids, scores] = await episodeMentionsReranker(neo4j, [
+    const [uuids, scores] = await episodeMentionsReranker(repo, [
       ['node-a', 'node-b'],
     ]);
     expect(uuids[0]).toBe('node-a');
@@ -238,12 +233,12 @@ describe('episodeMentionsReranker', () => {
 
   it('places zero-mention nodes after positively-mentioned nodes', async () => {
     // node-c is absent from DB result → sentinel score 0
-    neo4j.executeRead.mockResolvedValue([
+    repo.getEpisodeMentionCounts.mockResolvedValue([
       { uuid: 'node-a', score: 20 },
       { uuid: 'node-b', score: 5 },
     ]);
 
-    const [uuids] = await episodeMentionsReranker(neo4j, [
+    const [uuids] = await episodeMentionsReranker(repo, [
       ['node-a', 'node-b', 'node-c'],
     ]);
     expect(uuids.indexOf('node-a')).toBeLessThan(uuids.indexOf('node-c'));
@@ -251,13 +246,13 @@ describe('episodeMentionsReranker', () => {
   });
 
   it('excludes zero-mention nodes when minScore = 1', async () => {
-    neo4j.executeRead.mockResolvedValue([
+    repo.getEpisodeMentionCounts.mockResolvedValue([
       { uuid: 'node-a', score: 20 },
       { uuid: 'node-b', score: 5 },
     ]);
 
     const [uuids] = await episodeMentionsReranker(
-      neo4j,
+      repo,
       [['node-a', 'node-b', 'node-c']],
       1,
     );
@@ -267,16 +262,16 @@ describe('episodeMentionsReranker', () => {
   });
 
   it('returns empty and makes no DB call for empty input', async () => {
-    const [uuids, scores] = await episodeMentionsReranker(neo4j, [[]]);
+    const [uuids, scores] = await episodeMentionsReranker(repo, [[]]);
     expect(uuids).toEqual([]);
     expect(scores).toEqual([]);
-    expect(neo4j.executeRead).not.toHaveBeenCalled();
+    expect(repo.getEpisodeMentionCounts).not.toHaveBeenCalled();
   });
 
   it('returns all nodes with score 0 when none are mentioned', async () => {
-    neo4j.executeRead.mockResolvedValue([]);
+    repo.getEpisodeMentionCounts.mockResolvedValue([]);
 
-    const [uuids, scores] = await episodeMentionsReranker(neo4j, [
+    const [uuids, scores] = await episodeMentionsReranker(repo, [
       ['node-a', 'node-b'],
     ]);
     expect(uuids).toHaveLength(2);

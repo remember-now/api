@@ -330,4 +330,28 @@ describe('EntityEdgeRepository', () => {
       expect(results).toEqual([]);
     });
   });
+
+  describe('hasRelatesEdgesForGroup', () => {
+    it('should return true when executeRead returns hasEdges: true', async () => {
+      neo4j.executeRead.mockResolvedValue([{ hasEdges: true }]);
+      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      expect(result).toBe(true);
+      expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.stringContaining('RELATES_TO'),
+        { groupId: 'group-1' },
+      );
+    });
+
+    it('should return false when executeRead returns hasEdges: false', async () => {
+      neo4j.executeRead.mockResolvedValue([{ hasEdges: false }]);
+      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      expect(result).toBe(false);
+    });
+
+    it('should return false when executeRead returns empty results', async () => {
+      neo4j.executeRead.mockResolvedValue([]);
+      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      expect(result).toBe(false);
+    });
+  });
 });

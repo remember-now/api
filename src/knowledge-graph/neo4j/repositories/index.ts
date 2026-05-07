@@ -2,6 +2,7 @@ export * from './community-edge.repository';
 export * from './community-node.repository';
 export * from './entity-edge.repository';
 export * from './entity-node.repository';
+export * from './gds-community.repository';
 export * from './episodic-edge.repository';
 export * from './episodic-node.repository';
 export * from './has-episode-edge.repository';

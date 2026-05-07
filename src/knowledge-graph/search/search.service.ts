@@ -7,7 +7,6 @@ import { EmbeddingService } from '../embedding';
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
   GroupIdSchema,
-  Neo4jService,
   SearchByBfsParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
@@ -54,7 +53,6 @@ export class SearchService {
   constructor(
     private readonly llmService: LlmService,
     private readonly embeddingService: EmbeddingService,
-    private readonly neo4jService: Neo4jService,
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly episodicNodeRepository: EpisodicNodeRepository,
@@ -330,7 +328,7 @@ export class SearchService {
         ...new Set([...edgeMap.values()].map((e) => e.sourceNodeUuid)),
       ];
       const [rankedSourceUuids, sourceScores] = await nodeDistanceReranker(
-        this.neo4jService,
+        this.entityNodeRepository,
         sourceUuids,
         centerNodeUuid,
         rerankerMin,
@@ -500,14 +498,14 @@ export class SearchService {
         );
       }
       [rankedUuids, rankedScores] = await nodeDistanceReranker(
-        this.neo4jService,
+        this.entityNodeRepository,
         [...nodeMap.keys()],
         centerNodeUuid,
         rerankerMin,
       );
     } else if (reranker === NodeReranker.episode_mentions) {
       [rankedUuids, rankedScores] = await episodeMentionsReranker(
-        this.neo4jService,
+        this.entityNodeRepository,
         [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
         rerankerMin,
       );

@@ -26,10 +26,13 @@ export const GroupIdSchema = z
     'groupId must be non-empty and contain only alphanumeric characters, underscores, or hyphens',
   );
 
+export const GraphNameSchema = z.string().min(1);
+
 export const UuidSchema = z.uuid();
 export const UuidArraySchema = z.array(UuidSchema);
 
 export const SearchByTextParamsSchema = z.object({
+  // TODO: Should this string be optional?
   query: z.string().transform((q) => luceneSanitize(q)),
   groupIds: z.array(GroupIdSchema),
   limit: neoInt,
@@ -76,6 +79,7 @@ export const RetrieveEpisodesParamsSchema = z.object({
 // Types
 
 export type GroupId = z.infer<typeof GroupIdSchema>;
+export type GraphName = z.infer<typeof GraphNameSchema>;
 export type Uuid = z.infer<typeof UuidSchema>;
 export type UuidArray = z.infer<typeof UuidArraySchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
