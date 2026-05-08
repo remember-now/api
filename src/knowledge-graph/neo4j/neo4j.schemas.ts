@@ -36,7 +36,6 @@ export const GroupIdSchema = z
 export const GraphNameSchema = z.string().min(1).brand<'GraphName'>();
 
 export const UuidSchema = z.uuid().brand<'Uuid'>();
-export const UuidArraySchema = z.array(UuidSchema);
 
 export const SearchByTextParamsSchema = z.object({
   // TODO: Should this string be optional?
@@ -88,7 +87,6 @@ export const RetrieveEpisodesParamsSchema = z.object({
 export type GroupId = z.infer<typeof GroupIdSchema>;
 export type GraphName = z.infer<typeof GraphNameSchema>;
 export type Uuid = z.infer<typeof UuidSchema>;
-export type UuidArray = z.infer<typeof UuidArraySchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
 export type SearchBySimilarityParams = z.infer<
   typeof SearchBySimilarityParamsSchema

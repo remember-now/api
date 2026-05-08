@@ -6,7 +6,6 @@ import {
   GetByGroupIdsWithCursorParams,
   GroupId,
   Uuid,
-  UuidArray,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
@@ -70,7 +69,7 @@ export class HasEpisodeEdgeRepository implements OnModuleInit {
     );
   }
 
-  async deleteByUuids(uuids: UuidArray): Promise<void> {
+  async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:HAS_EPISODE]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
@@ -88,7 +87,7 @@ export class HasEpisodeEdgeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: UuidArray): Promise<HasEpisodeEdge[]> {
+  async getByUuids(uuids: Uuid[]): Promise<HasEpisodeEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (saga:Saga)-[e:HAS_EPISODE]->(episode:Episodic)
        WHERE e.uuid IN $uuids

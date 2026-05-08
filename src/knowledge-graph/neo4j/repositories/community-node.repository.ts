@@ -14,7 +14,6 @@ import {
   SearchBySimilarityParams,
   SearchByTextParams,
   Uuid,
-  UuidArray,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
@@ -138,7 +137,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     );
   }
 
-  async deleteByUuids(uuids: UuidArray): Promise<void> {
+  async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Community) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
@@ -164,7 +163,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: UuidArray): Promise<CommunityNode[]> {
+  async getByUuids(uuids: Uuid[]): Promise<CommunityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Community) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,

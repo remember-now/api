@@ -16,7 +16,6 @@ import {
   SearchBySimilarityParams,
   SearchByTextParams,
   Uuid,
-  UuidArray,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
@@ -180,7 +179,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     );
   }
 
-  async deleteByUuids(uuids: UuidArray): Promise<void> {
+  async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:RELATES_TO]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
@@ -202,7 +201,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: UuidArray): Promise<EntityEdge[]> {
+  async getByUuids(uuids: Uuid[]): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.uuid IN $uuids

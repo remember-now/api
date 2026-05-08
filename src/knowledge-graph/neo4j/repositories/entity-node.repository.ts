@@ -16,7 +16,6 @@ import {
   SearchBySimilarityParams,
   SearchByTextParams,
   Uuid,
-  UuidArray,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
@@ -154,7 +153,7 @@ export class EntityNodeRepository implements OnModuleInit {
     );
   }
 
-  async deleteByUuids(uuids: UuidArray): Promise<void> {
+  async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
@@ -191,7 +190,7 @@ export class EntityNodeRepository implements OnModuleInit {
     return this.mapRow(results[0]);
   }
 
-  async getByUuids(uuids: UuidArray): Promise<EntityNode[]> {
+  async getByUuids(uuids: Uuid[]): Promise<EntityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (n:Entity) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
@@ -332,7 +331,7 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async getNodeDistanceScores(
-    nodeUuids: UuidArray,
+    nodeUuids: Uuid[],
     centerNodeUuid: Uuid,
   ): Promise<{ uuid: Uuid; score: number }[]> {
     return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
@@ -344,7 +343,7 @@ export class EntityNodeRepository implements OnModuleInit {
   }
 
   async getEpisodeMentionCounts(
-    nodeUuids: UuidArray,
+    nodeUuids: Uuid[],
   ): Promise<{ uuid: Uuid; score: number }[]> {
     return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
