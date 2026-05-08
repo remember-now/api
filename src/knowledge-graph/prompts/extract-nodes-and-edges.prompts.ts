@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
 import { EpisodicNode } from '../models';
-import { concatenateEpisodes } from '../utils/text-utils';
+import { concatenateEpisodes } from './text-utils';
 
 // Schemas
 

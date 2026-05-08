@@ -6,7 +6,7 @@ import {
 import { z } from 'zod';
 
 import { EpisodicNode } from '../models';
-import { MAX_SUMMARY_CHARS, truncateAtSentence } from '../utils/text-utils';
+import { MAX_SUMMARY_CHARS, truncateAtSentence } from './text-utils';
 
 // Schema
 

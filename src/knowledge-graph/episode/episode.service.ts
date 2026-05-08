@@ -37,6 +37,7 @@ import {
   buildExtractEdgeAttributesMessages,
   buildExtractEntityAttributesMessages,
 } from '../prompts';
+import { buildNodeSummaryMessages } from '../prompts/node-summary.prompts';
 import {
   buildSummarizeSagaMessages,
   sagaSummaryJsonSchema,
@@ -49,7 +50,6 @@ import {
   getApplicableEdgeTypes,
   nodeSummaryJsonSchema,
 } from './episode.types';
-import { buildNodeSummaryMessages } from './node-summary.prompts';
 
 const PREVIOUS_EPISODES_WINDOW = 20;
 const MAX_NODES_PER_SUMMARY_BATCH = 30;

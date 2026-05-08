@@ -10,7 +10,6 @@ import {
   getApplicableEdgeTypes,
   nodeSummaryJsonSchema,
 } from '../episode/episode.types';
-import { buildNodeSummaryMessages } from '../episode/node-summary.prompts';
 import {
   CombinedExtractionService,
   EdgeExtractionService,
@@ -38,6 +37,7 @@ import {
   buildExtractEdgeAttributesMessages,
   buildExtractEntityAttributesMessages,
 } from '../prompts';
+import { buildNodeSummaryMessages } from '../prompts/node-summary.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,
