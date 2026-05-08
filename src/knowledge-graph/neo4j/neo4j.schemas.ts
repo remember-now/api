@@ -16,16 +16,14 @@ export enum EpisodeType {
 
 // Schemas
 
-export const NodeLabelsSchema = z
-  .array(
-    z
-      .string()
-      .regex(
-        /^[A-Za-z_][A-Za-z0-9_]*$/,
-        'node label must start with a letter or underscore and contain only alphanumeric characters or underscores',
-      ),
-  )
-  .min(1);
+export const NodeLabelSchema = z
+  .string()
+  .regex(
+    /^[A-Za-z_][A-Za-z0-9_]*$/,
+    'node label must start with a letter or underscore and contain only alphanumeric characters or underscores',
+  );
+
+export const NodeLabelsSchema = z.array(NodeLabelSchema).min(1);
 
 export const GroupIdSchema = z
   .string()

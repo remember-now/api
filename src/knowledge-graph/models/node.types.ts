@@ -6,7 +6,7 @@ import {
   EpisodeType,
   GroupId,
   GroupIdSchema,
-  NodeLabelsSchema,
+  NodeLabelSchema,
   Uuid,
   UuidSchema,
 } from '../neo4j/neo4j.schemas';
@@ -17,7 +17,7 @@ export const NodeBaseSchema = z.object({
   uuid: UuidSchema,
   name: z.string().min(1),
   groupId: GroupIdSchema,
-  labels: NodeLabelsSchema,
+  labels: z.array(NodeLabelSchema),
   createdAt: z.date(),
 });
 
