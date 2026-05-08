@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   CommunityEdge,
   createCommunityEdge,
@@ -13,7 +11,7 @@ import {
   NextEpisodeEdge,
 } from '@/knowledge-graph/models';
 
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from './kg-constants';
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from './kg-constants';
 
 export class KgEdgeFactory {
   static createEntityEdge(opts: Partial<EntityEdge> = {}): EntityEdge {
@@ -21,8 +19,8 @@ export class KgEdgeFactory {
       name: 'related_to',
       fact: 'A is related to B',
       groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: randomUUID(),
-      targetNodeUuid: randomUUID(),
+      sourceNodeUuid: kgUuid(),
+      targetNodeUuid: kgUuid(),
       validAt: KG_REFERENCE_TIME,
       ...opts,
     });
@@ -31,8 +29,8 @@ export class KgEdgeFactory {
   static createEpisodicEdge(opts: Partial<EpisodicEdge> = {}): EpisodicEdge {
     return createEpisodicEdge({
       groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: randomUUID(),
-      targetNodeUuid: randomUUID(),
+      sourceNodeUuid: kgUuid(),
+      targetNodeUuid: kgUuid(),
       ...opts,
     });
   }
@@ -42,8 +40,8 @@ export class KgEdgeFactory {
   ): HasEpisodeEdge {
     return createHasEpisodeEdge({
       groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: randomUUID(),
-      targetNodeUuid: randomUUID(),
+      sourceNodeUuid: kgUuid(),
+      targetNodeUuid: kgUuid(),
       ...opts,
     });
   }
@@ -53,8 +51,8 @@ export class KgEdgeFactory {
   ): NextEpisodeEdge {
     return createNextEpisodeEdge({
       groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: randomUUID(),
-      targetNodeUuid: randomUUID(),
+      sourceNodeUuid: kgUuid(),
+      targetNodeUuid: kgUuid(),
       ...opts,
     });
   }
@@ -62,8 +60,8 @@ export class KgEdgeFactory {
   static createCommunityEdge(opts: Partial<CommunityEdge> = {}): CommunityEdge {
     return createCommunityEdge({
       groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: randomUUID(),
-      targetNodeUuid: randomUUID(),
+      sourceNodeUuid: kgUuid(),
+      targetNodeUuid: kgUuid(),
       ...opts,
     });
   }

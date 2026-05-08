@@ -4,7 +4,7 @@ import neoDriver from 'neo4j-driver';
 import { EpisodeType } from '@/knowledge-graph/models';
 import { RetrieveEpisodesParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KG_REFERENCE_TIME, KgNodeFactory } from '@/test/factories';
+import { KG_REFERENCE_TIME, KgNodeFactory, kgUuid } from '@/test/factories';
 
 import { EpisodicNodeRepository } from './episodic-node.repository';
 
@@ -45,11 +45,12 @@ describe('EpisodicNodeRepository', () => {
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
+      const uuid = kgUuid();
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -57,7 +58,7 @@ describe('EpisodicNodeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 
@@ -89,11 +90,12 @@ describe('EpisodicNodeRepository', () => {
 
   describe('getByEntityNodeUuid', () => {
     it('should query with MENTIONS relationship', async () => {
+      const entityNodeUuid = kgUuid();
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByEntityNodeUuid('entity-uuid');
+      await repo.getByEntityNodeUuid(entityNodeUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),
-        expect.objectContaining({ entityNodeUuid: 'entity-uuid' }),
+        expect.objectContaining({ entityNodeUuid }),
       );
     });
   });

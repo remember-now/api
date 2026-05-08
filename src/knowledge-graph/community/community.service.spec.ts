@@ -6,6 +6,7 @@ import { LlmService } from '@/llm/llm.service';
 import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
+import { Uuid } from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
@@ -90,9 +91,9 @@ describe('CommunityService', () => {
 
   describe('when Entity edges exist', () => {
     const leidenResults = [
-      { uuid: 'entity-1', communityId: 0 },
-      { uuid: 'entity-2', communityId: 0 },
-      { uuid: 'entity-3', communityId: 1 },
+      { uuid: 'entity-1' as Uuid, communityId: 0 },
+      { uuid: 'entity-2' as Uuid, communityId: 0 },
+      { uuid: 'entity-3' as Uuid, communityId: 1 },
     ];
 
     beforeEach(() => {

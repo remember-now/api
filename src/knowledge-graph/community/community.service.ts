@@ -7,6 +7,7 @@ import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
 import { createCommunityEdge, createCommunityNode } from '../models';
+import { GraphNameSchema, GroupId, Uuid } from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
@@ -37,7 +38,7 @@ export class CommunityService {
     private readonly gdsCommunityRepository: GdsCommunityRepository,
   ) {}
 
-  async buildCommunities(userId: number, groupId: string): Promise<void> {
+  async buildCommunities(userId: number, groupId: GroupId): Promise<void> {
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
     const hasEdges =
       await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
@@ -51,10 +52,10 @@ export class CommunityService {
     const model = await this.llmService.getActiveModel(userId);
 
     // 3. Project GDS graph
-    const graphName = `community-${randomUUID()}`;
+    const graphName = GraphNameSchema.parse(`community-${randomUUID()}`);
     await this.gdsCommunityRepository.projectGraph(graphName, groupId);
 
-    let communityMap!: Map<number, string[]>;
+    let communityMap!: Map<number, Uuid[]>;
 
     try {
       // 4. Run Leiden
@@ -62,7 +63,7 @@ export class CommunityService {
         await this.gdsCommunityRepository.runLeiden(graphName);
 
       // 5. Group entity UUIDs by communityId
-      communityMap = new Map<number, string[]>();
+      communityMap = new Map<number, Uuid[]>();
       for (const row of leidenResults) {
         const existing = communityMap.get(row.communityId) ?? [];
         existing.push(row.uuid);

@@ -15,6 +15,7 @@ import {
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
+import { Uuid } from '../neo4j/neo4j.schemas';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -26,6 +27,8 @@ import {
 } from '../neo4j/repositories';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { EpisodeService } from './episode.service';
+
+const u = (s: string) => s as Uuid;
 
 const baseOptions = {
   userId: KG_TEST_USER_ID,
@@ -182,9 +185,9 @@ describe('EpisodeService', () => {
     const resolvedNode = KgNodeFactory.createEntityNode({ name: 'Alice' });
     const existingNode = {
       ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
-      uuid: 'existing-bob-uuid',
+      uuid: u('existing-bob-uuid'),
     };
-    const uuidMap = new Map([['temp-uuid', existingNode.uuid]]);
+    const uuidMap = new Map<Uuid, Uuid>([[u('temp-uuid'), existingNode.uuid]]);
 
     // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
     mockNodeExtractionService.extractNodes.mockResolvedValue([resolvedNode]);
@@ -217,7 +220,7 @@ describe('EpisodeService', () => {
     const edge = KgEdgeFactory.createEntityEdge({
       name: 'WORKS_AT',
       sourceNodeUuid: node.uuid,
-      targetNodeUuid: 'target-uuid',
+      targetNodeUuid: u('target-uuid'),
       fact: 'Alice works at Acme Corp',
     });
     mockEdgeExtractionService.extractEdges.mockResolvedValue([edge]);
@@ -230,18 +233,18 @@ describe('EpisodeService', () => {
   it('should call resolveEdges with embedded edges and uuidMap', async () => {
     const edge = KgEdgeFactory.createEntityEdge({
       name: 'WORKS_AT',
-      sourceNodeUuid: 'src',
-      targetNodeUuid: 'tgt',
+      sourceNodeUuid: u('src'),
+      targetNodeUuid: u('tgt'),
       fact: 'Alice works at Acme Corp',
     });
     const embeddedEdge = { ...edge, factEmbedding: [1, 0, 0] };
     const existingEdge = KgEdgeFactory.createEntityEdge({
       name: 'WORKS_AT',
-      sourceNodeUuid: 'src2',
-      targetNodeUuid: 'tgt2',
+      sourceNodeUuid: u('src2'),
+      targetNodeUuid: u('tgt2'),
       fact: 'Alice works at Acme Corp',
     });
-    const uuidMap = new Map<string, string>();
+    const uuidMap = new Map<Uuid, Uuid>();
 
     mockEmbeddingService.embedEdges.mockResolvedValue([embeddedEdge]);
     mockEntityEdgeRepository.searchByFact.mockResolvedValue([existingEdge]);
@@ -301,8 +304,8 @@ describe('EpisodeService', () => {
   it('should save invalidated edges via entityEdgeRepository.saveBulk', async () => {
     const invalidated = KgEdgeFactory.createEntityEdge({
       name: 'WORKS_AT',
-      sourceNodeUuid: 'src',
-      targetNodeUuid: 'tgt',
+      sourceNodeUuid: u('src'),
+      targetNodeUuid: u('tgt'),
       fact: 'Alice works at Acme Corp',
     });
     mockEdgeResolutionService.resolveEdges.mockResolvedValue({
@@ -323,9 +326,9 @@ describe('EpisodeService', () => {
     const resolvedNode = KgNodeFactory.createEntityNode({ name: 'Alice' });
     const existingNode = {
       ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
-      uuid: 'bob-uuid',
+      uuid: u('bob-uuid'),
     };
-    const uuidMap = new Map([['some-uuid', existingNode.uuid]]);
+    const uuidMap = new Map<Uuid, Uuid>([[u('some-uuid'), existingNode.uuid]]);
 
     // Provide a non-empty embedNodes result so collectNodeCandidates fires a search
     mockNodeExtractionService.extractNodes.mockResolvedValue([resolvedNode]);
@@ -373,7 +376,7 @@ describe('EpisodeService', () => {
       validAt: KG_REFERENCE_TIME,
       groupId: KG_TEST_GROUP_ID,
     });
-    prevEpisode.uuid = 'prev-episode-uuid';
+    prevEpisode.uuid = u('prev-episode-uuid');
 
     mockSagaNodeRepository.save.mockResolvedValue('saga-uuid');
     mockHasEpisodeEdgeRepository.save.mockResolvedValue('has-episode-uuid');
@@ -411,7 +414,7 @@ describe('EpisodeService', () => {
     const edge = KgEdgeFactory.createEntityEdge({
       name: 'WORKS_AT',
       sourceNodeUuid: node.uuid,
-      targetNodeUuid: 'target',
+      targetNodeUuid: u('target'),
       fact: 'Alice works at Acme Corp',
     });
 

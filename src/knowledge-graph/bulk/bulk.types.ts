@@ -10,16 +10,17 @@ import {
   EpisodicEdge,
   EpisodicNode,
 } from '../models';
+import { GroupId, Uuid } from '../neo4j/neo4j.schemas';
 
 export interface RawEpisode {
-  uuid?: string;
+  uuid?: Uuid;
   name: string;
   content: string;
   source: EpisodeType;
   sourceDescription: string;
   referenceTime: Date;
-  groupId: string;
-  sagaUuid?: string;
+  groupId: GroupId;
+  sagaUuid?: Uuid;
 }
 
 export interface AddBulkEpisodeOptions {

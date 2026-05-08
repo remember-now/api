@@ -8,7 +8,7 @@ import {
   SearchBySimilarityParamsSchema,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GROUP_ID, KgNodeFactory, kgUuid } from '@/test/factories';
 
 import { EntityNodeRepository } from './entity-node.repository';
 
@@ -144,22 +144,24 @@ describe('EntityNodeRepository', () => {
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
+      const uuid = kgUuid();
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
 
   describe('deleteByUuids', () => {
     it('should call DETACH DELETE with array of uuids', async () => {
+      const uuids = [kgUuid(), kgUuid()];
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.deleteByUuids(['uuid-1', 'uuid-2']);
+      await repo.deleteByUuids(uuids);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ uuids: ['uuid-1', 'uuid-2'] }),
+        expect.objectContaining({ uuids }),
       );
     });
   });
@@ -167,10 +169,10 @@ describe('EntityNodeRepository', () => {
   describe('deleteByGroupId', () => {
     it('should call DETACH DELETE with groupId', async () => {
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.deleteByGroupId('group-1');
+      await repo.deleteByGroupId(KG_TEST_GROUP_ID);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ groupId: 'group-1' }),
+        expect.objectContaining({ groupId: KG_TEST_GROUP_ID }),
       );
     });
   });
@@ -178,7 +180,7 @@ describe('EntityNodeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 
@@ -204,11 +206,12 @@ describe('EntityNodeRepository', () => {
     });
 
     it('should query by uuid', async () => {
+      const uuid = kgUuid();
       neo4j.executeRead.mockResolvedValue([]);
-      await repo.getByUuid('some-uuid');
+      await repo.getByUuid(uuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('uuid: $uuid'),
-        expect.objectContaining({ uuid: 'some-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -216,7 +219,7 @@ describe('EntityNodeRepository', () => {
   describe('getByUuids', () => {
     it('should return empty array when no results', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuids(['uuid-1']);
+      const result = await repo.getByUuids([kgUuid()]);
       expect(result).toEqual([]);
     });
 
@@ -347,8 +350,8 @@ describe('EntityNodeRepository', () => {
   describe('getNodeDistanceScores', () => {
     it('should call executeRead with RELATES_TO match and correct params', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const nodeUuids = ['uuid-a', 'uuid-b'];
-      const centerUuid = 'uuid-center';
+      const nodeUuids = [kgUuid(), kgUuid()];
+      const centerUuid = kgUuid();
       await repo.getNodeDistanceScores(nodeUuids, centerUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
@@ -360,7 +363,7 @@ describe('EntityNodeRepository', () => {
   describe('getEpisodeMentionCounts', () => {
     it('should call executeRead with MENTIONS match and correct params', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const nodeUuids = ['uuid-a', 'uuid-b'];
+      const nodeUuids = [kgUuid(), kgUuid()];
       await repo.getEpisodeMentionCounts(nodeUuids);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),

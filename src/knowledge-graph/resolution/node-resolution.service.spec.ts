@@ -10,7 +10,10 @@ import {
 } from '@/test/factories';
 
 import { EntityNode } from '../models';
+import { Uuid } from '../neo4j/neo4j.schemas';
 import { NodeResolutionService } from './node-resolution.service';
+
+const u = (s: string) => s as Uuid;
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
@@ -41,7 +44,7 @@ describe('NodeResolutionService', () => {
   it('should resolve exact name match without LLM call', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)]; // normalizes to same
-    existing[0].uuid = 'existing-uuid';
+    existing[0].uuid = u('existing-uuid');
 
     const result = await service.resolveNodes(
       mockModel,
@@ -58,7 +61,7 @@ describe('NodeResolutionService', () => {
   it('should add duplicate pair for exact name match', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)];
-    existing[0].uuid = 'existing-uuid';
+    existing[0].uuid = u('existing-uuid');
 
     const result = await service.resolveNodes(
       mockModel,
@@ -70,14 +73,14 @@ describe('NodeResolutionService', () => {
     expect(result.duplicatePairs).toHaveLength(1);
     expect(result.duplicatePairs[0]).toEqual({
       extractedUuid: extracted[0].uuid,
-      canonicalUuid: 'existing-uuid',
+      canonicalUuid: u('existing-uuid'),
     });
   });
 
   it('should escalate single cosine candidate to LLM', async () => {
     const extracted = [makeNode('Alice Johnson', KG_HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('Alice J.', KG_NEAR_SAME_EMBEDDING)];
-    existing[0].uuid = 'cosine-uuid';
+    existing[0].uuid = u('cosine-uuid');
 
     mockRunnable.invoke.mockResolvedValue({
       entity_resolutions: [
@@ -100,7 +103,7 @@ describe('NodeResolutionService', () => {
   it('should add as new node when LLM rejects single cosine candidate', async () => {
     const extracted = [makeNode('Alice Johnson', KG_HIGH_SIM_EMBEDDING)];
     const existing = [makeNode('Alice J.', KG_NEAR_SAME_EMBEDDING)];
-    existing[0].uuid = 'cosine-uuid';
+    existing[0].uuid = u('cosine-uuid');
 
     mockRunnable.invoke.mockResolvedValue({
       entity_resolutions: [
@@ -123,8 +126,14 @@ describe('NodeResolutionService', () => {
   it('should escalate multiple cosine candidates to LLM', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      {
+        ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-1'),
+      },
+      {
+        ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-2'),
+      },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -147,8 +156,14 @@ describe('NodeResolutionService', () => {
   it('should add duplicate pair when LLM returns a duplicate_name match', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      {
+        ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-1'),
+      },
+      {
+        ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-2'),
+      },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -174,8 +189,14 @@ describe('NodeResolutionService', () => {
   it('should add node to resolvedNodes when LLM returns empty duplicate_name', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      {
+        ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-1'),
+      },
+      {
+        ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-2'),
+      },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -199,8 +220,14 @@ describe('NodeResolutionService', () => {
   it('should map uuid when LLM returns duplicate_name matching an existing node', async () => {
     const extracted = [makeNode('Alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      {
+        ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-1'),
+      },
+      {
+        ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-2'),
+      },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -222,8 +249,14 @@ describe('NodeResolutionService', () => {
   it('should apply canonical name from LLM when different from extracted name', async () => {
     const extracted = [makeNode('alice', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
-      { ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-1' },
-      { ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING), uuid: 'exist-2' },
+      {
+        ...makeNode('Alice Smith', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-1'),
+      },
+      {
+        ...makeNode('Alice Jones', KG_NEAR_SAME_EMBEDDING),
+        uuid: u('exist-2'),
+      },
     ];
 
     mockRunnable.invoke.mockResolvedValue({
@@ -246,7 +279,7 @@ describe('NodeResolutionService', () => {
     const existing = [
       {
         ...makeNode('Bobby', KG_DIFF_EMBEDDING),
-        uuid: 'bob-exist',
+        uuid: u('bob-exist'),
       },
     ];
 
@@ -275,7 +308,7 @@ describe('NodeResolutionService', () => {
     const existing = [
       {
         ...makeNode('alicia', KG_DIFF_EMBEDDING),
-        uuid: 'alicia-exist',
+        uuid: u('alicia-exist'),
       },
     ];
 

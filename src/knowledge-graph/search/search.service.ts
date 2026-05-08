@@ -6,10 +6,11 @@ import { LlmService } from '@/llm/llm.service';
 import { EmbeddingService } from '../embedding';
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
-  GroupIdSchema,
+  GroupId,
   SearchByBfsParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
+  Uuid,
 } from '../neo4j';
 import {
   CommunityNodeRepository,
@@ -60,9 +61,9 @@ export class SearchService {
   ) {}
 
   async searchFromNodes(options: {
-    nodeUuids: string[];
+    nodeUuids: Uuid[];
     query: string;
-    groupIds: string[];
+    groupIds: GroupId[];
     config: SearchConfig;
     userId: number;
     filters?: SearchFilters;
@@ -90,9 +91,6 @@ export class SearchService {
       originNodeUuids,
     } = options;
 
-    for (const groupId of groupIds) {
-      GroupIdSchema.parse(groupId);
-    }
     const limit = config.limit ?? DEFAULT_SEARCH_LIMIT;
     const minScore = config.rerankerMinScore ?? 0;
 
@@ -212,21 +210,21 @@ export class SearchService {
   private async edgeSearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: string[],
+    groupIds: GroupId[],
     config: EdgeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: string,
-    originNodeUuids?: string[],
+    centerNodeUuid?: Uuid,
+    originNodeUuids?: Uuid[],
   ): Promise<[EntityEdge[], number[]]> {
     const fetch = 2 * limit;
-    const edgeMap = new Map<string, EntityEdge>();
+    const edgeMap = new Map<Uuid, EntityEdge>();
 
-    const bm25Uuids: string[] = [];
-    const cosineUuids: string[] = [];
-    let bfsUuids: string[] = [];
+    const bm25Uuids: Uuid[] = [];
+    const cosineUuids: Uuid[] = [];
+    let bfsUuids: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -291,7 +289,7 @@ export class SearchService {
     const reranker = config.reranker;
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    let rankedUuids: string[];
+    let rankedUuids: Uuid[];
     let rankedScores: number[];
 
     if (reranker === EdgeReranker.rrf) {
@@ -300,7 +298,7 @@ export class SearchService {
         rerankerMin,
       );
     } else if (reranker === EdgeReranker.mmr && queryVector) {
-      const vectorPairs = new Map<string, number[]>();
+      const vectorPairs = new Map<Uuid, number[]>();
       for (const [uuid, edge] of edgeMap) {
         if (edge.factEmbedding) vectorPairs.set(uuid, edge.factEmbedding);
       }
@@ -337,7 +335,7 @@ export class SearchService {
       const sourceScoreMap = new Map(
         rankedSourceUuids.map((u, i) => [u, sourceScores[i]]),
       );
-      const edgeEntries: [string, number][] = [];
+      const edgeEntries: [Uuid, number][] = [];
       for (const [uuid, edge] of edgeMap) {
         const score = sourceScoreMap.get(edge.sourceNodeUuid);
         if (score !== undefined) edgeEntries.push([uuid, score]);
@@ -384,21 +382,21 @@ export class SearchService {
   private async nodeSearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: string[],
+    groupIds: GroupId[],
     config: NodeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: string,
-    originNodeUuids?: string[],
+    centerNodeUuid?: Uuid,
+    originNodeUuids?: Uuid[],
   ): Promise<[EntityNode[], number[]]> {
     const fetch = 2 * limit;
-    const nodeMap = new Map<string, EntityNode>();
+    const nodeMap = new Map<Uuid, EntityNode>();
 
-    const bm25Uuids: string[] = [];
-    const cosineUuids: string[] = [];
-    let bfsUuids: string[] = [];
+    const bm25Uuids: Uuid[] = [];
+    const cosineUuids: Uuid[] = [];
+    let bfsUuids: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -464,7 +462,7 @@ export class SearchService {
     const reranker = config.reranker;
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    let rankedUuids: string[];
+    let rankedUuids: Uuid[];
     let rankedScores: number[];
 
     if (reranker === NodeReranker.rrf) {
@@ -473,7 +471,7 @@ export class SearchService {
         rerankerMin,
       );
     } else if (reranker === NodeReranker.mmr && queryVector) {
-      const vectorPairs = new Map<string, number[]>();
+      const vectorPairs = new Map<Uuid, number[]>();
       for (const [uuid, node] of nodeMap) {
         if (node.nameEmbedding) vectorPairs.set(uuid, node.nameEmbedding);
       }
@@ -531,7 +529,7 @@ export class SearchService {
 
   private async episodeSearch(
     query: string,
-    groupIds: string[],
+    groupIds: GroupId[],
     config: EpisodeSearchConfig,
     limit: number,
     minScore: number,
@@ -549,7 +547,7 @@ export class SearchService {
     const episodeMap = new Map(bm25Episodes.map((ep) => [ep.uuid, ep]));
     const bm25Uuids = bm25Episodes.map((ep) => ep.uuid);
 
-    let rankedUuids: string[];
+    let rankedUuids: Uuid[];
     let rankedScores: number[];
 
     if (config.reranker === EpisodeReranker.cross_encoder && model) {
@@ -581,18 +579,18 @@ export class SearchService {
   private async communitySearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: string[],
+    groupIds: GroupId[],
     config: CommunitySearchConfig,
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
   ): Promise<[CommunityNode[], number[]]> {
     const fetch = 2 * limit;
-    const communityMap = new Map<string, CommunityNode>();
+    const communityMap = new Map<Uuid, CommunityNode>();
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    const bm25Uuids: string[] = [];
-    const cosineUuids: string[] = [];
+    const bm25Uuids: Uuid[] = [];
+    const cosineUuids: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -632,7 +630,7 @@ export class SearchService {
 
     await Promise.all(tasks);
 
-    let rankedUuids: string[];
+    let rankedUuids: Uuid[];
     let rankedScores: number[];
 
     if (config.reranker === CommunityReranker.rrf) {
@@ -641,7 +639,7 @@ export class SearchService {
         rerankerMin,
       );
     } else if (config.reranker === CommunityReranker.mmr && queryVector) {
-      const vectorPairs = new Map<string, number[]>();
+      const vectorPairs = new Map<Uuid, number[]>();
       for (const [uuid, community] of communityMap) {
         if (community.nameEmbedding)
           vectorPairs.set(uuid, community.nameEmbedding);

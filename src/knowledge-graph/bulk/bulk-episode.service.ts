@@ -27,10 +27,11 @@ import {
   EntityNode,
 } from '../models';
 import {
-  GroupIdSchema,
+  GroupId,
   RetrieveEpisodesParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
+  Uuid,
 } from '../neo4j';
 import {
   EntityEdgeRepository,
@@ -113,10 +114,6 @@ export class BulkEpisodeService {
         episodicEdges: [],
       };
     }
-    for (const ep of episodes) {
-      GroupIdSchema.parse(ep.groupId);
-    }
-
     // 2. Get model
     const model = await this.llmService.getActiveModel(userId);
 
@@ -248,8 +245,8 @@ export class BulkEpisodeService {
     );
 
     // 10. Merge duplicate pairs from pass 1
-    const pass1Pairs: [string, string][] = nodeResolutions.flatMap((r) =>
-      r.duplicatePairs.map((p): [string, string] => [
+    const pass1Pairs: [Uuid, Uuid][] = nodeResolutions.flatMap((r) =>
+      r.duplicatePairs.map((p): [Uuid, Uuid] => [
         p.extractedUuid,
         p.canonicalUuid,
       ]),
@@ -257,7 +254,7 @@ export class BulkEpisodeService {
 
     // 11. Pass 2 — within-batch dedup: exact name match first, then cosine
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
-    const pass2Pairs: [string, string][] = [];
+    const pass2Pairs: [Uuid, Uuid][] = [];
     for (let i = 0; i < allNewNodes.length; i++) {
       for (let j = i + 1; j < allNewNodes.length; j++) {
         const a = allNewNodes[i];
@@ -293,7 +290,7 @@ export class BulkEpisodeService {
         })
         .filter((n): n is NonNullable<typeof n> => n !== undefined);
 
-      const seen = new Set<string>();
+      const seen = new Set<Uuid>();
       const merged = [...ownCanonical, ...matchedExisting].filter((n) => {
         if (seen.has(n.uuid)) return false;
         seen.add(n.uuid);
@@ -381,7 +378,7 @@ export class BulkEpisodeService {
       ).values(),
     ];
     if (edgeTypes && effectiveEdgeTypeMap) {
-      const uuidToNode = new Map<string, EntityNode>(
+      const uuidToNode = new Map<Uuid, EntityNode>(
         allCanonicalNodes.map((n) => [n.uuid, n]),
       );
 
@@ -451,7 +448,7 @@ export class BulkEpisodeService {
           .map((e) => e.fact),
       }));
 
-      const summaryMap = new Map<string, string>();
+      const summaryMap = new Map<Uuid, string>();
       for (let i = 0; i < nodesInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
         const batch = nodesInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
         // TODO: Uses episodicNodes[0] as context for ALL summary batches.
@@ -468,10 +465,7 @@ export class BulkEpisodeService {
           .withStructuredOutput(nodeSummaryJsonSchema)
           .invoke(summaryMessages);
 
-        for (const s of summaryResult.summaries as {
-          uuid: string;
-          summary: string;
-        }[]) {
+        for (const s of summaryResult.summaries) {
           summaryMap.set(s.uuid, s.summary);
         }
       }
@@ -568,7 +562,7 @@ export class BulkEpisodeService {
 
   private async collectNodeCandidates(
     nodes: EntityNode[],
-    groupId: string,
+    groupId: GroupId,
   ): Promise<EntityNode[]> {
     const results = await Promise.all(
       nodes.flatMap((n) => [
@@ -590,7 +584,7 @@ export class BulkEpisodeService {
           : Promise.resolve([] as EntityNode[]),
       ]),
     );
-    const seen = new Set<string>();
+    const seen = new Set<Uuid>();
     return results.flat().filter((n) => {
       if (seen.has(n.uuid)) return false;
       seen.add(n.uuid);
@@ -600,7 +594,7 @@ export class BulkEpisodeService {
 
   private async collectEdgeCandidates(
     edges: EntityEdge[],
-    groupId: string,
+    groupId: GroupId,
   ): Promise<EntityEdge[]> {
     const results = await Promise.all(
       edges.flatMap((e) => [

@@ -1,10 +1,18 @@
 import neo4j from 'neo4j-driver';
 import { z } from 'zod';
 
-import { EpisodeType } from '../models';
 import { luceneSanitize, toNeo4jDateTime } from './neo4j-utils';
 
 const neoInt = z.int().transform((v) => neo4j.int(v));
+
+// Enums
+
+export enum EpisodeType {
+  message = 'message',
+  json = 'json',
+  text = 'text',
+  factTriple = 'fact_triple',
+}
 
 // Schemas
 
@@ -24,11 +32,12 @@ export const GroupIdSchema = z
   .regex(
     /^[a-zA-Z0-9_-]+$/,
     'groupId must be non-empty and contain only alphanumeric characters, underscores, or hyphens',
-  );
+  )
+  .brand<'GroupId'>();
 
-export const GraphNameSchema = z.string().min(1);
+export const GraphNameSchema = z.string().min(1).brand<'GraphName'>();
 
-export const UuidSchema = z.uuid();
+export const UuidSchema = z.uuid().brand<'Uuid'>();
 export const UuidArraySchema = z.array(UuidSchema);
 
 export const SearchByTextParamsSchema = z.object({

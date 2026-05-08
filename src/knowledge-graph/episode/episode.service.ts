@@ -19,10 +19,11 @@ import {
   EpisodicNode,
 } from '../models';
 import {
-  GroupIdSchema,
+  GroupId,
   RetrieveEpisodesParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
+  Uuid,
 } from '../neo4j';
 import {
   EntityEdgeRepository,
@@ -76,11 +77,11 @@ export class EpisodeService {
   ) {}
 
   async getEpisodes(options: {
-    groupIds: string[];
+    groupIds: GroupId[];
     referenceTime?: Date;
     lastN?: number;
     source?: EpisodeType;
-    sagaUuid?: string;
+    sagaUuid?: Uuid;
   }): Promise<EpisodicNode[]> {
     const {
       groupIds,
@@ -100,7 +101,7 @@ export class EpisodeService {
     );
   }
 
-  async deleteEpisode(uuid: string): Promise<void> {
+  async deleteEpisode(uuid: Uuid): Promise<void> {
     const episode = await this.episodicNodeRepository.getByUuid(uuid);
     if (!episode) return;
 
@@ -131,14 +132,14 @@ export class EpisodeService {
 
   // TODO: For very large batches a bulk Cypher variant would be preferred over
   // sequential per-episode deletion.
-  async deleteEpisodesByUuid(uuids: string[]): Promise<void> {
+  async deleteEpisodesByUuid(uuids: Uuid[]): Promise<void> {
     await Promise.all(uuids.map((uuid) => this.deleteEpisode(uuid)));
   }
 
   async summarizeSaga(options: {
     userId: number;
-    sagaUuid: string;
-    groupId: string;
+    sagaUuid: Uuid;
+    groupId: GroupId;
   }): Promise<string> {
     const { userId, sagaUuid, groupId } = options;
 
@@ -204,8 +205,6 @@ export class EpisodeService {
     const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
       edgeTypeMap ??
       (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
-
-    GroupIdSchema.parse(groupId);
 
     // 1. Get active model
     const model = await this.llmService.getActiveModel(userId);

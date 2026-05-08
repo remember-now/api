@@ -2,7 +2,12 @@ import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { GetByGroupIdsWithCursorParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KG_TEST_UUID_CURSOR, KgNodeFactory } from '@/test/factories';
+import {
+  KG_TEST_GROUP_ID,
+  KG_TEST_UUID_CURSOR,
+  KgNodeFactory,
+  kgUuid,
+} from '@/test/factories';
 
 import { SagaNodeRepository } from './saga-node.repository';
 
@@ -40,11 +45,12 @@ describe('SagaNodeRepository', () => {
 
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
+      const uuid = kgUuid();
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -52,10 +58,10 @@ describe('SagaNodeRepository', () => {
   describe('deleteByGroupId', () => {
     it('should call DETACH DELETE with groupId', async () => {
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.deleteByGroupId('group-1');
+      await repo.deleteByGroupId(KG_TEST_GROUP_ID);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ groupId: 'group-1' }),
+        expect.objectContaining({ groupId: KG_TEST_GROUP_ID }),
       );
     });
   });
@@ -63,7 +69,7 @@ describe('SagaNodeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 

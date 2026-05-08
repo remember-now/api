@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
 
+import { EpisodeType, GroupIdSchema, UuidSchema } from '../neo4j/neo4j.schemas';
 import {
   CommunityNodeSchema,
   createCommunityNode,
@@ -10,7 +11,6 @@ import {
   createNodeDefaults,
   createSagaNode,
   EntityNodeSchema,
-  EpisodeType,
   EpisodicNodeSchema,
   NodeBaseSchema,
   SagaNodeSchema,
@@ -134,7 +134,8 @@ describe('EntityNode', () => {
     });
 
     it('should allow setting groupId', () => {
-      const node = createEntityNode({ name: 'Test', groupId: 'group-123' });
+      const groupId = GroupIdSchema.parse('group-123');
+      const node = createEntityNode({ name: 'Test', groupId });
 
       expect(node.groupId).toBe('group-123');
     });
@@ -255,7 +256,10 @@ describe('EpisodicNode', () => {
     });
 
     it('should allow overriding entityEdges', () => {
-      const uuids = ['uuid-1', 'uuid-2'];
+      const uuids = [
+        UuidSchema.parse('11111111-1111-4111-8111-111111111111'),
+        UuidSchema.parse('22222222-2222-4222-8222-222222222222'),
+      ];
       const node = createEpisodicNode({
         name: 'Episode',
         groupId: KG_TEST_GROUP_ID,
@@ -313,13 +317,16 @@ describe('EpisodicNode', () => {
       expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
     });
 
-    it('should accept entityEdges with string uuid values', () => {
+    it('should accept entityEdges with valid uuid values', () => {
       const node = createEpisodicNode({
         name: 'Episode',
         groupId: KG_TEST_GROUP_ID,
         content: 'content',
         validAt,
-        entityEdges: ['uuid-a', 'uuid-b'],
+        entityEdges: [
+          UuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab'),
+          UuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc'),
+        ],
       });
       expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
     });
@@ -442,7 +449,8 @@ describe('SagaNode', () => {
     });
 
     it('should allow overriding groupId', () => {
-      const node = createSagaNode({ name: 'Saga', groupId: 'group-1' });
+      const groupId = GroupIdSchema.parse('group-1');
+      const node = createSagaNode({ name: 'Saga', groupId });
       expect(node.groupId).toBe('group-1');
     });
 

@@ -151,9 +151,9 @@ export class SagaNodeRepository implements OnModuleInit {
 
   private mapRow(row: Record<string, unknown>): SagaNode {
     return {
-      uuid: row['uuid'] as string,
+      uuid: row['uuid'] as Uuid,
       name: row['name'] as string,
-      groupId: row['group_id'] as string,
+      groupId: row['group_id'] as GroupId,
       labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string | undefined) ?? '',

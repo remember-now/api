@@ -4,6 +4,7 @@ import { CommunityEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
   GetByGroupIdsParams,
+  GroupId,
   Uuid,
   UuidArray,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
@@ -119,11 +120,11 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   private mapRow(row: Record<string, unknown>): CommunityEdge {
     return {
-      uuid: row['uuid'] as string,
-      groupId: row['group_id'] as string,
+      uuid: row['uuid'] as Uuid,
+      groupId: row['group_id'] as GroupId,
       createdAt: row['created_at'] as Date,
-      sourceNodeUuid: row['source_node_uuid'] as string,
-      targetNodeUuid: row['target_node_uuid'] as string,
+      sourceNodeUuid: row['source_node_uuid'] as Uuid,
+      targetNodeUuid: row['target_node_uuid'] as Uuid,
     };
   }
 }

@@ -6,7 +6,7 @@ import {
   SearchBySimilarityParamsSchema,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KgNodeFactory } from '@/test/factories';
+import { KgNodeFactory, kgUuid } from '@/test/factories';
 
 import { CommunityNodeRepository } from './community-node.repository';
 
@@ -68,10 +68,11 @@ describe('CommunityNodeRepository', () => {
   describe('delete', () => {
     it('should call DETACH DELETE', async () => {
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      const uuid = kgUuid();
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('DETACH DELETE'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -79,7 +80,7 @@ describe('CommunityNodeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 

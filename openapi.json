@@ -1263,7 +1263,7 @@
           },
           "groupId": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^[a-zA-Z0-9_-]+$"
           },
           "source": {
             "type": "string",
@@ -1290,7 +1290,7 @@
           },
           "groupId": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^[a-zA-Z0-9_-]+$"
           }
         },
         "required": [

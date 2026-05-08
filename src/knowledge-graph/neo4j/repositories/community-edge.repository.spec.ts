@@ -1,9 +1,7 @@
-import { randomUUID } from 'node:crypto';
-
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KgEdgeFactory } from '@/test/factories';
+import { KgEdgeFactory, kgUuid } from '@/test/factories';
 
 import { CommunityEdgeRepository } from './community-edge.repository';
 
@@ -11,8 +9,8 @@ describe('CommunityEdgeRepository', () => {
   let repo: CommunityEdgeRepository;
   let neo4j: DeepMockProxy<Neo4jService>;
 
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
@@ -41,11 +39,12 @@ describe('CommunityEdgeRepository', () => {
 
   describe('delete', () => {
     it('should call DELETE on HAS_MEMBER', async () => {
+      const uuid = kgUuid();
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('HAS_MEMBER'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -53,7 +52,7 @@ describe('CommunityEdgeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 

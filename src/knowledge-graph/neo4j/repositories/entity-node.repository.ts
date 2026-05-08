@@ -334,8 +334,8 @@ export class EntityNodeRepository implements OnModuleInit {
   async getNodeDistanceScores(
     nodeUuids: UuidArray,
     centerNodeUuid: Uuid,
-  ): Promise<{ uuid: string; score: number }[]> {
-    return this.neo4j.executeRead<{ uuid: string; score: number }>(
+  ): Promise<{ uuid: Uuid; score: number }[]> {
+    return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (center:Entity {uuid: $centerUuid})-[:RELATES_TO]-(n:Entity {uuid: nodeUuid})
        RETURN 1 AS score, nodeUuid AS uuid`,
@@ -345,8 +345,8 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async getEpisodeMentionCounts(
     nodeUuids: UuidArray,
-  ): Promise<{ uuid: string; score: number }[]> {
-    return this.neo4j.executeRead<{ uuid: string; score: number }>(
+  ): Promise<{ uuid: Uuid; score: number }[]> {
+    return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: nodeUuid})
        RETURN count(*) AS score, n.uuid AS uuid`,
@@ -356,9 +356,9 @@ export class EntityNodeRepository implements OnModuleInit {
 
   private mapRow(row: Record<string, unknown>): EntityNode {
     return {
-      uuid: row['uuid'] as string,
+      uuid: row['uuid'] as Uuid,
       name: row['name'] as string,
-      groupId: row['group_id'] as string,
+      groupId: row['group_id'] as GroupId,
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string) ?? '',
       attributes: row['attributes']

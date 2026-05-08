@@ -1,9 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
+import { EpisodicNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
+  EpisodeType,
   GetByGroupIdsParams,
   GroupId,
   RetrieveEpisodesParams,
@@ -202,8 +203,8 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getMentionedEntityUuids(episodeUuid: Uuid): Promise<string[]> {
-    const results = await this.neo4j.executeRead<{ uuid: string }>(
+  async getMentionedEntityUuids(episodeUuid: Uuid): Promise<Uuid[]> {
+    const results = await this.neo4j.executeRead<{ uuid: Uuid }>(
       /* cypher */ `MATCH (ep:Episodic {uuid: $episodeUuid})-[:MENTIONS]->(n:Entity)
        RETURN n.uuid AS uuid`,
       { episodeUuid },
@@ -234,16 +235,16 @@ export class EpisodicNodeRepository implements OnModuleInit {
 
   private mapRow(row: Record<string, unknown>): EpisodicNode {
     return {
-      uuid: row['uuid'] as string,
+      uuid: row['uuid'] as Uuid,
       name: row['name'] as string,
-      groupId: row['group_id'] as string,
+      groupId: row['group_id'] as GroupId,
       labels: row['labels'] as string[],
       createdAt: row['created_at'] as Date,
       source: (row['source'] as EpisodeType) ?? EpisodeType.text,
       sourceDescription: (row['source_description'] as string) ?? '',
       content: (row['content'] as string) ?? '',
       validAt: row['valid_at'] as Date,
-      entityEdges: (row['entity_edges'] as string[]) ?? [],
+      entityEdges: (row['entity_edges'] as Uuid[]) ?? [],
     };
   }
 }

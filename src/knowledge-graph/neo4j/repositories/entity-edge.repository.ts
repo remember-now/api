@@ -217,8 +217,8 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getUuidsForEpisodeDeletion(episodeUuid: Uuid): Promise<string[]> {
-    const results = await this.neo4j.executeRead<{ uuid: string }>(
+  async getUuidsForEpisodeDeletion(episodeUuid: Uuid): Promise<Uuid[]> {
+    const results = await this.neo4j.executeRead<{ uuid: Uuid }>(
       // episodes[0] is the creating episode — mirrors Python graphiti.py remove_episode:
       // only edges whose first episode matches are deleted; edges that merely accumulated
       // this episode as a contributor (episodes[1..]) are intentionally kept.
@@ -404,15 +404,15 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   private mapRow(row: Record<string, unknown>): EntityEdge {
     return {
-      uuid: row['uuid'] as string,
+      uuid: row['uuid'] as Uuid,
       name: row['name'] as string,
-      groupId: row['group_id'] as string,
+      groupId: row['group_id'] as GroupId,
       createdAt: row['created_at'] as Date,
-      sourceNodeUuid: row['source_node_uuid'] as string,
-      targetNodeUuid: row['target_node_uuid'] as string,
+      sourceNodeUuid: row['source_node_uuid'] as Uuid,
+      targetNodeUuid: row['target_node_uuid'] as Uuid,
       fact: (row['fact'] as string) ?? '',
       factEmbedding: (row['fact_embedding'] as number[] | null) ?? null,
-      episodes: (row['episodes'] as string[]) ?? [],
+      episodes: (row['episodes'] as Uuid[]) ?? [],
       expiredAt: (row['expired_at'] as Date | null) ?? null,
       validAt: (row['valid_at'] as Date | null) ?? null,
       invalidAt: (row['invalid_at'] as Date | null) ?? null,

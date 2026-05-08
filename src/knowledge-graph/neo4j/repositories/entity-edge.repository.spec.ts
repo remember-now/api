@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
@@ -9,7 +7,7 @@ import {
   SearchByTextParamsSchema,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import { KgEdgeFactory } from '@/test/factories';
+import { KG_TEST_GROUP_ID, KgEdgeFactory, kgUuid } from '@/test/factories';
 
 import { EntityEdgeRepository } from './entity-edge.repository';
 
@@ -17,8 +15,8 @@ describe('EntityEdgeRepository', () => {
   let repo: EntityEdgeRepository;
   let neo4j: DeepMockProxy<Neo4jService>;
 
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   beforeEach(() => {
     neo4j = mockDeep<Neo4jService>();
@@ -80,11 +78,12 @@ describe('EntityEdgeRepository', () => {
 
   describe('delete', () => {
     it('should call DELETE on RELATES_TO', async () => {
+      const uuid = kgUuid();
       neo4j.executeWrite.mockResolvedValue([]);
-      await repo.delete('test-uuid');
+      await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
-        expect.objectContaining({ uuid: 'test-uuid' }),
+        expect.objectContaining({ uuid }),
       );
     });
   });
@@ -92,7 +91,7 @@ describe('EntityEdgeRepository', () => {
   describe('getByUuid', () => {
     it('should return null when not found', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.getByUuid('missing');
+      const result = await repo.getByUuid(kgUuid());
       expect(result).toBeNull();
     });
 
@@ -334,23 +333,23 @@ describe('EntityEdgeRepository', () => {
   describe('hasRelatesEdgesForGroup', () => {
     it('should return true when executeRead returns hasEdges: true', async () => {
       neo4j.executeRead.mockResolvedValue([{ hasEdges: true }]);
-      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      const result = await repo.hasRelatesEdgesForGroup(KG_TEST_GROUP_ID);
       expect(result).toBe(true);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
-        { groupId: 'group-1' },
+        { groupId: KG_TEST_GROUP_ID },
       );
     });
 
     it('should return false when executeRead returns hasEdges: false', async () => {
       neo4j.executeRead.mockResolvedValue([{ hasEdges: false }]);
-      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      const result = await repo.hasRelatesEdgesForGroup(KG_TEST_GROUP_ID);
       expect(result).toBe(false);
     });
 
     it('should return false when executeRead returns empty results', async () => {
       neo4j.executeRead.mockResolvedValue([]);
-      const result = await repo.hasRelatesEdgesForGroup('group-1');
+      const result = await repo.hasRelatesEdgesForGroup(KG_TEST_GROUP_ID);
       expect(result).toBe(false);
     });
   });

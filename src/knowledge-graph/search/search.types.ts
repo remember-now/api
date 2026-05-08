@@ -1,4 +1,5 @@
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
+import { GroupId, Uuid } from '../neo4j/neo4j.schemas';
 import { SearchConfig } from './search-config.types';
 import { SearchFilters } from './search-filters.types';
 
@@ -6,25 +7,25 @@ import { SearchFilters } from './search-filters.types';
 
 export interface SearchResults {
   edges: EntityEdge[];
-  edgeScores: Map<string, number>;
+  edgeScores: Map<Uuid, number>;
   nodes: EntityNode[];
-  nodeScores: Map<string, number>;
+  nodeScores: Map<Uuid, number>;
   episodes: EpisodicNode[];
-  episodeScores: Map<string, number>;
+  episodeScores: Map<Uuid, number>;
   communities: CommunityNode[];
-  communityScores: Map<string, number>;
+  communityScores: Map<Uuid, number>;
 }
 
 export interface SearchOptions {
   userId: number;
   query: string;
-  groupIds: string[];
+  groupIds: GroupId[];
   config: SearchConfig;
   filters?: SearchFilters;
   /** UUID of the node to use as the graph-distance anchor for node_distance reranking. */
-  centerNodeUuid?: string;
+  centerNodeUuid?: Uuid;
   /** UUIDs of nodes to start BFS traversal from. */
-  originNodeUuids?: string[];
+  originNodeUuids?: Uuid[];
 }
 
 // Helpers

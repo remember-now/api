@@ -7,6 +7,7 @@ import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
 import { EpisodeService } from '@/knowledge-graph/episode';
 import { EpisodeType } from '@/knowledge-graph/models';
+import { GroupIdSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { SearchService } from '@/knowledge-graph/search';
 import {
   EdgeReranker,
@@ -21,7 +22,7 @@ import { AgentService } from './agent.service';
 const TestIngestSchema = z.object({
   name: z.string().min(1),
   content: z.string().min(1),
-  groupId: z.string().min(1),
+  groupId: GroupIdSchema,
   source: z.enum(EpisodeType).optional(),
 });
 class TestIngestDto extends createZodDto(TestIngestSchema) {}
@@ -29,7 +30,7 @@ class TestIngestDto extends createZodDto(TestIngestSchema) {}
 // TODO: REMOVE — test DTOs
 const TestSearchSchema = z.object({
   query: z.string().min(1),
-  groupId: z.string().min(1),
+  groupId: GroupIdSchema,
 });
 class TestSearchDto extends createZodDto(TestSearchSchema) {}
 

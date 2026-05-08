@@ -1,6 +1,4 @@
-import { randomUUID } from 'node:crypto';
-
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from '@/test/factories';
 
 import {
   CommunityEdgeSchema,
@@ -43,10 +41,10 @@ describe('edge.types', () => {
   describe('EdgeBaseSchema', () => {
     it('should accept a valid edge base', () => {
       const edge = {
-        uuid: randomUUID(),
+        uuid: kgUuid(),
         groupId: 'group-1',
-        sourceNodeUuid: randomUUID(),
-        targetNodeUuid: randomUUID(),
+        sourceNodeUuid: kgUuid(),
+        targetNodeUuid: kgUuid(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).not.toThrow();
@@ -54,10 +52,10 @@ describe('edge.types', () => {
 
     it('should reject invalid source uuid', () => {
       const edge = {
-        uuid: randomUUID(),
+        uuid: kgUuid(),
         groupId: 'group-1',
         sourceNodeUuid: 'not-a-uuid',
-        targetNodeUuid: randomUUID(),
+        targetNodeUuid: kgUuid(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();
@@ -65,9 +63,9 @@ describe('edge.types', () => {
 
     it('should reject invalid target uuid', () => {
       const edge = {
-        uuid: randomUUID(),
+        uuid: kgUuid(),
         groupId: 'group-1',
-        sourceNodeUuid: randomUUID(),
+        sourceNodeUuid: kgUuid(),
         targetNodeUuid: 'not-a-uuid',
         createdAt: new Date(),
       };
@@ -76,10 +74,10 @@ describe('edge.types', () => {
 
     it('should reject empty groupId', () => {
       const edge = {
-        uuid: randomUUID(),
+        uuid: kgUuid(),
         groupId: '',
-        sourceNodeUuid: randomUUID(),
-        targetNodeUuid: randomUUID(),
+        sourceNodeUuid: kgUuid(),
+        targetNodeUuid: kgUuid(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();
@@ -88,8 +86,8 @@ describe('edge.types', () => {
 });
 
 describe('EntityEdge', () => {
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   describe('createEntityEdge', () => {
     it('should create with correct defaults', () => {
@@ -206,8 +204,8 @@ describe('EntityEdge', () => {
 });
 
 describe('EpisodicEdge', () => {
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   describe('createEpisodicEdge', () => {
     it('should create with correct defaults', () => {
@@ -273,8 +271,8 @@ describe('EpisodicEdge', () => {
 });
 
 describe('CommunityEdge', () => {
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   describe('createCommunityEdge', () => {
     it('should create with correct defaults', () => {
@@ -326,8 +324,8 @@ describe('CommunityEdge', () => {
 });
 
 describe('HasEpisodeEdge', () => {
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   describe('createHasEpisodeEdge', () => {
     it('should create with correct defaults', () => {
@@ -379,8 +377,8 @@ describe('HasEpisodeEdge', () => {
 });
 
 describe('NextEpisodeEdge', () => {
-  const sourceNodeUuid = randomUUID();
-  const targetNodeUuid = randomUUID();
+  const sourceNodeUuid = kgUuid();
+  const targetNodeUuid = kgUuid();
 
   describe('createNextEpisodeEdge', () => {
     it('should create with correct defaults', () => {

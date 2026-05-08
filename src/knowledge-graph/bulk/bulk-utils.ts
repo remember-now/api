@@ -1,4 +1,5 @@
 import { EntityEdge } from '@/knowledge-graph/models';
+import { Uuid } from '@/knowledge-graph/neo4j/neo4j.schemas';
 
 /**
  * Maximum number of concurrent LLM API calls in bulk ingestion.
@@ -68,14 +69,14 @@ export async function withConcurrency<T>(
  * When merging two roots, the lexicographically larger root is attached under
  * the smaller one — so `find()` always returns the lex-smallest representative.
  */
-export class UnionFind {
-  private readonly parent: Map<string, string>;
+export class UnionFind<T extends string = string> {
+  private readonly parent: Map<T, T>;
 
-  constructor(elements: Iterable<string>) {
+  constructor(elements: Iterable<T>) {
     this.parent = new Map([...elements].map((e) => [e, e]));
   }
 
-  find(x: string): string {
+  find(x: T): T {
     // Iterative path compression
     let root = x;
     while (this.parent.get(root) !== root) {
@@ -90,7 +91,7 @@ export class UnionFind {
     return root;
   }
 
-  union(a: string, b: string): void {
+  union(a: T, b: T): void {
     const ra = this.find(a);
     const rb = this.find(b);
     if (ra === rb) return;
@@ -107,16 +108,16 @@ export class UnionFind {
  * Maps each UUID to the lexicographically smallest canonical UUID in its
  * duplicate cluster. Used for within-batch bidirectional deduplication.
  */
-export function compressUuidMap(
-  pairs: [string, string][],
-): Map<string, string> {
-  const allUuids = new Set<string>();
+export function compressUuidMap<T extends string = string>(
+  pairs: [T, T][],
+): Map<T, T> {
+  const allUuids = new Set<T>();
   for (const [a, b] of pairs) {
     allUuids.add(a);
     allUuids.add(b);
   }
 
-  const uf = new UnionFind(allUuids);
+  const uf = new UnionFind<T>(allUuids);
   for (const [a, b] of pairs) {
     uf.union(a, b);
   }
@@ -129,12 +130,12 @@ export function compressUuidMap(
  * pairs returned by node resolution. Uses union-find with path compression so
  * chains of aliases collapse to their ultimate canonical target.
  */
-export function buildDirectedUuidMap(
-  pairs: [string, string][],
-): Map<string, string> {
-  const parent = new Map<string, string>();
+export function buildDirectedUuidMap<T extends string = string>(
+  pairs: [T, T][],
+): Map<T, T> {
+  const parent = new Map<T, T>();
 
-  const find = (uuid: string): string => {
+  const find = (uuid: T): T => {
     if (!parent.has(uuid)) parent.set(uuid, uuid);
     let root = uuid;
     while (parent.get(root) !== root) root = parent.get(root)!;
@@ -162,7 +163,7 @@ export function buildDirectedUuidMap(
  */
 export function resolveEdgePointers(
   edges: EntityEdge[],
-  uuidMap: Map<string, string>,
+  uuidMap: Map<Uuid, Uuid>,
 ): EntityEdge[] {
   return edges.map((e) => ({
     ...e,

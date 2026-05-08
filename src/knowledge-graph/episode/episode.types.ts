@@ -7,13 +7,14 @@ import {
   EpisodicEdge,
   EpisodicNode,
 } from '../models';
+import { GroupId, Uuid, UuidSchema } from '../neo4j/neo4j.schemas';
 
 // Schemas
 
 export const NodeSummarySchema = z.object({
   summaries: z.array(
     z.object({
-      uuid: z.string(),
+      uuid: UuidSchema,
       summary: z.string(),
     }),
   ),
@@ -50,9 +51,9 @@ export interface AddEpisodeOptions {
   content: string;
   source?: EpisodeType;
   sourceDescription?: string;
-  groupId: string;
+  groupId: GroupId;
   referenceTime?: Date;
-  sagaUuid?: string;
+  sagaUuid?: Uuid;
   entityTypes?: EntityTypeMap;
   edgeTypes?: EdgeTypesMap;
   edgeTypeMap?: EdgeTypeMap;

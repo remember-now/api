@@ -2,20 +2,22 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import {
+  EpisodeType,
+  GroupId,
+  GroupIdSchema,
+  NodeLabelsSchema,
+  Uuid,
+  UuidSchema,
+} from '../neo4j/neo4j.schemas';
+
 // Schemas
 
-export enum EpisodeType {
-  message = 'message',
-  json = 'json',
-  text = 'text',
-  factTriple = 'fact_triple',
-}
-
 export const NodeBaseSchema = z.object({
-  uuid: z.uuid(),
+  uuid: UuidSchema,
   name: z.string().min(1),
-  groupId: z.string().min(1),
-  labels: z.array(z.string()),
+  groupId: GroupIdSchema,
+  labels: NodeLabelsSchema,
   createdAt: z.date(),
 });
 
@@ -30,7 +32,7 @@ export const EpisodicNodeSchema = NodeBaseSchema.extend({
   sourceDescription: z.string(),
   content: z.string(),
   validAt: z.date(),
-  entityEdges: z.array(z.string()),
+  entityEdges: z.array(UuidSchema),
 });
 
 export const CommunityNodeSchema = NodeBaseSchema.extend({
@@ -55,14 +57,14 @@ export type SagaNode = z.infer<typeof SagaNodeSchema>;
 
 export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
   return {
-    uuid: randomUUID(),
+    uuid: UuidSchema.parse(randomUUID()),
     labels: [],
     createdAt: new Date(),
   };
 }
 
 export function createEntityNode(
-  partial: Partial<EntityNode> & { name: string; groupId: string },
+  partial: Partial<EntityNode> & { name: string; groupId: GroupId },
 ): EntityNode {
   return {
     ...createNodeDefaults(),
@@ -77,7 +79,7 @@ export function createEntityNode(
 export function createEpisodicNode(
   partial: Partial<EpisodicNode> & {
     name: string;
-    groupId: string;
+    groupId: GroupId;
     content: string;
     validAt: Date;
   },
@@ -87,13 +89,13 @@ export function createEpisodicNode(
     labels: ['Episodic'],
     source: EpisodeType.text,
     sourceDescription: '',
-    entityEdges: [],
+    entityEdges: [] as Uuid[],
     ...partial,
   };
 }
 
 export function createCommunityNode(
-  partial: Partial<CommunityNode> & { name: string; groupId: string },
+  partial: Partial<CommunityNode> & { name: string; groupId: GroupId },
 ): CommunityNode {
   return {
     ...createNodeDefaults(),
@@ -105,7 +107,7 @@ export function createCommunityNode(
 }
 
 export function createSagaNode(
-  partial: Partial<SagaNode> & { name: string; groupId: string },
+  partial: Partial<SagaNode> & { name: string; groupId: GroupId },
 ): SagaNode {
   return {
     ...createNodeDefaults(),

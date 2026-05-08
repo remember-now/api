@@ -2,7 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EntityEdge, EpisodicNode } from '../models';
-import { SearchByTextParamsSchema } from '../neo4j';
+import { SearchByTextParamsSchema, Uuid } from '../neo4j';
 import { EntityEdgeRepository } from '../neo4j/repositories';
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 import {
@@ -28,7 +28,7 @@ export class EdgeResolutionService {
     episode: EpisodicNode,
     extractedEdges: EntityEdge[],
     existingEdges: EntityEdge[],
-    uuidMap: Map<string, string>,
+    uuidMap: Map<Uuid, Uuid>,
     referenceTime: Date,
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
@@ -63,8 +63,8 @@ export class EdgeResolutionService {
     }
 
     const resolvedEdges: EntityEdge[] = [];
-    const resolvedExistingUuids = new Set<string>();
-    const invalidatedEdgesMap = new Map<string, EntityEdge>();
+    const resolvedExistingUuids = new Set<Uuid>();
+    const invalidatedEdgesMap = new Map<Uuid, EntityEdge>();
 
     for (const edge of deduped) {
       // Find same-endpoint existing edges

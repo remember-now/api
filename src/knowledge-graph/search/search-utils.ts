@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import { Uuid } from '../neo4j/neo4j.schemas';
 import { EntityNodeRepository } from '../neo4j/repositories';
 import { DEFAULT_MMR_LAMBDA } from './search-config.types';
 
@@ -11,11 +12,11 @@ import { DEFAULT_MMR_LAMBDA } from './search-config.types';
  * Reciprocal rank fusion across multiple ranked UUID lists.
  * rank_const = 1 (matching the graphiti Python implementation).
  */
-export function rrf(
-  resultUuidLists: string[][],
+export function rrf<T extends string = Uuid>(
+  resultUuidLists: T[][],
   minScore = 0,
-): [string[], number[]] {
-  const scores = new Map<string, number>();
+): [T[], number[]] {
+  const scores = new Map<T, number>();
 
   for (const list of resultUuidLists) {
     for (let i = 0; i < list.length; i++) {
@@ -51,12 +52,12 @@ function dotProduct(a: number[], b: number[]): number {
  * Candidates are L2-normalized; the query vector is used as-is (matching Python).
  * mmr_score = lambda * dot(queryVec, normCandidate) + (lambda-1) * maxPairwiseSim
  */
-export function mmr(
+export function mmr<T extends string = Uuid>(
   queryVector: number[],
-  uuidVectorPairs: Map<string, number[]>,
+  uuidVectorPairs: Map<T, number[]>,
   lambda = DEFAULT_MMR_LAMBDA,
   minScore = -2.0,
-): [string[], number[]] {
+): [T[], number[]] {
   if (uuidVectorPairs.size === 0) return [[], []];
 
   const uuids = [...uuidVectorPairs.keys()];
@@ -84,7 +85,7 @@ export function mmr(
   });
 
   const scored = uuids
-    .map((uuid, i) => [uuid, mmrScores[i]] as [string, number])
+    .map((uuid, i) => [uuid, mmrScores[i]] as [T, number])
     .filter(([, score]) => score >= minScore)
     .sort((a, b) => b[1] - a[1]);
 
@@ -100,12 +101,12 @@ export function mmr(
  */
 export async function nodeDistanceReranker(
   repo: EntityNodeRepository,
-  nodeUuids: string[],
-  centerNodeUuid: string,
+  nodeUuids: Uuid[],
+  centerNodeUuid: Uuid,
   minScore = 0,
-): Promise<[string[], number[]]> {
+): Promise<[Uuid[], number[]]> {
   const filteredUuids = nodeUuids.filter((uuid) => uuid !== centerNodeUuid);
-  const scores = new Map<string, number>();
+  const scores = new Map<Uuid, number>();
 
   if (filteredUuids.length > 0) {
     const results = await repo.getNodeDistanceScores(
@@ -135,7 +136,7 @@ export async function nodeDistanceReranker(
   const result = orderedUuids
     .map((uuid) => {
       const s = scores.get(uuid) ?? Infinity;
-      return [uuid, s === Infinity ? 0 : 1 / s] as [string, number];
+      return [uuid, s === Infinity ? 0 : 1 / s] as [Uuid, number];
     })
     .filter(([, invScore]) => invScore >= minScore);
 
@@ -151,11 +152,11 @@ export async function nodeDistanceReranker(
  */
 export async function episodeMentionsReranker(
   repo: EntityNodeRepository,
-  nodeUuidLists: string[][],
+  nodeUuidLists: Uuid[][],
   minScore = 0,
-): Promise<[string[], number[]]> {
-  const [sortedUuids] = rrf(nodeUuidLists);
-  const scores = new Map<string, number>();
+): Promise<[Uuid[], number[]]> {
+  const [sortedUuids] = rrf<Uuid>(nodeUuidLists);
+  const scores = new Map<Uuid, number>();
 
   if (sortedUuids.length > 0) {
     const results = await repo.getEpisodeMentionCounts(sortedUuids);
@@ -170,7 +171,7 @@ export async function episodeMentionsReranker(
   sortedUuids.sort((a, b) => scores.get(b)! - scores.get(a)!);
 
   const result = sortedUuids
-    .map((uuid) => [uuid, scores.get(uuid)!] as [string, number])
+    .map((uuid) => [uuid, scores.get(uuid)!] as [Uuid, number])
     .filter(([, score]) => score >= minScore);
 
   return [result.map(([uuid]) => uuid), result.map(([, score]) => score)];
@@ -193,9 +194,9 @@ const CrossEncoderScoreSchema = z.object({
 export async function crossEncoderReranker(
   model: BaseChatModel,
   query: string,
-  items: Array<{ uuid: string; text: string }>,
+  items: Array<{ uuid: Uuid; text: string }>,
   minScore = 0,
-): Promise<[string[], number[]]> {
+): Promise<[Uuid[], number[]]> {
   if (items.length === 0) return [[], []];
 
   const scoredModel = model.withStructuredOutput(
@@ -218,7 +219,7 @@ export async function crossEncoderReranker(
     .map((item, i) => {
       const raw = rawScores[i] as { score: number };
       const normalized = (raw.score ?? 0) / 100;
-      return [item.uuid, normalized] as [string, number];
+      return [item.uuid, normalized] as [Uuid, number];
     })
     .filter(([, score]) => score >= minScore)
     .sort((a, b) => b[1] - a[1]);

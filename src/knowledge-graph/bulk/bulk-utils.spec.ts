@@ -1,3 +1,4 @@
+import { GroupId, Uuid } from '../neo4j/neo4j.schemas';
 import {
   buildDirectedUuidMap,
   compressUuidMap,
@@ -5,6 +6,8 @@ import {
   UnionFind,
   withConcurrency,
 } from './bulk-utils';
+
+const u = (s: string) => s as Uuid;
 
 describe('withConcurrency', () => {
   it('returns results in input order', async () => {
@@ -148,29 +151,28 @@ const makeEdge = (
   uuid: string,
   sourceNodeUuid: string,
   targetNodeUuid: string,
-) =>
-  ({
-    uuid,
-    sourceNodeUuid,
-    targetNodeUuid,
-    name: 'RELATES_TO',
-    fact: 'test',
-    groupId: 'g',
-    episodes: [],
-    createdAt: new Date(),
-    validAt: null,
-    invalidAt: null,
-    expiredAt: null,
-    factEmbedding: null,
-    attributes: {},
-  }) as Parameters<typeof resolveEdgePointers>[0][number];
+) => ({
+  uuid: u(uuid),
+  sourceNodeUuid: u(sourceNodeUuid),
+  targetNodeUuid: u(targetNodeUuid),
+  name: 'RELATES_TO',
+  fact: 'test',
+  groupId: 'g' as GroupId,
+  episodes: [],
+  createdAt: new Date(),
+  validAt: null,
+  invalidAt: null,
+  expiredAt: null,
+  factEmbedding: null,
+  attributes: {},
+});
 
 describe('resolveEdgePointers', () => {
   it('remaps sourceNodeUuid and targetNodeUuid via map', () => {
     const edge = makeEdge('e1', 'old-src', 'old-tgt');
-    const uuidMap = new Map([
-      ['old-src', 'new-src'],
-      ['old-tgt', 'new-tgt'],
+    const uuidMap = new Map<Uuid, Uuid>([
+      [u('old-src'), u('new-src')],
+      [u('old-tgt'), u('new-tgt')],
     ]);
     const [result] = resolveEdgePointers([edge], uuidMap);
     expect(result.sourceNodeUuid).toBe('new-src');
@@ -179,7 +181,7 @@ describe('resolveEdgePointers', () => {
 
   it('unmapped uuids are unchanged', () => {
     const edge = makeEdge('e1', 'src', 'tgt');
-    const uuidMap = new Map<string, string>();
+    const uuidMap = new Map<Uuid, Uuid>();
     const [result] = resolveEdgePointers([edge], uuidMap);
     expect(result.sourceNodeUuid).toBe('src');
     expect(result.targetNodeUuid).toBe('tgt');
@@ -187,7 +189,7 @@ describe('resolveEdgePointers', () => {
 
   it('does not mutate input edge', () => {
     const edge = makeEdge('e1', 'old-src', 'old-tgt');
-    const uuidMap = new Map([['old-src', 'new-src']]);
+    const uuidMap = new Map<Uuid, Uuid>([[u('old-src'), u('new-src')]]);
     resolveEdgePointers([edge], uuidMap);
     expect(edge.sourceNodeUuid).toBe('old-src');
   });

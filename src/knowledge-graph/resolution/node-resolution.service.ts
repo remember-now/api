@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EntityNode, EpisodicNode } from '../models';
+import { Uuid } from '../neo4j/neo4j.schemas';
 import { buildDedupeNodesMessages } from './dedupe-nodes.prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,
@@ -16,8 +17,8 @@ import { nodeResolutionsJsonSchema } from './resolution.types';
 
 export interface NodeResolutionResult {
   resolvedNodes: EntityNode[];
-  uuidMap: Map<string, string>;
-  duplicatePairs: Array<{ extractedUuid: string; canonicalUuid: string }>;
+  uuidMap: Map<Uuid, Uuid>;
+  duplicatePairs: Array<{ extractedUuid: Uuid; canonicalUuid: Uuid }>;
 }
 
 @Injectable()
@@ -30,12 +31,12 @@ export class NodeResolutionService {
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
   ): Promise<NodeResolutionResult> {
-    const uuidMap = new Map<string, string>();
+    const uuidMap = new Map<Uuid, Uuid>();
     const duplicatePairs: Array<{
-      extractedUuid: string;
-      canonicalUuid: string;
+      extractedUuid: Uuid;
+      canonicalUuid: Uuid;
     }> = [];
-    const llmCandidates = new Map<string, EntityNode[]>();
+    const llmCandidates = new Map<Uuid, EntityNode[]>();
 
     for (const extracted of extractedNodes) {
       const normalizedName = normalizeString(extracted.name);
@@ -100,7 +101,7 @@ export class NodeResolutionService {
       const idxToUuid = new Map(llmExtractedWithIdx.map((e) => [e.id, e.uuid]));
 
       // Collect unique candidate nodes across all batches
-      const candidateSet = new Map<string, EntityNode>();
+      const candidateSet = new Map<Uuid, EntityNode>();
       for (const candidates of llmCandidates.values()) {
         for (const c of candidates) {
           candidateSet.set(c.uuid, c);

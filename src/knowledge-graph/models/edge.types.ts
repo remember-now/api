@@ -2,13 +2,20 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import {
+  GroupId,
+  GroupIdSchema,
+  Uuid,
+  UuidSchema,
+} from '../neo4j/neo4j.schemas';
+
 // Schemas
 
 export const EdgeBaseSchema = z.object({
-  uuid: z.uuid(),
-  groupId: z.string().min(1),
-  sourceNodeUuid: z.uuid(),
-  targetNodeUuid: z.uuid(),
+  uuid: UuidSchema,
+  groupId: GroupIdSchema,
+  sourceNodeUuid: UuidSchema,
+  targetNodeUuid: UuidSchema,
   createdAt: z.date(),
 });
 
@@ -16,7 +23,7 @@ export const EntityEdgeSchema = EdgeBaseSchema.extend({
   name: z.string().min(1),
   fact: z.string(),
   factEmbedding: z.array(z.number()).nullable(),
-  episodes: z.array(z.string()),
+  episodes: z.array(UuidSchema),
   expiredAt: z.date().nullable(),
   validAt: z.date().nullable(),
   invalidAt: z.date().nullable(),
@@ -48,7 +55,7 @@ export function createEdgeDefaults(): Omit<
   'groupId' | 'sourceNodeUuid' | 'targetNodeUuid'
 > {
   return {
-    uuid: randomUUID(),
+    uuid: UuidSchema.parse(randomUUID()),
     createdAt: new Date(),
   };
 }
@@ -57,15 +64,15 @@ export function createEntityEdge(
   partial: Partial<EntityEdge> & {
     name: string;
     fact: string;
-    groupId: string;
-    sourceNodeUuid: string;
-    targetNodeUuid: string;
+    groupId: GroupId;
+    sourceNodeUuid: Uuid;
+    targetNodeUuid: Uuid;
   },
 ): EntityEdge {
   return {
     ...createEdgeDefaults(),
     factEmbedding: null,
-    episodes: [],
+    episodes: [] as Uuid[],
     expiredAt: null,
     validAt: null,
     invalidAt: null,
@@ -76,9 +83,9 @@ export function createEntityEdge(
 
 export function createEpisodicEdge(
   partial: Partial<EpisodicEdge> & {
-    groupId: string;
-    sourceNodeUuid: string;
-    targetNodeUuid: string;
+    groupId: GroupId;
+    sourceNodeUuid: Uuid;
+    targetNodeUuid: Uuid;
   },
 ): EpisodicEdge {
   return { ...createEdgeDefaults(), ...partial };
@@ -86,9 +93,9 @@ export function createEpisodicEdge(
 
 export function createCommunityEdge(
   partial: Partial<CommunityEdge> & {
-    groupId: string;
-    sourceNodeUuid: string;
-    targetNodeUuid: string;
+    groupId: GroupId;
+    sourceNodeUuid: Uuid;
+    targetNodeUuid: Uuid;
   },
 ): CommunityEdge {
   return { ...createEdgeDefaults(), ...partial };
@@ -96,9 +103,9 @@ export function createCommunityEdge(
 
 export function createHasEpisodeEdge(
   partial: Partial<HasEpisodeEdge> & {
-    groupId: string;
-    sourceNodeUuid: string;
-    targetNodeUuid: string;
+    groupId: GroupId;
+    sourceNodeUuid: Uuid;
+    targetNodeUuid: Uuid;
   },
 ): HasEpisodeEdge {
   return { ...createEdgeDefaults(), ...partial };
@@ -106,9 +113,9 @@ export function createHasEpisodeEdge(
 
 export function createNextEpisodeEdge(
   partial: Partial<NextEpisodeEdge> & {
-    groupId: string;
-    sourceNodeUuid: string;
-    targetNodeUuid: string;
+    groupId: GroupId;
+    sourceNodeUuid: Uuid;
+    targetNodeUuid: Uuid;
   },
 ): NextEpisodeEdge {
   return { ...createEdgeDefaults(), ...partial };
