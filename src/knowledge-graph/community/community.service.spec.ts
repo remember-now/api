@@ -1,5 +1,6 @@
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { mockDeep } from 'jest-mock-extended';
+import { Test, TestingModule } from '@nestjs/testing';
 
 import { LlmService } from '@/llm/llm.service';
 import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
@@ -20,50 +21,37 @@ import {
 describe('CommunityService', () => {
   let service: CommunityService;
 
-  let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
-  let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
-  let mockEntityEdgeRepository: ReturnType<
-    typeof mockDeep<EntityEdgeRepository>
-  >;
-  let mockEntityNodeRepository: ReturnType<
-    typeof mockDeep<EntityNodeRepository>
-  >;
-  let mockCommunityNodeRepository: ReturnType<
-    typeof mockDeep<CommunityNodeRepository>
-  >;
-  let mockCommunityEdgeRepository: ReturnType<
-    typeof mockDeep<CommunityEdgeRepository>
-  >;
-  let mockGdsCommunityRepository: ReturnType<
-    typeof mockDeep<GdsCommunityRepository>
-  >;
+  let mockLlmService: DeepMocked<LlmService>;
+  let mockEmbeddingService: DeepMocked<EmbeddingService>;
+  let mockEntityEdgeRepository: DeepMocked<EntityEdgeRepository>;
+  let mockEntityNodeRepository: DeepMocked<EntityNodeRepository>;
+  let mockCommunityNodeRepository: DeepMocked<CommunityNodeRepository>;
+  let mockCommunityEdgeRepository: DeepMocked<CommunityEdgeRepository>;
+  let mockGdsCommunityRepository: DeepMocked<GdsCommunityRepository>;
 
-  let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
+  let mockModel: DeepMocked<BaseChatModel>;
   let mockRunnable: { invoke: jest.Mock };
 
-  beforeEach(() => {
-    mockLlmService = mockDeep<LlmService>();
-    mockEmbeddingService = mockDeep<EmbeddingService>();
-    mockEntityEdgeRepository = mockDeep<EntityEdgeRepository>();
-    mockEntityNodeRepository = mockDeep<EntityNodeRepository>();
-    mockCommunityNodeRepository = mockDeep<CommunityNodeRepository>();
-    mockCommunityEdgeRepository = mockDeep<CommunityEdgeRepository>();
-    mockGdsCommunityRepository = mockDeep<GdsCommunityRepository>();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [CommunityService],
+    })
+      .useMocker(createMock)
+      .compile();
 
-    mockModel = mockDeep<BaseChatModel>();
+    service = module.get(CommunityService);
+    mockLlmService = module.get(LlmService);
+    mockEmbeddingService = module.get(EmbeddingService);
+    mockEntityEdgeRepository = module.get(EntityEdgeRepository);
+    mockEntityNodeRepository = module.get(EntityNodeRepository);
+    mockCommunityNodeRepository = module.get(CommunityNodeRepository);
+    mockCommunityEdgeRepository = module.get(CommunityEdgeRepository);
+    mockGdsCommunityRepository = module.get(GdsCommunityRepository);
+
+    mockModel = createMock<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
     mockEmbeddingService.embedText.mockResolvedValue(null);
-
-    service = new CommunityService(
-      mockLlmService,
-      mockEmbeddingService,
-      mockEntityEdgeRepository,
-      mockEntityNodeRepository,
-      mockCommunityNodeRepository,
-      mockCommunityEdgeRepository,
-      mockGdsCommunityRepository,
-    );
 
     mockLlmService.getActiveModel.mockResolvedValue(mockModel);
     mockCommunityNodeRepository.deleteByGroupId.mockResolvedValue(undefined);

@@ -1,5 +1,6 @@
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { mockDeep } from 'jest-mock-extended';
+import { Test, TestingModule } from '@nestjs/testing';
 
 import { LlmService } from '@/llm/llm.service';
 import {
@@ -37,80 +38,50 @@ const baseOptions = {
 describe('EpisodeService', () => {
   let service: EpisodeService;
 
-  let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
-  let mockCommunityService: ReturnType<typeof mockDeep<CommunityService>>;
-  let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
-  let mockNodeExtractionService: ReturnType<
-    typeof mockDeep<NodeExtractionService>
-  >;
-  let mockEdgeExtractionService: ReturnType<
-    typeof mockDeep<EdgeExtractionService>
-  >;
-  let mockNodeResolutionService: ReturnType<
-    typeof mockDeep<NodeResolutionService>
-  >;
-  let mockEdgeResolutionService: ReturnType<
-    typeof mockDeep<EdgeResolutionService>
-  >;
-  let mockEntityNodeRepository: ReturnType<
-    typeof mockDeep<EntityNodeRepository>
-  >;
-  let mockEntityEdgeRepository: ReturnType<
-    typeof mockDeep<EntityEdgeRepository>
-  >;
-  let mockEpisodicNodeRepository: ReturnType<
-    typeof mockDeep<EpisodicNodeRepository>
-  >;
-  let mockEpisodicEdgeRepository: ReturnType<
-    typeof mockDeep<EpisodicEdgeRepository>
-  >;
-  let mockSagaNodeRepository: ReturnType<typeof mockDeep<SagaNodeRepository>>;
-  let mockHasEpisodeEdgeRepository: ReturnType<
-    typeof mockDeep<HasEpisodeEdgeRepository>
-  >;
-  let mockNextEpisodeEdgeRepository: ReturnType<
-    typeof mockDeep<NextEpisodeEdgeRepository>
-  >;
+  let mockLlmService: DeepMocked<LlmService>;
+  let mockCommunityService: DeepMocked<CommunityService>;
+  let mockEmbeddingService: DeepMocked<EmbeddingService>;
+  let mockNodeExtractionService: DeepMocked<NodeExtractionService>;
+  let mockEdgeExtractionService: DeepMocked<EdgeExtractionService>;
+  let mockNodeResolutionService: DeepMocked<NodeResolutionService>;
+  let mockEdgeResolutionService: DeepMocked<EdgeResolutionService>;
+  let mockEntityNodeRepository: DeepMocked<EntityNodeRepository>;
+  let mockEntityEdgeRepository: DeepMocked<EntityEdgeRepository>;
+  let mockEpisodicNodeRepository: DeepMocked<EpisodicNodeRepository>;
+  let mockEpisodicEdgeRepository: DeepMocked<EpisodicEdgeRepository>;
+  let mockSagaNodeRepository: DeepMocked<SagaNodeRepository>;
+  let mockHasEpisodeEdgeRepository: DeepMocked<HasEpisodeEdgeRepository>;
+  let mockNextEpisodeEdgeRepository: DeepMocked<NextEpisodeEdgeRepository>;
 
-  let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
+  let mockModel: DeepMocked<BaseChatModel>;
   let mockRunnable: { invoke: jest.Mock };
 
-  beforeEach(() => {
-    mockLlmService = mockDeep<LlmService>();
-    mockCommunityService = mockDeep<CommunityService>();
-    mockEmbeddingService = mockDeep<EmbeddingService>();
-    mockNodeExtractionService = mockDeep<NodeExtractionService>();
-    mockEdgeExtractionService = mockDeep<EdgeExtractionService>();
-    mockNodeResolutionService = mockDeep<NodeResolutionService>();
-    mockEdgeResolutionService = mockDeep<EdgeResolutionService>();
-    mockEntityNodeRepository = mockDeep<EntityNodeRepository>();
-    mockEntityEdgeRepository = mockDeep<EntityEdgeRepository>();
-    mockEpisodicNodeRepository = mockDeep<EpisodicNodeRepository>();
-    mockEpisodicEdgeRepository = mockDeep<EpisodicEdgeRepository>();
-    mockSagaNodeRepository = mockDeep<SagaNodeRepository>();
-    mockHasEpisodeEdgeRepository = mockDeep<HasEpisodeEdgeRepository>();
-    mockNextEpisodeEdgeRepository = mockDeep<NextEpisodeEdgeRepository>();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [EpisodeService],
+    })
+      .useMocker(createMock)
+      .compile();
 
-    mockModel = mockDeep<BaseChatModel>();
+    service = module.get(EpisodeService);
+    mockLlmService = module.get(LlmService);
+    mockCommunityService = module.get(CommunityService);
+    mockEmbeddingService = module.get(EmbeddingService);
+    mockNodeExtractionService = module.get(NodeExtractionService);
+    mockEdgeExtractionService = module.get(EdgeExtractionService);
+    mockNodeResolutionService = module.get(NodeResolutionService);
+    mockEdgeResolutionService = module.get(EdgeResolutionService);
+    mockEntityNodeRepository = module.get(EntityNodeRepository);
+    mockEntityEdgeRepository = module.get(EntityEdgeRepository);
+    mockEpisodicNodeRepository = module.get(EpisodicNodeRepository);
+    mockEpisodicEdgeRepository = module.get(EpisodicEdgeRepository);
+    mockSagaNodeRepository = module.get(SagaNodeRepository);
+    mockHasEpisodeEdgeRepository = module.get(HasEpisodeEdgeRepository);
+    mockNextEpisodeEdgeRepository = module.get(NextEpisodeEdgeRepository);
+
+    mockModel = createMock<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
-
-    service = new EpisodeService(
-      mockLlmService,
-      mockCommunityService,
-      mockEmbeddingService,
-      mockNodeExtractionService,
-      mockEdgeExtractionService,
-      mockNodeResolutionService,
-      mockEdgeResolutionService,
-      mockEntityNodeRepository,
-      mockEntityEdgeRepository,
-      mockEpisodicNodeRepository,
-      mockEpisodicEdgeRepository,
-      mockSagaNodeRepository,
-      mockHasEpisodeEdgeRepository,
-      mockNextEpisodeEdgeRepository,
-    );
 
     // Default mock implementations
     mockLlmService.getActiveModel.mockResolvedValue(mockModel);

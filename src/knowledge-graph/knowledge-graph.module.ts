@@ -1,75 +1,34 @@
 import { Module } from '@nestjs/common';
 
-import { EmbeddingConfigModule } from '@/config/embedding';
-import { LlmModule } from '@/llm/llm.module';
-
-import { BulkEpisodeService } from './bulk';
-import { CommunityService } from './community';
-import { EmbeddingService } from './embedding';
-import { EpisodeService } from './episode';
-import {
-  CombinedExtractionService,
-  EdgeExtractionService,
-  NodeExtractionService,
-} from './extraction';
+import { BulkModule } from './bulk/bulk.module';
+import { CommunityModule } from './community/community.module';
+import { EmbeddingModule } from './embedding/embedding.module';
+import { EpisodeModule } from './episode/episode.module';
+import { ExtractionModule } from './extraction/extraction.module';
 import { Neo4jModule } from './neo4j/neo4j.module';
-import {
-  CommunityEdgeRepository,
-  CommunityNodeRepository,
-  EntityEdgeRepository,
-  EntityNodeRepository,
-  EpisodicEdgeRepository,
-  EpisodicNodeRepository,
-  GdsCommunityRepository,
-  HasEpisodeEdgeRepository,
-  NextEpisodeEdgeRepository,
-  SagaNodeRepository,
-} from './neo4j/repositories';
-import { EdgeResolutionService, NodeResolutionService } from './resolution';
-import { SearchService } from './search';
-
-const repositories = [
-  EntityNodeRepository,
-  EpisodicNodeRepository,
-  CommunityNodeRepository,
-  SagaNodeRepository,
-  EntityEdgeRepository,
-  EpisodicEdgeRepository,
-  CommunityEdgeRepository,
-  HasEpisodeEdgeRepository,
-  NextEpisodeEdgeRepository,
-  GdsCommunityRepository,
-];
-
-const extractionServices = [
-  NodeExtractionService,
-  EdgeExtractionService,
-  CombinedExtractionService,
-];
-
-const resolutionServices = [NodeResolutionService, EdgeResolutionService];
+import { ResolutionModule } from './resolution/resolution.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
-  imports: [Neo4jModule, EmbeddingConfigModule, LlmModule],
-  providers: [
-    ...repositories,
-    ...extractionServices,
-    EmbeddingService,
-    ...resolutionServices,
-    EpisodeService,
-    CommunityService,
-    SearchService,
-    BulkEpisodeService,
+  imports: [
+    EmbeddingModule,
+    Neo4jModule,
+    ExtractionModule,
+    ResolutionModule,
+    CommunityModule,
+    SearchModule,
+    EpisodeModule,
+    BulkModule,
   ],
   exports: [
-    ...repositories,
-    ...extractionServices,
-    EmbeddingService,
-    ...resolutionServices,
-    EpisodeService,
-    CommunityService,
-    SearchService,
-    BulkEpisodeService,
+    EmbeddingModule,
+    Neo4jModule,
+    ExtractionModule,
+    ResolutionModule,
+    CommunityModule,
+    SearchModule,
+    EpisodeModule,
+    BulkModule,
   ],
 })
 export class KnowledgeGraphModule {}

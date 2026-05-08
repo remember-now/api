@@ -1,5 +1,6 @@
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
+import { Test, TestingModule } from '@nestjs/testing';
 
 import {
   KG_HIGH_SIM_EMBEDDING,
@@ -32,15 +33,23 @@ function makeEdge(
 
 describe('EdgeResolutionService', () => {
   let service: EdgeResolutionService;
-  let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
+  let mockModel: DeepMocked<BaseChatModel>;
   let mockRunnable: { invoke: jest.Mock };
-  let mockEdgeRepo: DeepMockProxy<EntityEdgeRepository>;
+  let mockEdgeRepo: DeepMocked<EntityEdgeRepository>;
 
-  beforeEach(() => {
-    mockEdgeRepo = mockDeep<EntityEdgeRepository>();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [EdgeResolutionService],
+    })
+      .useMocker(createMock)
+      .compile();
+
+    service = module.get(EdgeResolutionService);
+    mockEdgeRepo = module.get(EntityEdgeRepository);
+
     mockEdgeRepo.searchByFact.mockResolvedValue([]);
-    service = new EdgeResolutionService(mockEdgeRepo);
-    mockModel = mockDeep<BaseChatModel>();
+
+    mockModel = createMock<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
   });

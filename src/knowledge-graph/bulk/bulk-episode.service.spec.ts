@@ -1,5 +1,6 @@
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { mockDeep } from 'jest-mock-extended';
+import { Test, TestingModule } from '@nestjs/testing';
 
 import { EpisodeType } from '@/knowledge-graph/models';
 import { LlmService } from '@/llm/llm.service';
@@ -9,7 +10,6 @@ import {
   KgNodeFactory,
 } from '@/test/factories';
 
-import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import {
   CombinedExtractionService,
@@ -41,60 +41,43 @@ function makeRaw(name: string): RawEpisode {
 
 describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () => {
   let service: BulkEpisodeService;
-  let mockLlmService: ReturnType<typeof mockDeep<LlmService>>;
-  let mockCommunityService: ReturnType<typeof mockDeep<CommunityService>>;
-  let mockEmbeddingService: ReturnType<typeof mockDeep<EmbeddingService>>;
-  let mockNodeExtraction: ReturnType<typeof mockDeep<NodeExtractionService>>;
-  let mockEdgeExtraction: ReturnType<typeof mockDeep<EdgeExtractionService>>;
-  let mockCombinedExtraction: ReturnType<
-    typeof mockDeep<CombinedExtractionService>
-  >;
-  let mockNodeResolution: ReturnType<typeof mockDeep<NodeResolutionService>>;
-  let mockEdgeResolution: ReturnType<typeof mockDeep<EdgeResolutionService>>;
-  let mockEntityNodeRepo: ReturnType<typeof mockDeep<EntityNodeRepository>>;
-  let mockEntityEdgeRepo: ReturnType<typeof mockDeep<EntityEdgeRepository>>;
-  let mockEpisodicNodeRepo: ReturnType<typeof mockDeep<EpisodicNodeRepository>>;
-  let mockEpisodicEdgeRepo: ReturnType<typeof mockDeep<EpisodicEdgeRepository>>;
-  let mockModel: ReturnType<typeof mockDeep<BaseChatModel>>;
+  let mockLlmService: DeepMocked<LlmService>;
+  let mockEmbeddingService: DeepMocked<EmbeddingService>;
+  let mockNodeExtraction: DeepMocked<NodeExtractionService>;
+  let mockEdgeExtraction: DeepMocked<EdgeExtractionService>;
+  let mockCombinedExtraction: DeepMocked<CombinedExtractionService>;
+  let mockNodeResolution: DeepMocked<NodeResolutionService>;
+  let mockEdgeResolution: DeepMocked<EdgeResolutionService>;
+  let mockEntityNodeRepo: DeepMocked<EntityNodeRepository>;
+  let mockEntityEdgeRepo: DeepMocked<EntityEdgeRepository>;
+  let mockEpisodicNodeRepo: DeepMocked<EpisodicNodeRepository>;
+  let mockEpisodicEdgeRepo: DeepMocked<EpisodicEdgeRepository>;
+  let mockModel: DeepMocked<BaseChatModel>;
   let mockRunnable: { invoke: jest.Mock };
 
-  beforeEach(() => {
-    mockLlmService = mockDeep<LlmService>();
-    mockCommunityService = mockDeep<CommunityService>();
-    mockEmbeddingService = mockDeep<EmbeddingService>();
-    mockNodeExtraction = mockDeep<NodeExtractionService>();
-    mockEdgeExtraction = mockDeep<EdgeExtractionService>();
-    mockCombinedExtraction = mockDeep<CombinedExtractionService>();
-    mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
-      nodes: [],
-      edges: [],
-      nodeEpisodeIndexMap: new Map(),
-    });
-    mockNodeResolution = mockDeep<NodeResolutionService>();
-    mockEdgeResolution = mockDeep<EdgeResolutionService>();
-    mockEntityNodeRepo = mockDeep<EntityNodeRepository>();
-    mockEntityEdgeRepo = mockDeep<EntityEdgeRepository>();
-    mockEpisodicNodeRepo = mockDeep<EpisodicNodeRepository>();
-    mockEpisodicEdgeRepo = mockDeep<EpisodicEdgeRepository>();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [BulkEpisodeService],
+    })
+      .useMocker(createMock)
+      .compile();
 
-    mockModel = mockDeep<BaseChatModel>();
+    service = module.get(BulkEpisodeService);
+    mockLlmService = module.get(LlmService);
+    mockEmbeddingService = module.get(EmbeddingService);
+    mockNodeExtraction = module.get(NodeExtractionService);
+    mockEdgeExtraction = module.get(EdgeExtractionService);
+    mockCombinedExtraction = module.get(CombinedExtractionService);
+    mockNodeResolution = module.get(NodeResolutionService);
+    mockEdgeResolution = module.get(EdgeResolutionService);
+    mockEntityNodeRepo = module.get(EntityNodeRepository);
+    mockEntityEdgeRepo = module.get(EntityEdgeRepository);
+    mockEpisodicNodeRepo = module.get(EpisodicNodeRepository);
+    mockEpisodicEdgeRepo = module.get(EpisodicEdgeRepository);
+
+    mockModel = createMock<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
-
-    service = new BulkEpisodeService(
-      mockLlmService,
-      mockCommunityService,
-      mockEmbeddingService,
-      mockNodeExtraction,
-      mockEdgeExtraction,
-      mockCombinedExtraction,
-      mockNodeResolution,
-      mockEdgeResolution,
-      mockEntityNodeRepo,
-      mockEntityEdgeRepo,
-      mockEpisodicNodeRepo,
-      mockEpisodicEdgeRepo,
-    );
 
     // Default stubs for steps that are not under test
     mockLlmService.getActiveModel.mockResolvedValue(mockModel);
@@ -121,6 +104,11 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     mockEntityEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockEpisodicEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockRunnable.invoke.mockResolvedValue({ summaries: [] });
+    mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
+      nodes: [],
+      edges: [],
+      nodeEpisodeIndexMap: new Map(),
+    });
   });
 
   afterEach(() => {
