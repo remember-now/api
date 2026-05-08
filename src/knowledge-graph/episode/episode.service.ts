@@ -44,16 +44,17 @@ import {
 } from '../prompts/summarize-sagas.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
+  CANDIDATE_LIMIT,
+  MAX_NODES_PER_SUMMARY_BATCH,
+  PREVIOUS_EPISODES_WINDOW,
+} from './episode-constants';
+import {
   AddEpisodeOptions,
   AddEpisodeResult,
   EdgeTypeMap,
   getApplicableEdgeTypes,
   nodeSummaryJsonSchema,
 } from './episode.types';
-
-const PREVIOUS_EPISODES_WINDOW = 20;
-const MAX_NODES_PER_SUMMARY_BATCH = 30;
-const CANDIDATE_LIMIT = 10;
 
 @Injectable()
 export class EpisodeService {

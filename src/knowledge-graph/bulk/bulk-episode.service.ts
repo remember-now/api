@@ -6,6 +6,11 @@ import { LlmService } from '@/llm/llm.service';
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import {
+  CANDIDATE_LIMIT,
+  MAX_NODES_PER_SUMMARY_BATCH,
+  PREVIOUS_EPISODES_WINDOW,
+} from '../episode/episode-constants';
+import {
   EdgeTypeMap,
   getApplicableEdgeTypes,
   nodeSummaryJsonSchema,
@@ -52,10 +57,6 @@ import {
 } from './bulk-utils';
 import { AddBulkEpisodeOptions, AddBulkEpisodeResult } from './bulk.types';
 import { chunkContent, shouldChunk } from './content-chunking';
-
-const PREVIOUS_EPISODES_WINDOW = 20;
-const MAX_NODES_PER_SUMMARY_BATCH = 30;
-const CANDIDATE_LIMIT = 10;
 
 function reassembleByOffsets<T>(flat: T[], lengths: number[]): T[][] {
   let offset = 0;
