@@ -7,6 +7,8 @@ import {
   EpisodeType,
   GetByGroupIdsParams,
   GroupId,
+  NodeLabels,
+  NodeName,
   RetrieveEpisodesParams,
   SearchByTextParams,
   Uuid,
@@ -235,9 +237,9 @@ export class EpisodicNodeRepository implements OnModuleInit {
   private mapRow(row: Record<string, unknown>): EpisodicNode {
     return {
       uuid: row['uuid'] as Uuid,
-      name: row['name'] as string,
+      name: row['name'] as NodeName,
       groupId: row['group_id'] as GroupId,
-      labels: row['labels'] as string[],
+      labels: row['labels'] as NodeLabels,
       createdAt: row['created_at'] as Date,
       source: (row['source'] as EpisodeType) ?? EpisodeType.text,
       sourceDescription: (row['source_description'] as string) ?? '',

@@ -7,6 +7,8 @@ import {
   GroupId,
   GroupIdSchema,
   NodeLabelSchema,
+  NodeName,
+  NodeNameSchema,
   Uuid,
   UuidSchema,
 } from '../neo4j/neo4j.schemas';
@@ -15,7 +17,7 @@ import {
 
 export const NodeBaseSchema = z.object({
   uuid: UuidSchema,
-  name: z.string().min(1),
+  name: NodeNameSchema,
   groupId: GroupIdSchema,
   labels: z.array(NodeLabelSchema),
   createdAt: z.date(),
@@ -64,11 +66,11 @@ export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
 }
 
 export function createEntityNode(
-  partial: Partial<EntityNode> & { name: string; groupId: GroupId },
+  partial: Partial<EntityNode> & { name: NodeName; groupId: GroupId },
 ): EntityNode {
   return {
     ...createNodeDefaults(),
-    labels: ['Entity'],
+    labels: [NodeLabelSchema.parse('Entity')],
     nameEmbedding: null,
     summary: '',
     attributes: {},
@@ -78,7 +80,7 @@ export function createEntityNode(
 
 export function createEpisodicNode(
   partial: Partial<EpisodicNode> & {
-    name: string;
+    name: NodeName;
     groupId: GroupId;
     content: string;
     validAt: Date;
@@ -86,7 +88,7 @@ export function createEpisodicNode(
 ): EpisodicNode {
   return {
     ...createNodeDefaults(),
-    labels: ['Episodic'],
+    labels: [NodeLabelSchema.parse('Episodic')],
     source: EpisodeType.text,
     sourceDescription: '',
     entityEdges: [] as Uuid[],
@@ -95,11 +97,11 @@ export function createEpisodicNode(
 }
 
 export function createCommunityNode(
-  partial: Partial<CommunityNode> & { name: string; groupId: GroupId },
+  partial: Partial<CommunityNode> & { name: NodeName; groupId: GroupId },
 ): CommunityNode {
   return {
     ...createNodeDefaults(),
-    labels: ['Community'],
+    labels: [NodeLabelSchema.parse('Community')],
     nameEmbedding: null,
     summary: '',
     ...partial,
@@ -107,11 +109,11 @@ export function createCommunityNode(
 }
 
 export function createSagaNode(
-  partial: Partial<SagaNode> & { name: string; groupId: GroupId },
+  partial: Partial<SagaNode> & { name: NodeName; groupId: GroupId },
 ): SagaNode {
   return {
     ...createNodeDefaults(),
-    labels: ['Saga'],
+    labels: [NodeLabelSchema.parse('Saga')],
     summary: '',
     lastSummarizedAt: null,
     ...partial,

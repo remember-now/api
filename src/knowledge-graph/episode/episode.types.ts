@@ -1,15 +1,34 @@
 import { z } from 'zod';
 
 import {
-  EntityEdge,
-  EntityNode,
-  EpisodeType,
-  EpisodicEdge,
-  EpisodicNode,
+  EntityEdgeSchema,
+  EntityNodeSchema,
+  EpisodicEdgeSchema,
+  EpisodicNodeSchema,
 } from '../models';
-import { GroupId, Uuid, UuidSchema } from '../neo4j/neo4j.schemas';
+import {
+  EpisodeTypeSchema,
+  GroupIdSchema,
+  NodeLabelSchema,
+  NodeNameSchema,
+  RelationshipTypeSchema,
+  UuidSchema,
+} from '../neo4j';
 
 // Schemas
+
+export const EpisodeSchema = z
+  .object({
+    groupId: GroupIdSchema,
+    name: NodeNameSchema,
+    content: z.string().min(1),
+    source: EpisodeTypeSchema,
+    sourceDescription: z.string().optional(),
+    referenceTime: z.date().default(() => new Date()),
+    uuid: UuidSchema.optional(),
+    sagaUuid: UuidSchema.optional(),
+  })
+  .brand<'Episode'>();
 
 export const NodeSummarySchema = z.object({
   summaries: z.array(
@@ -20,94 +39,63 @@ export const NodeSummarySchema = z.object({
   ),
 });
 
+export const EntityTypeMapSchema = z.record(
+  NodeLabelSchema,
+  z.object({
+    description: z.string(),
+    schema: z.instanceof(z.ZodType),
+  }),
+);
+export const EdgeTypeMapSchema = z.record(
+  RelationshipTypeSchema,
+  z.object({
+    description: z.string(),
+    schema: z.instanceof(z.ZodType),
+  }),
+);
+
+export const EdgeTypeMappingsSchema = z.map(
+  z.tuple([NodeLabelSchema, NodeLabelSchema]),
+  z.array(RelationshipTypeSchema),
+);
+
+export const BaseEpisodeOptionsSchema = z.object({
+  userId: z.number(),
+  entityTypes: EntityTypeMapSchema.optional(),
+  edgeTypes: EdgeTypeMapSchema.optional(),
+  edgeTypeMappings: EdgeTypeMappingsSchema.optional(),
+  excludedEntityTypes: z.array(NodeLabelSchema).optional(),
+  customInstructions: z.string().optional(),
+  updateCommunities: z.boolean().optional(),
+});
+
+export const BaseEpisodeResultSchema = z.object({
+  nodes: z.array(EntityNodeSchema),
+  edges: z.array(EntityEdgeSchema),
+  invalidatedEdges: z.array(EntityEdgeSchema),
+  episodicEdges: z.array(EpisodicEdgeSchema),
+});
+
+export const AddEpisodeOptionsSchema = BaseEpisodeOptionsSchema.extend({
+  episode: EpisodeSchema,
+});
+
+export const AddEpisodeResultSchema = BaseEpisodeResultSchema.extend({
+  episode: EpisodicNodeSchema,
+});
+
 // Types
 
 export type NodeSummary = z.infer<typeof NodeSummarySchema>;
+export type EntityTypeMap = z.infer<typeof EntityTypeMapSchema>;
+export type EdgeTypeMap = z.infer<typeof EdgeTypeMapSchema>;
+export type EdgeTypeMappings = z.infer<typeof EdgeTypeMappingsSchema>;
 
-export type EntityTypeMap = Record<
-  string,
-  {
-    description: string;
-    schema: z.ZodTypeAny;
-  }
->;
-
-export type EdgeTypesMap = Record<
-  string,
-  {
-    description: string;
-    schema: z.ZodTypeAny;
-  }
->;
-
-// key format: "SourceLabel,TargetLabel" — e.g. "Person,Company", "Entity,Entity"
-export type EdgeTypeMap = Record<string, string[]>;
-
-// Interfaces
-
-export interface AddEpisodeOptions {
-  userId: number;
-  name: string;
-  content: string;
-  source?: EpisodeType;
-  sourceDescription?: string;
-  groupId: GroupId;
-  referenceTime?: Date;
-  sagaUuid?: Uuid;
-  entityTypes?: EntityTypeMap;
-  edgeTypes?: EdgeTypesMap;
-  edgeTypeMap?: EdgeTypeMap;
-  excludedEntityTypes?: string[];
-  customInstructions?: string;
-  updateCommunities?: boolean;
-}
-
-export interface AddEpisodeResult {
-  episode: EpisodicNode;
-  nodes: EntityNode[];
-  edges: EntityEdge[];
-  invalidatedEdges: EntityEdge[];
-  episodicEdges: EpisodicEdge[];
-}
+export type Episode = z.infer<typeof EpisodeSchema>;
+export type AddEpisodeOptionsInput = z.input<typeof AddEpisodeOptionsSchema>;
+export type AddEpisodeOptions = z.infer<typeof AddEpisodeOptionsSchema>;
+export type AddEpisodeResult = z.infer<typeof AddEpisodeResultSchema>;
 
 // JSON Schemas
 
 export const nodeSummaryJsonSchema = z.toJSONSchema(NodeSummarySchema);
-
-// Helpers
-
-/**
- * Returns the subset of `edgeTypes` that are valid for the given source/target
- * label combination, as determined by `edgeTypeMap`.
- *
- * `edgeTypeMap` keys are `"SourceLabel,TargetLabel"` strings. For each
- * combination of source and target labels, the map yields edge type names whose
- * definitions are then looked up in `edgeTypes`. Duplicates are deduplicated
- * (first occurrence wins).
- *
- * @example
- * // sourceLabels: ['Person'], targetLabels: ['Company']
- * // edgeTypeMap:  { 'Person,Company': ['WORKS_AT', 'FOUNDED'] }
- * // edgeTypes:    { WORKS_AT: { description: '...', schema: ... }, FOUNDED: { ... } }
- * // → { WORKS_AT: { description: '...', schema: ... }, FOUNDED: { ... } }
- */
-export function getApplicableEdgeTypes(
-  sourceLabels: string[],
-  targetLabels: string[],
-  edgeTypes: EdgeTypesMap,
-  edgeTypeMap: EdgeTypeMap,
-): EdgeTypesMap {
-  const result: EdgeTypesMap = {};
-
-  for (const src of sourceLabels) {
-    for (const tgt of targetLabels) {
-      const key = `${src},${tgt}`;
-
-      for (const typeName of edgeTypeMap[key] ?? []) {
-        const typeDef = edgeTypes[typeName];
-        if (typeDef && !(typeName in result)) result[typeName] = typeDef;
-      }
-    }
-  }
-  return result;
-}

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
+import { Episode, EpisodeSchema } from '@/knowledge-graph/episode';
 import {
+  EpisodeType,
   GroupIdSchema,
   UuidSchema,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
@@ -22,3 +24,14 @@ export const KG_TEST_SAGA_UUID = UuidSchema.parse(
 
 /** Helper for tests that need a fresh branded UUID. */
 export const kgUuid = () => UuidSchema.parse(randomUUID());
+
+export function makeEpisode(name: string): Episode {
+  return EpisodeSchema.parse({
+    name: name,
+    content: `Content: ${name}`,
+    source: EpisodeType.text,
+    sourceDescription: 'test',
+    referenceTime: KG_REFERENCE_TIME,
+    groupId: KG_TEST_GROUP_ID,
+  });
+}

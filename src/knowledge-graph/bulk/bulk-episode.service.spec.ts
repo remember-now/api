@@ -2,13 +2,8 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { EpisodeType } from '@/knowledge-graph/models';
 import { LlmService } from '@/llm/llm.service';
-import {
-  KG_REFERENCE_TIME,
-  KG_TEST_GROUP_ID,
-  KgNodeFactory,
-} from '@/test/factories';
+import { KG_TEST_GROUP_ID, KgNodeFactory, makeEpisode } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
 import {
@@ -24,20 +19,8 @@ import {
 } from '../neo4j/repositories';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { BulkEpisodeService } from './bulk-episode.service';
-import { RawEpisode } from './bulk.types';
 
 const USER_ID = 1;
-
-function makeRaw(name: string): RawEpisode {
-  return {
-    name,
-    content: `Content: ${name}`,
-    source: EpisodeType.text,
-    sourceDescription: 'test',
-    referenceTime: KG_REFERENCE_TIME,
-    groupId: KG_TEST_GROUP_ID,
-  };
-}
 
 describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () => {
   let service: BulkEpisodeService;
@@ -158,7 +141,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       expect(result.nodes.find((n) => n.uuid === alias.uuid)).toBeUndefined();
@@ -188,7 +171,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1')],
+        episodes: [makeEpisode('ep1')],
       });
 
       // Existing canonical is included; alias is not
@@ -232,7 +215,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       // allCanonicalNodes deduplication (via Map in step 17) ensures exactly one save
@@ -276,7 +259,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       const hasA = result.nodes.some((n) => n.uuid === nodeA.uuid);
@@ -316,7 +299,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
@@ -353,7 +336,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       // nodeA (first-seen) is canonical; nodeB is its alias and must not appear
@@ -391,7 +374,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
@@ -428,7 +411,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
 
       expect(result.nodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
@@ -485,7 +468,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       const result = await service.addEpisodesBulk({
         userId: USER_ID,
-        episodes: [makeRaw('ep1'), makeRaw('ep2'), makeRaw('ep3')],
+        episodes: [makeEpisode('ep1'), makeEpisode('ep2'), makeEpisode('ep3')],
       });
 
       // nodeB is excluded by pass-1 (resolveNodes returned it as an alias of nodeA).

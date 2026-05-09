@@ -1,6 +1,10 @@
 import { ZodError } from 'zod';
 
-import { GroupIdSchema, NodeLabelsSchema } from './neo4j.schemas';
+import {
+  GroupIdSchema,
+  NodeLabelsSchema,
+  RelationshipTypeSchema,
+} from './neo4j.schemas';
 
 describe('NodeLabelsSchema', () => {
   it('should pass for a valid single label', () => {
@@ -41,6 +45,58 @@ describe('NodeLabelsSchema', () => {
 
   it('should throw ZodError for empty array', () => {
     expect(() => NodeLabelsSchema.parse([])).toThrow(ZodError);
+  });
+});
+
+describe('RelationshipTypeSchema', () => {
+  it('accepts a single-segment type', () => {
+    expect(() => RelationshipTypeSchema.parse('KNOWS')).not.toThrow();
+  });
+
+  it('accepts a multi-segment type', () => {
+    expect(() => RelationshipTypeSchema.parse('HAS_PROPERTY')).not.toThrow();
+    expect(() => RelationshipTypeSchema.parse('RELATED_TO')).not.toThrow();
+  });
+
+  it('accepts types with digits', () => {
+    expect(() => RelationshipTypeSchema.parse('A1_B2')).not.toThrow();
+  });
+
+  it('throws ZodError for lowercase', () => {
+    expect(() => RelationshipTypeSchema.parse('knows')).toThrow(ZodError);
+    expect(() => RelationshipTypeSchema.parse('has_property')).toThrow(
+      ZodError,
+    );
+  });
+
+  it('throws ZodError for mixed case', () => {
+    expect(() => RelationshipTypeSchema.parse('Has_Property')).toThrow(
+      ZodError,
+    );
+  });
+
+  it('throws ZodError for leading underscore', () => {
+    expect(() => RelationshipTypeSchema.parse('_KNOWS')).toThrow(ZodError);
+  });
+
+  it('throws ZodError for trailing underscore', () => {
+    expect(() => RelationshipTypeSchema.parse('KNOWS_')).toThrow(ZodError);
+  });
+
+  it('throws ZodError for double underscore', () => {
+    expect(() => RelationshipTypeSchema.parse('HAS__PROPERTY')).toThrow(
+      ZodError,
+    );
+  });
+
+  it('throws ZodError for empty string', () => {
+    expect(() => RelationshipTypeSchema.parse('')).toThrow(ZodError);
+  });
+
+  it('throws ZodError for type with spaces', () => {
+    expect(() => RelationshipTypeSchema.parse('HAS PROPERTY')).toThrow(
+      ZodError,
+    );
   });
 });
 

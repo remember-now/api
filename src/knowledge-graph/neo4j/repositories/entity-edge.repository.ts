@@ -12,6 +12,7 @@ import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
   GetByGroupIdsParams,
   GroupId,
+  RelationshipType,
   SearchByBfsParams,
   SearchBySimilarityParams,
   SearchByTextParams,
@@ -404,7 +405,7 @@ export class EntityEdgeRepository implements OnModuleInit {
   private mapRow(row: Record<string, unknown>): EntityEdge {
     return {
       uuid: row['uuid'] as Uuid,
-      name: row['name'] as string,
+      name: row['name'] as RelationshipType,
       groupId: row['group_id'] as GroupId,
       createdAt: row['created_at'] as Date,
       sourceNodeUuid: row['source_node_uuid'] as Uuid,

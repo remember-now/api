@@ -11,6 +11,8 @@ import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
   GetByGroupIdsParams,
   GroupId,
+  NodeLabels,
+  NodeName,
   SearchBySimilarityParams,
   SearchByTextParams,
   Uuid,
@@ -248,9 +250,9 @@ export class CommunityNodeRepository implements OnModuleInit {
   private mapRow(row: Record<string, unknown>): CommunityNode {
     return {
       uuid: row['uuid'] as Uuid,
-      name: row['name'] as string,
+      name: row['name'] as NodeName,
       groupId: row['group_id'] as GroupId,
-      labels: row['labels'] as string[],
+      labels: row['labels'] as NodeLabels,
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string) ?? '',
       nameEmbedding: (row['name_embedding'] as number[] | null) ?? null,

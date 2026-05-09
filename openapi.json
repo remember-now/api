@@ -1266,6 +1266,7 @@
             "pattern": "^[a-zA-Z0-9_-]+$"
           },
           "source": {
+            "default": "message",
             "type": "string",
             "enum": [
               "message",

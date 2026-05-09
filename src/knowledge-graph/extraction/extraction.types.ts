@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
+import { NodeNameSchema, RelationshipTypeSchema } from '../neo4j';
+
 // Schemas
 
 export const ExtractedEntitySchema = z.object({
-  name: z.string(),
+  name: NodeNameSchema,
   entityTypeId: z.number().optional(),
 });
 
@@ -14,7 +16,7 @@ export const ExtractedEntitiesSchema = z.object({
 export const ExtractedEdgeSchema = z.object({
   source: z.string(),
   target: z.string(),
-  name: z.string(),
+  name: RelationshipTypeSchema,
   description: z.string(),
   validAt: z.string().nullable().optional(),
   invalidAt: z.string().nullable().optional(),

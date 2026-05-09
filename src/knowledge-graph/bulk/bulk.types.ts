@@ -1,44 +1,24 @@
+import z from 'zod';
+
 import {
-  EdgeTypeMap,
-  EdgeTypesMap,
-  EntityTypeMap,
+  BaseEpisodeOptionsSchema,
+  BaseEpisodeResultSchema,
+  EpisodeSchema,
 } from '../episode/episode.types';
-import {
-  EntityEdge,
-  EntityNode,
-  EpisodeType,
-  EpisodicEdge,
-  EpisodicNode,
-} from '../models';
-import { GroupId, Uuid } from '../neo4j/neo4j.schemas';
+import { EpisodicNodeSchema } from '../models';
 
-export interface RawEpisode {
-  uuid?: Uuid;
-  name: string;
-  content: string;
-  source: EpisodeType;
-  sourceDescription: string;
-  referenceTime: Date;
-  groupId: GroupId;
-  sagaUuid?: Uuid;
-}
+// Schemas
 
-export interface AddBulkEpisodeOptions {
-  userId: number;
-  episodes: RawEpisode[];
-  entityTypes?: EntityTypeMap;
-  edgeTypes?: EdgeTypesMap;
-  edgeTypeMap?: EdgeTypeMap;
-  excludedEntityTypes?: string[];
-  customInstructions?: string;
-  updateCommunities?: boolean;
-  useCombinedExtraction?: boolean;
-}
+export const AddBulkEpisodeOptionsSchema = BaseEpisodeOptionsSchema.extend({
+  episodes: z.array(EpisodeSchema).min(1),
+  useCombinedExtraction: z.boolean().optional(),
+});
 
-export interface AddBulkEpisodeResult {
-  episodes: EpisodicNode[];
-  nodes: EntityNode[];
-  edges: EntityEdge[];
-  invalidatedEdges: EntityEdge[];
-  episodicEdges: EpisodicEdge[];
-}
+export const AddBulkEpisodeResultSchema = BaseEpisodeResultSchema.extend({
+  episodes: z.array(EpisodicNodeSchema),
+});
+
+// Types
+
+export type AddBulkEpisodeOptions = z.infer<typeof AddBulkEpisodeOptionsSchema>;
+export type AddBulkEpisodeResult = z.infer<typeof AddBulkEpisodeResultSchema>;

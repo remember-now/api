@@ -5,21 +5,22 @@ import {
 } from '@langchain/core/messages';
 import { z } from 'zod';
 
-import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
 import { EpisodicNode } from '../models';
+import { NodeNameSchema, RelationshipTypeSchema } from '../neo4j';
 import { concatenateEpisodes } from './text-utils';
 
 // Schemas
 
 export const CombinedEntitySchema = z.object({
-  name: z.string(),
+  name: NodeNameSchema,
   entityTypeId: z.number().optional(),
 });
 
 export const CombinedFactSchema = z.object({
-  sourceEntityName: z.string(),
-  targetEntityName: z.string(),
-  relationType: z.string(),
+  sourceEntityName: NodeNameSchema,
+  targetEntityName: NodeNameSchema,
+  relationType: RelationshipTypeSchema,
   fact: z.string(),
   validAt: z.string().nullable().optional(),
   invalidAt: z.string().nullable().optional(),
@@ -73,8 +74,8 @@ export function buildExtractNodesAndEdgesMessages(ctx: {
   episodes: EpisodicNode[];
   referenceTime: Date;
   entityTypes?: Record<string, { description: string }>;
-  edgeTypes?: EdgeTypesMap;
-  edgeTypeMap?: EdgeTypeMap;
+  edgeTypes?: EdgeTypeMap;
+  edgeTypeMappings?: EdgeTypeMappings;
   customInstructions?: string;
 }): BaseMessage[] {
   const {
@@ -82,7 +83,7 @@ export function buildExtractNodesAndEdgesMessages(ctx: {
     referenceTime,
     entityTypes,
     edgeTypes,
-    edgeTypeMap,
+    edgeTypeMappings,
     customInstructions,
   } = ctx;
 
@@ -91,9 +92,9 @@ export function buildExtractNodesAndEdgesMessages(ctx: {
 
   // Build inverted signatures map: typeName → list of "SourceLabel,TargetLabel" keys
   const edgeTypeSignaturesMap: Record<string, string[]> = {};
-  if (edgeTypeMap) {
-    for (const [sig, names] of Object.entries(edgeTypeMap)) {
-      for (const n of names) {
+  if (edgeTypeMappings) {
+    for (const [sig, names] of Object.entries(edgeTypeMappings)) {
+      for (const n of names as string[]) {
         (edgeTypeSignaturesMap[n] ??= []).push(sig);
       }
     }

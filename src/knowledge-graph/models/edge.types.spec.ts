@@ -1,5 +1,6 @@
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from '@/test/factories';
 
+import { RelationshipTypeSchema } from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeSchema,
   createCommunityEdge,
@@ -92,7 +93,7 @@ describe('EntityEdge', () => {
   describe('createEntityEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -114,7 +115,7 @@ describe('EntityEdge', () => {
 
     it('should allow overriding fact', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'Person A knows Person B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -125,7 +126,7 @@ describe('EntityEdge', () => {
 
     it('should allow setting factEmbedding', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -138,7 +139,7 @@ describe('EntityEdge', () => {
     it('should allow setting dates', () => {
       const date = KG_REFERENCE_TIME;
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -156,7 +157,7 @@ describe('EntityEdge', () => {
   describe('EntityEdgeSchema', () => {
     it('should accept valid entity edge', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -167,7 +168,7 @@ describe('EntityEdge', () => {
 
     it('should reject empty name', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -178,7 +179,7 @@ describe('EntityEdge', () => {
 
     it('should reject empty groupId', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,
@@ -189,7 +190,7 @@ describe('EntityEdge', () => {
 
     it('should accept null dates', () => {
       const edge = createEntityEdge({
-        name: 'KNOWS',
+        name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         groupId: KG_TEST_GROUP_ID,
         sourceNodeUuid,

@@ -5,6 +5,8 @@ import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import {
   GetByGroupIdsWithCursorParams,
   GroupId,
+  NodeLabels,
+  NodeName,
   Uuid,
 } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
@@ -151,9 +153,9 @@ export class SagaNodeRepository implements OnModuleInit {
   private mapRow(row: Record<string, unknown>): SagaNode {
     return {
       uuid: row['uuid'] as Uuid,
-      name: row['name'] as string,
+      name: row['name'] as NodeName,
       groupId: row['group_id'] as GroupId,
-      labels: row['labels'] as string[],
+      labels: row['labels'] as NodeLabels,
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string | undefined) ?? '',
       lastSummarizedAt:

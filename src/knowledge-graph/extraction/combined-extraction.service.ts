@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import {
   EdgeTypeMap,
-  EdgeTypesMap,
+  EdgeTypeMappings,
   EntityTypeMap,
 } from '../episode/episode.types';
 import {
@@ -14,6 +14,7 @@ import {
   EntityNode,
   EpisodicNode,
 } from '../models';
+import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
 import { buildExtractTimestampsBatchMessages } from '../prompts/extract-edges.prompts';
 import {
   buildExtractNodesAndEdgesMessages,
@@ -35,8 +36,8 @@ export class CombinedExtractionService {
     model: BaseChatModel,
     episodes: EpisodicNode[],
     entityTypes?: EntityTypeMap,
-    edgeTypes?: EdgeTypesMap,
-    edgeTypeMap?: EdgeTypeMap,
+    edgeTypes?: EdgeTypeMap,
+    edgeTypeMappings?: EdgeTypeMappings,
     customInstructions?: string,
     excludedEntityTypes?: string[],
   ): Promise<{
@@ -59,7 +60,7 @@ export class CombinedExtractionService {
       referenceTime,
       entityTypes,
       edgeTypes,
-      edgeTypeMap,
+      edgeTypeMappings,
       customInstructions,
     });
 
@@ -189,11 +190,13 @@ export class CombinedExtractionService {
 function resolveLabels(
   entityTypeId: number | undefined,
   entityTypes?: EntityTypeMap,
-): string[] {
+): NodeLabels {
+  const entity = NodeLabelSchema.parse('Entity');
+
   if (entityTypeId === undefined || !entityTypes) {
-    return ['Entity'];
+    return [entity];
   }
-  const labels = Object.keys(entityTypes);
+  const labels = Object.keys(entityTypes) as NodeLabel[];
   const label = labels[entityTypeId];
-  return label ? ['Entity', label] : ['Entity'];
+  return label ? [entity, label] : [entity];
 }

@@ -5,6 +5,8 @@ import { z } from 'zod';
 import {
   GroupId,
   GroupIdSchema,
+  RelationshipType,
+  RelationshipTypeSchema,
   Uuid,
   UuidSchema,
 } from '../neo4j/neo4j.schemas';
@@ -20,7 +22,7 @@ export const EdgeBaseSchema = z.object({
 });
 
 export const EntityEdgeSchema = EdgeBaseSchema.extend({
-  name: z.string().min(1),
+  name: RelationshipTypeSchema,
   fact: z.string(),
   factEmbedding: z.array(z.number()).nullable(),
   episodes: z.array(UuidSchema),
@@ -62,7 +64,7 @@ export function createEdgeDefaults(): Omit<
 
 export function createEntityEdge(
   partial: Partial<EntityEdge> & {
-    name: string;
+    name: RelationshipType;
     fact: string;
     groupId: GroupId;
     sourceNodeUuid: Uuid;

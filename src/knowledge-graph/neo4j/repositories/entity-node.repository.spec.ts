@@ -1,6 +1,5 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 import neoDriver from 'neo4j-driver';
-import { ZodError } from 'zod';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import {
@@ -48,15 +47,6 @@ describe('EntityNodeRepository', () => {
         expect.stringContaining('MERGE (n:Entity:Person'),
         expect.anything(),
       );
-    });
-
-    it('should throw ZodError for unsafe label', async () => {
-      const node = KgNodeFactory.createEntityNode({
-        name: 'Test',
-        labels: ['Entity) WITH n MATCH (x'],
-      });
-      await expect(repo.save(node)).rejects.toBeInstanceOf(ZodError);
-      expect(neo4j.executeWrite).not.toHaveBeenCalled();
     });
 
     it('should use vector property call when nameEmbedding is present', async () => {

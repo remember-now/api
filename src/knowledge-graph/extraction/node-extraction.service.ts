@@ -3,19 +3,22 @@ import { Injectable } from '@nestjs/common';
 
 import { EntityTypeMap } from '../episode/episode.types';
 import { createEntityNode, EntityNode, EpisodicNode } from '../models';
+import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
 import { buildExtractNodesMessages } from '../prompts';
 import { extractedEntitiesJsonSchema } from './extraction.types';
 
 function resolveLabels(
   entityTypeId: number | undefined,
   entityTypes?: EntityTypeMap,
-): string[] {
+): NodeLabels {
+  const entity = NodeLabelSchema.parse('Entity');
+
   if (entityTypeId === undefined || !entityTypes) {
-    return ['Entity'];
+    return [entity];
   }
-  const labels = Object.keys(entityTypes);
+  const labels = Object.keys(entityTypes) as NodeLabel[];
   const label = labels[entityTypeId];
-  return label ? ['Entity', label] : ['Entity'];
+  return label ? [entity, label] : [entity];
 }
 
 @Injectable()

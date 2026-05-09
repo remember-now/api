@@ -23,7 +23,7 @@ const TestIngestSchema = z.object({
   name: z.string().min(1),
   content: z.string().min(1),
   groupId: GroupIdSchema,
-  source: z.enum(EpisodeType).optional(),
+  source: z.enum(EpisodeType).default(EpisodeType.message),
 });
 class TestIngestDto extends createZodDto(TestIngestSchema) {}
 
@@ -58,10 +58,12 @@ export class AgentController {
   async testIngest(@Body() body: TestIngestDto, @GetUser('id') userId: number) {
     const result = await this.episodeService.addEpisode({
       userId,
-      name: body.name,
-      content: body.content,
-      groupId: body.groupId,
-      source: body.source,
+      episode: {
+        name: body.name,
+        content: body.content,
+        groupId: body.groupId,
+        source: body.source,
+      },
     });
 
     return {

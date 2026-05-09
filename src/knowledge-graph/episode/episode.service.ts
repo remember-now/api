@@ -20,6 +20,7 @@ import {
 } from '../models';
 import {
   GroupId,
+  NodeNameSchema,
   RetrieveEpisodesParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
@@ -50,10 +51,14 @@ import {
   PREVIOUS_EPISODES_WINDOW,
 } from './episode-constants';
 import {
-  AddEpisodeOptions,
-  AddEpisodeResult,
-  EdgeTypeMap,
   getApplicableEdgeTypes,
+  getEffectiveTypeMappings,
+} from './episode-utils';
+import {
+  AddEpisodeOptions,
+  AddEpisodeOptionsInput,
+  AddEpisodeOptionsSchema,
+  AddEpisodeResult,
   nodeSummaryJsonSchema,
 } from './episode.types';
 
@@ -185,26 +190,21 @@ export class EpisodeService {
     return updatedSaga.summary;
   }
 
-  async addEpisode(options: AddEpisodeOptions): Promise<AddEpisodeResult> {
+  async addEpisode(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult> {
     const {
       userId,
-      name,
-      content,
-      source = EpisodeType.text,
-      sourceDescription = '',
-      groupId,
-      referenceTime = new Date(),
-      sagaUuid,
+      episode,
       entityTypes,
       edgeTypes,
-      edgeTypeMap,
+      edgeTypeMappings,
       excludedEntityTypes,
       customInstructions,
-    } = options;
+    }: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
 
-    const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
-      edgeTypeMap ??
-      (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
+    const effectiveEdgeTypeMappings = getEffectiveTypeMappings(
+      edgeTypeMappings,
+      edgeTypes,
+    );
 
     // 1. Get active model
     const model = await this.llmService.getActiveModel(userId);
@@ -212,32 +212,32 @@ export class EpisodeService {
     // 2. Retrieve previous episodes
     const previousEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
       RetrieveEpisodesParamsSchema.parse({
-        referenceTime,
+        referenceTime: episode.referenceTime,
         lastN: PREVIOUS_EPISODES_WINDOW,
-        groupIds: [groupId],
+        groupIds: [episode.groupId],
       }),
     );
 
     // 3. Create + save episode
-    const episode = createEpisodicNode({
-      name,
-      content,
-      source,
-      sourceDescription,
-      groupId,
-      validAt: referenceTime,
+    const episodicNode = createEpisodicNode({
+      name: episode.name,
+      content: episode.content,
+      source: episode.source,
+      sourceDescription: episode.sourceDescription,
+      groupId: episode.groupId,
+      validAt: episode.referenceTime,
     });
-    await this.episodicNodeRepository.save(episode);
+    await this.episodicNodeRepository.save(episodicNode);
 
     // 4. Extract nodes (with chunking for large content)
     let extractedNodes: EntityNode[];
-    if (shouldChunk(content)) {
-      const chunks = await chunkContent(content, source);
+    if (shouldChunk(episode.content)) {
+      const chunks = await chunkContent(episode.content, episode.source);
       const perChunk = await Promise.all(
         chunks.map((chunk) =>
           this.nodeExtractionService.extractNodes(
             model,
-            { ...episode, content: chunk },
+            { ...episodicNode, content: chunk },
             previousEpisodes,
             entityTypes,
             customInstructions,
@@ -257,7 +257,7 @@ export class EpisodeService {
     } else {
       extractedNodes = await this.nodeExtractionService.extractNodes(
         model,
-        episode,
+        episodicNode,
         previousEpisodes,
         entityTypes,
         customInstructions,
@@ -270,14 +270,14 @@ export class EpisodeService {
       await this.embeddingService.embedNodes(extractedNodes);
     const existingNodes = await this.collectNodeCandidates(
       embeddedNodes,
-      groupId,
+      episode.groupId,
     );
 
     // 6. Resolve nodes
     const { resolvedNodes, uuidMap } =
       await this.nodeResolutionService.resolveNodes(
         model,
-        episode,
+        episodicNode,
         embeddedNodes,
         existingNodes,
         previousEpisodes,
@@ -292,13 +292,13 @@ export class EpisodeService {
     // 7. Extract edges
     const extractedEdges = await this.edgeExtractionService.extractEdges(
       model,
-      episode,
+      episodicNode,
       canonicalNodes,
       previousEpisodes,
-      referenceTime,
+      episode.referenceTime,
       customInstructions,
       edgeTypes,
-      effectiveEdgeTypeMap,
+      effectiveEdgeTypeMappings,
     );
 
     // 8. Embed extracted edges, then collect search-based candidates
@@ -306,23 +306,23 @@ export class EpisodeService {
       await this.embeddingService.embedEdges(extractedEdges);
     const existingEdges = await this.collectEdgeCandidates(
       embeddedEdges,
-      groupId,
+      episode.groupId,
     );
 
     // 9. Resolve edges
     const { resolvedEdges, invalidatedEdges } =
       await this.edgeResolutionService.resolveEdges(
         model,
-        episode,
+        episodicNode,
         embeddedEdges,
         existingEdges,
         uuidMap,
-        referenceTime,
+        episode.referenceTime,
         previousEpisodes,
         customInstructions,
       );
 
-    episode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map(
+    episodicNode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map(
       (e) => e.uuid,
     );
 
@@ -336,10 +336,10 @@ export class EpisodeService {
             e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
         );
         const attrMessages = buildExtractEntityAttributesMessages({
-          episodeContent: episode.content,
+          episodeContent: episodicNode.content,
           previousEpisodesContent: previousEpisodes.map((ep) => ep.content),
           relatedFacts: nodeEdges.map((e) => e.fact),
-          referenceTime: episode.validAt,
+          referenceTime: episodicNode.validAt,
           existingAttributes: node.attributes ?? {},
         });
         const attrs = (await model
@@ -350,7 +350,7 @@ export class EpisodeService {
     }
 
     // 9.6. Extract edge attributes post-resolution (custom edge types)
-    if (edgeTypes && effectiveEdgeTypeMap) {
+    if (edgeTypes && effectiveEdgeTypeMappings) {
       const uuidToNode = new Map<string, EntityNode>(
         canonicalNodes.map((n) => [n.uuid, n]),
       );
@@ -362,7 +362,7 @@ export class EpisodeService {
           src.labels,
           tgt.labels,
           edgeTypes,
-          effectiveEdgeTypeMap,
+          effectiveEdgeTypeMappings,
         );
         const typeDef = applicable[edge.name];
         if (!typeDef) continue;
@@ -373,7 +373,7 @@ export class EpisodeService {
         const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
           buildExtractEdgeAttributesMessages({
             fact: edge.fact,
-            referenceTime: episode.validAt,
+            referenceTime: episodicNode.validAt,
             existingAttributes: edge.attributes ?? {},
           }),
         )) as Record<string, unknown>;
@@ -405,7 +405,7 @@ export class EpisodeService {
           i + MAX_NODES_PER_SUMMARY_BATCH,
         );
         const summaryMessages = buildNodeSummaryMessages({
-          episode,
+          episode: episodicNode,
           previousEpisodes,
           nodes: batch,
         });
@@ -430,9 +430,9 @@ export class EpisodeService {
     // 11. Build episodic edges
     const episodicEdges = canonicalNodes.map((n) =>
       createEpisodicEdge({
-        sourceNodeUuid: episode.uuid,
+        sourceNodeUuid: episodicNode.uuid,
         targetNodeUuid: n.uuid,
-        groupId,
+        groupId: episode.groupId,
       }),
     );
 
@@ -442,35 +442,39 @@ export class EpisodeService {
       this.entityEdgeRepository.saveBulk(resolvedEdges),
       this.entityEdgeRepository.saveBulk(invalidatedEdges),
       this.episodicEdgeRepository.saveBulk(episodicEdges),
-      this.episodicNodeRepository.save(episode),
+      this.episodicNodeRepository.save(episodicNode),
     ]);
 
     // 13. Saga association
-    if (sagaUuid) {
+    if (episode.sagaUuid) {
       await this.sagaNodeRepository.save(
-        createSagaNode({ uuid: sagaUuid, name: sagaUuid, groupId }),
+        createSagaNode({
+          uuid: episode.sagaUuid,
+          name: NodeNameSchema.parse(episode.sagaUuid),
+          groupId: episode.groupId,
+        }),
       );
       await this.hasEpisodeEdgeRepository.save(
         createHasEpisodeEdge({
-          sourceNodeUuid: sagaUuid,
-          targetNodeUuid: episode.uuid,
-          groupId,
+          sourceNodeUuid: episode.sagaUuid,
+          targetNodeUuid: episodicNode.uuid,
+          groupId: episode.groupId,
         }),
       );
 
       const [prevEpisode] = await this.episodicNodeRepository.retrieveEpisodes(
         RetrieveEpisodesParamsSchema.parse({
-          referenceTime,
+          referenceTime: episode.referenceTime,
           lastN: 1,
-          sagaUuid,
+          sagaUuid: episode.sagaUuid,
         }),
       );
-      if (prevEpisode && prevEpisode.uuid !== episode.uuid) {
+      if (prevEpisode && prevEpisode.uuid !== episodicNode.uuid) {
         await this.nextEpisodeEdgeRepository.save(
           createNextEpisodeEdge({
             sourceNodeUuid: prevEpisode.uuid,
-            targetNodeUuid: episode.uuid,
-            groupId,
+            targetNodeUuid: episodicNode.uuid,
+            groupId: episode.groupId,
           }),
         );
       }
@@ -478,11 +482,11 @@ export class EpisodeService {
 
     // 14. Build communities (opt-in)
     if (options.updateCommunities) {
-      await this.communityService.buildCommunities(userId, groupId);
+      await this.communityService.buildCommunities(userId, episode.groupId);
     }
 
     return {
-      episode,
+      episode: episodicNode,
       nodes: resolvedNodes,
       edges: resolvedEdges,
       invalidatedEdges,

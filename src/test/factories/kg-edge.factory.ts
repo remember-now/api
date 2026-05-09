@@ -10,19 +10,23 @@ import {
   HasEpisodeEdge,
   NextEpisodeEdge,
 } from '@/knowledge-graph/models';
+import { RelationshipTypeSchema } from '@/knowledge-graph/neo4j';
 
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from './kg-constants';
 
+type WithStringName<T> = Omit<Partial<T>, 'name'> & { name?: string };
+
 export class KgEdgeFactory {
-  static createEntityEdge(opts: Partial<EntityEdge> = {}): EntityEdge {
+  static createEntityEdge(opts: WithStringName<EntityEdge> = {}): EntityEdge {
+    const { name, ...rest } = opts;
     return createEntityEdge({
-      name: 'related_to',
+      name: RelationshipTypeSchema.parse(name ?? 'RELATED_TO'),
       fact: 'A is related to B',
       groupId: KG_TEST_GROUP_ID,
       sourceNodeUuid: kgUuid(),
       targetNodeUuid: kgUuid(),
       validAt: KG_REFERENCE_TIME,
-      ...opts,
+      ...rest,
     });
   }
 

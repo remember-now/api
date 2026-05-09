@@ -10,6 +10,7 @@ import {
   KG_TEST_USER_ID,
   KgEdgeFactory,
   KgNodeFactory,
+  makeEpisode,
 } from '@/test/factories';
 
 import { CommunityService } from '../community';
@@ -32,10 +33,7 @@ const u = (s: string) => s as Uuid;
 
 const baseOptions = {
   userId: KG_TEST_USER_ID,
-  name: 'Test Episode',
-  content: 'Alice works at Acme Corp.',
-  groupId: KG_TEST_GROUP_ID,
-  referenceTime: KG_REFERENCE_TIME,
+  episode: makeEpisode('Test Episode'),
 };
 
 describe('EpisodeService', () => {
@@ -359,7 +357,9 @@ describe('EpisodeService', () => {
       .mockResolvedValueOnce([]) // first call for previousEpisodes
       .mockResolvedValueOnce([]); // second call for saga lookup
 
-    await service.addEpisode({ ...baseOptions, sagaUuid: KG_TEST_SAGA_UUID });
+    const baseSagaOptions = baseOptions;
+    baseSagaOptions.episode.sagaUuid = KG_TEST_SAGA_UUID;
+    await service.addEpisode({ ...baseSagaOptions });
 
     expect(mockHasEpisodeEdgeRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -386,7 +386,9 @@ describe('EpisodeService', () => {
       .mockResolvedValueOnce([]) // previousEpisodes
       .mockResolvedValueOnce([prevEpisode]); // saga previous episode
 
-    await service.addEpisode({ ...baseOptions, sagaUuid: KG_TEST_SAGA_UUID });
+    const baseSagaOptions = baseOptions;
+    baseSagaOptions.episode.sagaUuid = KG_TEST_SAGA_UUID;
+    await service.addEpisode({ ...baseSagaOptions });
 
     expect(mockNextEpisodeEdgeRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -404,7 +406,9 @@ describe('EpisodeService', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
-    await service.addEpisode({ ...baseOptions, sagaUuid: KG_TEST_SAGA_UUID });
+    const baseSagaOptions = baseOptions;
+    baseSagaOptions.episode.sagaUuid = KG_TEST_SAGA_UUID;
+    await service.addEpisode({ ...baseSagaOptions });
 
     expect(mockNextEpisodeEdgeRepository.save).not.toHaveBeenCalled();
   });

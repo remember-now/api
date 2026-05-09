@@ -30,7 +30,7 @@ const baseEpisode = KgNodeFactory.createEpisodicNode({
 });
 
 function makeEdge(
-  overrides: Partial<EntityEdge> & { name: string; fact: string },
+  overrides: { name: string; fact: string } & Omit<Partial<EntityEdge>, 'name'>,
 ): EntityEdge {
   return KgEdgeFactory.createEntityEdge({
     sourceNodeUuid: DEFAULT_SRC,

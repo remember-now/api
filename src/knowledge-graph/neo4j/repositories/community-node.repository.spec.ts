@@ -35,12 +35,6 @@ describe('CommunityNodeRepository', () => {
       expect(result).toBe(node.uuid);
     });
 
-    it('should throw before executing query when labels are invalid', async () => {
-      const node = KgNodeFactory.createCommunityNode({ labels: [] });
-      await expect(repo.save(node)).rejects.toThrow();
-      expect(neo4j.executeWrite).not.toHaveBeenCalled();
-    });
-
     it('should use vector property when nameEmbedding is present', async () => {
       const node = KgNodeFactory.createCommunityNode({
         name: 'Community',

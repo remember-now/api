@@ -7,7 +7,12 @@ import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
 import { createCommunityEdge, createCommunityNode } from '../models';
-import { GraphNameSchema, GroupId, Uuid } from '../neo4j/neo4j.schemas';
+import {
+  GraphNameSchema,
+  GroupId,
+  NodeNameSchema,
+  Uuid,
+} from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
@@ -18,7 +23,7 @@ import {
 import { buildCommunitySummaryMessages } from './community-summary.prompts';
 
 export const CommunitySummarySchema = z.object({
-  name: z.string(),
+  name: NodeNameSchema,
   summary: z.string(),
 });
 

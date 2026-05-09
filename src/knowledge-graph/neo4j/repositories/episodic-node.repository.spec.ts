@@ -35,12 +35,6 @@ describe('EpisodicNodeRepository', () => {
       );
       expect(result).toBe(node.uuid);
     });
-
-    it('should throw before executing query when labels are invalid', async () => {
-      const node = KgNodeFactory.createEpisodicNode({ labels: [] });
-      await expect(repo.save(node)).rejects.toThrow();
-      expect(neo4j.executeWrite).not.toHaveBeenCalled();
-    });
   });
 
   describe('delete', () => {

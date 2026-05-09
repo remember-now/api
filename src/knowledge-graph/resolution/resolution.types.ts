@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
+import { NodeNameSchema } from '../neo4j';
+
 // Schemas
 
 export const NodeResolutionSchema = z.object({
   id: z.number(),
-  name: z.string(),
-  duplicate_name: z.string(),
+  name: NodeNameSchema,
+  duplicate_name: NodeNameSchema,
 });
 
 export const NodeResolutionsSchema = z.object({

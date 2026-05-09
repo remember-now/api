@@ -4,7 +4,7 @@ import {
   SystemMessage,
 } from '@langchain/core/messages';
 
-import { EdgeTypeMap, EdgeTypesMap } from '../episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
 import { EntityNode, EpisodicNode } from '../models';
 import { episodeToContext } from './prompts.types';
 
@@ -64,8 +64,8 @@ export function buildExtractEdgesMessages(ctx: {
   previousEpisodes: EpisodicNode[];
   referenceTime: Date;
   customInstructions?: string;
-  edgeTypes?: EdgeTypesMap;
-  edgeTypeMap?: EdgeTypeMap;
+  edgeTypes?: EdgeTypeMap;
+  edgeTypeMappings?: EdgeTypeMappings;
 }): BaseMessage[] {
   const {
     episode,
@@ -74,7 +74,7 @@ export function buildExtractEdgesMessages(ctx: {
     referenceTime,
     customInstructions,
     edgeTypes,
-    edgeTypeMap,
+    edgeTypeMappings,
   } = ctx;
 
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
@@ -82,9 +82,9 @@ export function buildExtractEdgesMessages(ctx: {
 
   // Build inverted signatures map: typeName → list of "SourceLabel,TargetLabel" keys
   const edgeTypeSignaturesMap: Record<string, string[]> = {};
-  if (edgeTypeMap) {
-    for (const [sig, names] of Object.entries(edgeTypeMap)) {
-      for (const n of names) {
+  if (edgeTypeMappings) {
+    for (const [sig, names] of Object.entries(edgeTypeMappings)) {
+      for (const n of names as string[]) {
         (edgeTypeSignaturesMap[n] ??= []).push(sig);
       }
     }

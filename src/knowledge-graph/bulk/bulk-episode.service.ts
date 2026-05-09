@@ -5,16 +5,13 @@ import { LlmService } from '@/llm/llm.service';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
+import { getApplicableEdgeTypes, getEffectiveTypeMappings } from '../episode';
 import {
   CANDIDATE_LIMIT,
   MAX_NODES_PER_SUMMARY_BATCH,
   PREVIOUS_EPISODES_WINDOW,
 } from '../episode/episode-constants';
-import {
-  EdgeTypeMap,
-  getApplicableEdgeTypes,
-  nodeSummaryJsonSchema,
-} from '../episode/episode.types';
+import { nodeSummaryJsonSchema } from '../episode/episode.types';
 import {
   CombinedExtractionService,
   EdgeExtractionService,
@@ -93,31 +90,34 @@ export class BulkEpisodeService {
       episodes,
       entityTypes,
       edgeTypes,
-      edgeTypeMap,
+      edgeTypeMappings,
       excludedEntityTypes,
       customInstructions,
       updateCommunities,
       useCombinedExtraction = false,
     } = options;
 
-    const effectiveEdgeTypeMap: EdgeTypeMap | undefined =
-      edgeTypeMap ??
-      (edgeTypes ? { 'Entity,Entity': Object.keys(edgeTypes) } : undefined);
-
-    // 1. Guard
-    if (episodes.length === 0) {
-      return {
-        episodes: [],
-        nodes: [],
-        edges: [],
-        invalidatedEdges: [],
-        episodicEdges: [],
-      };
-    }
-    // 2. Get model
+    const effectiveEdgeTypeMappings = getEffectiveTypeMappings(
+      edgeTypeMappings,
+      edgeTypes,
+    );
+    // 1. Get model
     const model = await this.llmService.getActiveModel(userId);
 
-    // 3. Create episodic nodes (apply uuid override if provided)
+    // 2. Retrieve previous episodes in parallel
+    const prevEpisodesPerEpisode = await Promise.all(
+      episodes.map((ep) =>
+        this.episodicNodeRepository.retrieveEpisodes(
+          RetrieveEpisodesParamsSchema.parse({
+            referenceTime: ep.referenceTime,
+            lastN: PREVIOUS_EPISODES_WINDOW,
+            groupIds: [ep.groupId],
+          }),
+        ),
+      ),
+    );
+
+    // 3. Create + save episodic nodes (apply uuid override if provided)
     const episodicNodes = episodes.map((raw) => {
       const node = createEpisodicNode({
         name: raw.name,
@@ -129,24 +129,9 @@ export class BulkEpisodeService {
       });
       return raw.uuid ? { ...node, uuid: raw.uuid } : node;
     });
-
-    // 4. Save all episodic nodes
     await this.episodicNodeRepository.saveBulk(episodicNodes);
 
-    // 5. Retrieve previous episodes in parallel
-    const prevEpisodesPerEpisode = await Promise.all(
-      episodicNodes.map((ep) =>
-        this.episodicNodeRepository.retrieveEpisodes(
-          RetrieveEpisodesParamsSchema.parse({
-            referenceTime: ep.validAt,
-            lastN: PREVIOUS_EPISODES_WINDOW,
-            groupIds: [ep.groupId],
-          }),
-        ),
-      ),
-    );
-
-    // 6. Extract nodes (and edges, if using combined extraction) in parallel
+    // 4. Extract nodes (and edges, if using combined extraction) in parallel
     // Combined path: single LLM call per episode yields both nodes and edges.
     // Separate path: node extraction only; edges are extracted later in step 13.
     let preExtractedEdgesPerEpisode: EntityEdge[][] | null = null;
@@ -161,7 +146,7 @@ export class BulkEpisodeService {
               [ep],
               entityTypes,
               edgeTypes,
-              effectiveEdgeTypeMap,
+              effectiveEdgeTypeMappings,
               customInstructions,
               excludedEntityTypes,
             );
@@ -208,7 +193,7 @@ export class BulkEpisodeService {
       }),
     );
 
-    // 7. Embed all extracted nodes (batch)
+    // 5. Embed all extracted nodes (batch)
     const allExtractedNodes = extractedNodesPerEpisode.flat();
     const allEmbedded =
       await this.embeddingService.embedNodes(allExtractedNodes);
@@ -217,7 +202,7 @@ export class BulkEpisodeService {
       extractedNodesPerEpisode.map((a) => a.length),
     );
 
-    // 8. Collect search-based node candidates per episode
+    // 6. Collect search-based node candidates per episode
     const groupIds = [...new Set(episodes.map((e) => e.groupId))];
     const candidatesPerEpisode = await Promise.all(
       embeddedPerEpisode.map((nodes, i) =>
@@ -228,7 +213,7 @@ export class BulkEpisodeService {
       candidatesPerEpisode.flat().map((n) => [n.uuid, n]),
     );
 
-    // 9. Pass 1 — resolve nodes vs live graph in parallel
+    // 7. Pass 1 — resolve nodes vs live graph in parallel
     const nodeResolutions = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       embeddedPerEpisode.map(
@@ -244,7 +229,7 @@ export class BulkEpisodeService {
       ),
     );
 
-    // 10. Merge duplicate pairs from pass 1
+    // 8. Merge duplicate pairs from pass 1
     const pass1Pairs: [Uuid, Uuid][] = nodeResolutions.flatMap((r) =>
       r.duplicatePairs.map((p): [Uuid, Uuid] => [
         p.extractedUuid,
@@ -252,7 +237,7 @@ export class BulkEpisodeService {
       ]),
     );
 
-    // 11. Pass 2 — within-batch dedup: exact name match first, then cosine
+    // 9. Pass 2 — within-batch dedup: exact name match first, then cosine
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
     const pass2Pairs: [Uuid, Uuid][] = [];
     for (let i = 0; i < allNewNodes.length; i++) {
@@ -276,7 +261,7 @@ export class BulkEpisodeService {
 
     const finalUuidMap = buildDirectedUuidMap([...pass1Pairs, ...pass2Pairs]);
 
-    // 12. Determine canonical nodes per episode
+    // 10. Determine canonical nodes per episode
     const canonicalNodesPerEpisode = nodeResolutions.map((resolution) => {
       const ownCanonical = resolution.resolvedNodes.filter(
         (n) => (finalUuidMap.get(n.uuid) ?? n.uuid) === n.uuid,
@@ -299,7 +284,7 @@ export class BulkEpisodeService {
       return merged;
     });
 
-    // 13. Extract edges in parallel, then resolve pointers.
+    // 11. Extract edges in parallel, then resolve pointers.
     // Combined path: edges were already extracted in step 6; remap node UUIDs via finalUuidMap.
     // Separate path: extract edges using the canonical nodes resolved above.
     const rawEdgesPerEpisode = preExtractedEdgesPerEpisode
@@ -316,7 +301,7 @@ export class BulkEpisodeService {
                 ep.validAt,
                 customInstructions,
                 edgeTypes,
-                effectiveEdgeTypeMap,
+                effectiveEdgeTypeMappings,
               ),
           ),
         );
@@ -325,7 +310,7 @@ export class BulkEpisodeService {
       resolveEdgePointers(edges, finalUuidMap),
     );
 
-    // 14. Embed all extracted edges (batch)
+    // 12. Embed all extracted edges (batch)
     const allExtractedEdges = pointedEdgesPerEpisode.flat();
     const allEmbeddedEdges =
       await this.embeddingService.embedEdges(allExtractedEdges);
@@ -334,14 +319,14 @@ export class BulkEpisodeService {
       pointedEdgesPerEpisode.map((a) => a.length),
     );
 
-    // 15. Collect search-based edge candidates per episode
+    // 13. Collect search-based edge candidates per episode
     const edgeCandidatesPerEpisode = await Promise.all(
       embeddedEdgesPerEpisode.map((edges, i) =>
         this.collectEdgeCandidates(edges, episodicNodes[i].groupId),
       ),
     );
 
-    // 16. Resolve edges in parallel
+    // 14. Resolve edges in parallel
     const edgeResolutions = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       episodicNodes.map(
@@ -371,13 +356,13 @@ export class BulkEpisodeService {
       ].map((e) => e.uuid);
     });
 
-    // 16.5. Extract edge attributes for resolved edges (custom edge types)
+    // 14.5. Extract edge attributes for resolved edges (custom edge types)
     const allCanonicalNodes = [
       ...new Map(
         canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n]),
       ).values(),
     ];
-    if (edgeTypes && effectiveEdgeTypeMap) {
+    if (edgeTypes && effectiveEdgeTypeMappings) {
       const uuidToNode = new Map<Uuid, EntityNode>(
         allCanonicalNodes.map((n) => [n.uuid, n]),
       );
@@ -394,7 +379,7 @@ export class BulkEpisodeService {
             src.labels,
             tgt.labels,
             edgeTypes,
-            effectiveEdgeTypeMap,
+            effectiveEdgeTypeMappings,
           );
           const typeDef = applicable[edge.name];
           if (!typeDef) continue;
@@ -415,7 +400,7 @@ export class BulkEpisodeService {
             src.labels,
             tgt.labels,
             edgeTypes,
-            effectiveEdgeTypeMap,
+            effectiveEdgeTypeMappings,
           );
           const typeDef = applicable[edge.name];
           const jsonSchema = z.toJSONSchema(typeDef.schema);
@@ -431,7 +416,7 @@ export class BulkEpisodeService {
       );
     }
 
-    // 17. Generate node summaries for all new canonical nodes
+    // 15. Generate node summaries for all new canonical nodes
     const newNodesOnly = allCanonicalNodes.filter(
       (n) => !existingNodesMap.has(n.uuid),
     );
@@ -476,7 +461,7 @@ export class BulkEpisodeService {
       }
     }
 
-    // 17.5. Extract entity attributes for new canonical nodes (post-resolution, with edge context)
+    // 16. Extract entity attributes for new canonical nodes (post-resolution, with edge context)
     const nodeToEpisodeCtx = new Map<
       string,
       {
@@ -518,7 +503,7 @@ export class BulkEpisodeService {
       }
     }
 
-    // 18. Create episodic edges
+    // 17. Create episodic edges
     const allEpisodicEdges = episodicNodes.flatMap((ep, i) =>
       canonicalNodesPerEpisode[i].map((node) =>
         createEpisodicEdge({
@@ -529,7 +514,7 @@ export class BulkEpisodeService {
       ),
     );
 
-    // 19. Persist in parallel
+    // 18. Persist in parallel
     await Promise.all([
       this.entityNodeRepository.saveBulk(allCanonicalNodes),
       this.entityEdgeRepository.saveBulk(allResolvedEdges),
@@ -538,7 +523,7 @@ export class BulkEpisodeService {
       this.episodicNodeRepository.saveBulk(episodicNodes),
     ]);
 
-    // 20. Optional community build
+    // 19. Optional community build
     // TODO: Concurrent addEpisodesBulk calls for the same groupId can race here —
     // two community builds may project conflicting graph snapshots and race on
     // deleteByGroupId. Investigate a per-groupId mutex or advisory lock before

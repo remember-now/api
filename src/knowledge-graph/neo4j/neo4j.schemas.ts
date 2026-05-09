@@ -14,16 +14,29 @@ export enum EpisodeType {
   factTriple = 'fact_triple',
 }
 
+export const EpisodeTypeSchema = z.enum(EpisodeType);
+
 // Schemas
+
+export const NodeNameSchema = z.string().min(1).brand<'NodeName'>();
 
 export const NodeLabelSchema = z
   .string()
   .regex(
     /^[A-Za-z_][A-Za-z0-9_]*$/,
     'node label must start with a letter or underscore and contain only alphanumeric characters or underscores',
-  );
+  )
+  .brand<'NodeLabel'>();
 
 export const NodeLabelsSchema = z.array(NodeLabelSchema).min(1);
+
+export const RelationshipTypeSchema = z
+  .string()
+  .regex(
+    /^[A-Z0-9]+(_[A-Z0-9]+)*$/,
+    'relationship type must be SCREAMING_SNAKE_CASE (uppercase letters, digits, single underscores between segments)',
+  )
+  .brand<'RelationshipType'>();
 
 export const GroupIdSchema = z
   .string()
@@ -69,22 +82,21 @@ export const GetByGroupIdsWithCursorParamsSchema = z.object({
   uuidCursor: UuidSchema.optional(),
 });
 
-const episodeTypeValues = Object.values(EpisodeType) as [
-  EpisodeType,
-  ...EpisodeType[],
-];
-
 export const RetrieveEpisodesParamsSchema = z.object({
   referenceTime: z.date().transform((d) => toNeo4jDateTime(d)),
   lastN: neoInt,
   groupIds: z.array(GroupIdSchema).optional(),
-  source: z.enum(episodeTypeValues).optional(),
+  source: EpisodeTypeSchema.optional(),
   sagaUuid: UuidSchema.optional(),
 });
 
 // Types
 
+export type NodeLabel = z.infer<typeof NodeLabelSchema>;
+export type NodeLabels = z.infer<typeof NodeLabelsSchema>;
+export type NodeName = z.infer<typeof NodeNameSchema>;
 export type GroupId = z.infer<typeof GroupIdSchema>;
+export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
 export type GraphName = z.infer<typeof GraphNameSchema>;
 export type Uuid = z.infer<typeof UuidSchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
