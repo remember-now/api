@@ -1,3 +1,4 @@
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
@@ -6,7 +7,11 @@ import { LlmService } from '@/llm/llm.service';
 import { chunkContent, shouldChunk } from '../bulk/content-chunking';
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
-import { EdgeExtractionService, NodeExtractionService } from '../extraction';
+import {
+  CombinedExtractionService,
+  EdgeExtractionService,
+  NodeExtractionService,
+} from '../extraction';
 import {
   createEpisodicEdge,
   createEpisodicNode,
@@ -56,6 +61,9 @@ import {
   AddEpisodeOptionsInput,
   AddEpisodeOptionsSchema,
   AddEpisodeResult,
+  EdgeTypeMap,
+  EdgeTypeMappings,
+  EntityTypeMap,
   nodeSummaryJsonSchema,
 } from './episode.types';
 
@@ -69,6 +77,7 @@ export class EpisodeService {
     private readonly edgeExtractionService: EdgeExtractionService,
     private readonly nodeResolutionService: NodeResolutionService,
     private readonly edgeResolutionService: EdgeResolutionService,
+    private readonly combinedExtractionService: CombinedExtractionService,
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly episodicNodeRepository: EpisodicNodeRepository,
@@ -186,6 +195,75 @@ export class EpisodeService {
     return updatedSaga.summary;
   }
 
+  // * REFACTORING *
+
+  async extractNodes(
+    model: BaseChatModel,
+    episode: EpisodicNode,
+    previousEpisodesForEpisode: EpisodicNode[],
+    entityTypes?: EntityTypeMap,
+    edgeTypes?: EdgeTypeMap,
+    edgeTypeMappings?: EdgeTypeMappings,
+    customInstructions?: string,
+    excludedEntityTypes?: string[],
+    useCombinedExtraction: boolean = false,
+  ): Promise<{
+    extractedNodes: EntityNode[];
+    preExtractedEdges?: EntityEdge[];
+  }> {
+    if (useCombinedExtraction) {
+      const { nodes, edges } = await this.combinedExtractionService.extractNodesAndEdges(
+        model,
+        [episode],
+        entityTypes,
+        edgeTypes,
+        edgeTypeMappings,
+        customInstructions,
+        excludedEntityTypes,
+      );
+      return { extractedNodes: nodes, preExtractedEdges: edges };
+    }
+
+    if (shouldChunk(episode.content)) {
+      const chunks = await chunkContent(episode.content, episode.source);
+      const perChunk = await Promise.all(
+        chunks.map((chunk) =>
+          this.nodeExtractionService.extractNodes(
+            model,
+            { ...episode, content: chunk },
+            previousEpisodesForEpisode,
+            entityTypes,
+            customInstructions,
+            excludedEntityTypes,
+          ),
+        ),
+      );
+      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
+      const nodesByName = new Map<string, EntityNode>();
+
+      for (const nodes of perChunk) {
+        for (const node of nodes) {
+          const key = node.name.toLowerCase();
+          if (!nodesByName.has(key)) nodesByName.set(key, node);
+        }
+      }
+      return { extractedNodes: [...nodesByName.values()] };
+    }
+
+    return {
+      extractedNodes: await this.nodeExtractionService.extractNodes(
+        model,
+        episode,
+        previousEpisodesForEpisode,
+        entityTypes,
+        customInstructions,
+        excludedEntityTypes,
+      ),
+    };
+  }
+
+  // * REFACTORING END *
+
   async addEpisode(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult> {
     const {
       userId,
@@ -224,40 +302,17 @@ export class EpisodeService {
     await this.episodicNodeRepository.save(episodicNode);
 
     // 4. Extract nodes (with chunking for large content)
-    let extractedNodes: EntityNode[];
-    if (shouldChunk(episode.content)) {
-      const chunks = await chunkContent(episode.content, episode.source);
-      const perChunk = await Promise.all(
-        chunks.map((chunk) =>
-          this.nodeExtractionService.extractNodes(
-            model,
-            { ...episodicNode, content: chunk },
-            previousEpisodes,
-            entityTypes,
-            customInstructions,
-            excludedEntityTypes,
-          ),
-        ),
-      );
-      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
-      const nodesByName = new Map<string, EntityNode>();
-      for (const nodes of perChunk) {
-        for (const node of nodes) {
-          const key = node.name.toLowerCase();
-          if (!nodesByName.has(key)) nodesByName.set(key, node);
-        }
-      }
-      extractedNodes = [...nodesByName.values()];
-    } else {
-      extractedNodes = await this.nodeExtractionService.extractNodes(
-        model,
-        episodicNode,
-        previousEpisodes,
-        entityTypes,
-        customInstructions,
-        excludedEntityTypes,
-      );
-    }
+    const { extractedNodes } = await this.extractNodes(
+      model,
+      episodicNode,
+      previousEpisodes,
+      entityTypes,
+      edgeTypes,
+      effectiveEdgeTypeMappings,
+      customInstructions,
+      excludedEntityTypes,
+      false,
+    );
 
     // 5. Embed extracted nodes, then collect search-based candidates
     const embeddedNodes = await this.embeddingService.embedNodes(extractedNodes);
