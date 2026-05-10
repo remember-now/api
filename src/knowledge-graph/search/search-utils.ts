@@ -61,9 +61,7 @@ export function mmr<T extends string = Uuid>(
   if (uuidVectorPairs.size === 0) return [[], []];
 
   const uuids = [...uuidVectorPairs.keys()];
-  const normalized = uuids.map((uuid) =>
-    l2Normalize(uuidVectorPairs.get(uuid)!),
-  );
+  const normalized = uuids.map((uuid) => l2Normalize(uuidVectorPairs.get(uuid)!));
 
   // Build full pairwise similarity matrix
   const simMatrix: number[][] = Array.from({ length: uuids.length }, () =>
@@ -79,9 +77,7 @@ export function mmr<T extends string = Uuid>(
 
   const mmrScores = uuids.map((_, i) => {
     const maxSim = simMatrix[i].reduce((m, v) => (v > m ? v : m), -Infinity);
-    return (
-      lambda * dotProduct(queryVector, normalized[i]) + (lambda - 1) * maxSim
-    );
+    return lambda * dotProduct(queryVector, normalized[i]) + (lambda - 1) * maxSim;
   });
 
   const scored = uuids
@@ -109,10 +105,7 @@ export async function nodeDistanceReranker(
   const scores = new Map<Uuid, number>();
 
   if (filteredUuids.length > 0) {
-    const results = await repo.getNodeDistanceScores(
-      filteredUuids,
-      centerNodeUuid,
-    );
+    const results = await repo.getNodeDistanceScores(filteredUuids, centerNodeUuid);
     for (const row of results) {
       scores.set(row.uuid, row.score);
     }
@@ -199,9 +192,7 @@ export async function crossEncoderReranker(
 ): Promise<[Uuid[], number[]]> {
   if (items.length === 0) return [[], []];
 
-  const scoredModel = model.withStructuredOutput(
-    z.toJSONSchema(CrossEncoderScoreSchema),
-  );
+  const scoredModel = model.withStructuredOutput(z.toJSONSchema(CrossEncoderScoreSchema));
 
   const rawScores = await Promise.all(
     items.map((item) =>

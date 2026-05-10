@@ -65,7 +65,9 @@ export class EpisodicEdgeRepository implements OnModuleInit {
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:MENTIONS {uuid: $uuid}]->() DELETE e',
-      { uuid },
+      {
+        uuid,
+      },
     );
   }
 
@@ -105,9 +107,7 @@ export class EpisodicEdgeRepository implements OnModuleInit {
     );
   }
 
-  async getByGroupIds(
-    params: GetByGroupIdsWithCursorParams,
-  ): Promise<EpisodicEdge[]> {
+  async getByGroupIds(params: GetByGroupIdsWithCursorParams): Promise<EpisodicEdge[]> {
     const { groupIds, limit, uuidCursor } = params;
 
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';

@@ -86,9 +86,7 @@ export class LlmController {
     @GetUser('id') userId: number,
   ) {
     if (params.provider !== body.provider) {
-      throw new BadRequestException(
-        'Body provider does not match URL provider',
-      );
+      throw new BadRequestException('Body provider does not match URL provider');
     }
     return this.llmService.saveProviderConfig(userId, body);
   }

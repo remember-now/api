@@ -11,10 +11,7 @@ import { Environment } from '@/config/app/configuration';
  * - Graceful shutdown with worker cleanup
  * - Test teardown error detection method to avoid logging noise
  */
-export abstract class BaseQueueConsumer
-  extends WorkerHost
-  implements OnModuleDestroy
-{
+export abstract class BaseQueueConsumer extends WorkerHost implements OnModuleDestroy {
   protected readonly logger: Logger;
   protected readonly isTest = process.env.NODE_ENV === Environment.Test;
 

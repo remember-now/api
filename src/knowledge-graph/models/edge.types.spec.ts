@@ -253,9 +253,7 @@ describe('EpisodicEdge', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      expect(() =>
-        EpisodicEdgeSchema.parse({ ...edge, groupId: '' }),
-      ).toThrow();
+      expect(() => EpisodicEdgeSchema.parse({ ...edge, groupId: '' })).toThrow();
     });
 
     it('should reject invalid source uuid', () => {
@@ -306,9 +304,7 @@ describe('CommunityEdge', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      expect(() =>
-        CommunityEdgeSchema.parse({ ...edge, groupId: '' }),
-      ).toThrow();
+      expect(() => CommunityEdgeSchema.parse({ ...edge, groupId: '' })).toThrow();
     });
 
     it('should reject invalid uuid', () => {
@@ -317,9 +313,7 @@ describe('CommunityEdge', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      expect(() =>
-        CommunityEdgeSchema.parse({ ...edge, uuid: 'not-a-uuid' }),
-      ).toThrow();
+      expect(() => CommunityEdgeSchema.parse({ ...edge, uuid: 'not-a-uuid' })).toThrow();
     });
   });
 });
@@ -359,9 +353,7 @@ describe('HasEpisodeEdge', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      expect(() =>
-        HasEpisodeEdgeSchema.parse({ ...edge, groupId: '' }),
-      ).toThrow();
+      expect(() => HasEpisodeEdgeSchema.parse({ ...edge, groupId: '' })).toThrow();
     });
 
     it('should reject invalid target uuid', () => {
@@ -426,9 +418,7 @@ describe('NextEpisodeEdge', () => {
         sourceNodeUuid,
         targetNodeUuid,
       });
-      expect(() =>
-        NextEpisodeEdgeSchema.parse({ ...edge, groupId: '' }),
-      ).toThrow();
+      expect(() => NextEpisodeEdgeSchema.parse({ ...edge, groupId: '' })).toThrow();
     });
 
     it('should reject invalid uuid', () => {

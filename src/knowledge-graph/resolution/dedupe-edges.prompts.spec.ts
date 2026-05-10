@@ -1,8 +1,4 @@
-import {
-  KG_REFERENCE_TIME,
-  KG_TEST_GROUP_ID,
-  KgNodeFactory,
-} from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
 
@@ -113,9 +109,7 @@ describe('buildDedupeEdgesMessages', () => {
     });
     const human = messages[1];
     expect(human.content).toContain('idx: 1');
-    expect(human.content).toContain(
-      'Alice leads the engineering team at Acme Corp',
-    );
+    expect(human.content).toContain('Alice leads the engineering team at Acme Corp');
   });
 
   it('should include custom instructions in human message', () => {

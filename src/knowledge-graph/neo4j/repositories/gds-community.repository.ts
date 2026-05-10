@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import {
-  GraphName,
-  GroupId,
-  Uuid,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
+import { GraphName, GroupId, Uuid } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 @Injectable()
@@ -20,9 +16,7 @@ export class GdsCommunityRepository {
     );
   }
 
-  async runLeiden(
-    graphName: GraphName,
-  ): Promise<{ uuid: Uuid; communityId: number }[]> {
+  async runLeiden(graphName: GraphName): Promise<{ uuid: Uuid; communityId: number }[]> {
     return this.neo4j.executeRead<{ uuid: Uuid; communityId: number }>(
       /* cypher */ `CALL gds.leiden.stream($graphName, { randomSeed: 42 })
        YIELD nodeId, communityId
@@ -32,9 +26,8 @@ export class GdsCommunityRepository {
   }
 
   async dropGraph(graphName: GraphName): Promise<void> {
-    await this.neo4j.executeWrite(
-      /* cypher */ `CALL gds.graph.drop($graphName, false)`,
-      { graphName },
-    );
+    await this.neo4j.executeWrite(/* cypher */ `CALL gds.graph.drop($graphName, false)`, {
+      graphName,
+    });
   }
 }

@@ -6,11 +6,7 @@ import { LlmProvider } from '@generated/prisma/client';
 
 import { TestLlmFactory } from '@/test/factories';
 
-import {
-  ProviderParamDto,
-  SaveLlmConfigDto,
-  SetActiveProviderDto,
-} from './dto';
+import { ProviderParamDto, SaveLlmConfigDto, SetActiveProviderDto } from './dto';
 import { LlmController } from './llm.controller';
 import { LlmService } from './llm.service';
 
@@ -147,11 +143,7 @@ describe('LlmController', () => {
       const mockResult = TestLlmFactory.createLlmConfigResponse();
       llmService.saveProviderConfig.mockResolvedValueOnce(mockResult);
 
-      const result = await llmController.saveProviderConfig(
-        params,
-        body,
-        userId,
-      );
+      const result = await llmController.saveProviderConfig(params, body, userId);
 
       expect(llmService.saveProviderConfig).toHaveBeenCalledWith(userId, body);
       expect(llmService.saveProviderConfig).toHaveBeenCalledTimes(1);

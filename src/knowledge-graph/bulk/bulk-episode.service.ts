@@ -82,9 +82,7 @@ export class BulkEpisodeService {
     private readonly episodicEdgeRepository: EpisodicEdgeRepository,
   ) {}
 
-  async addEpisodesBulk(
-    options: AddBulkEpisodeOptions,
-  ): Promise<AddBulkEpisodeResult> {
+  async addEpisodesBulk(options: AddBulkEpisodeOptions): Promise<AddBulkEpisodeResult> {
     const {
       userId,
       episodes,
@@ -152,9 +150,8 @@ export class BulkEpisodeService {
             );
           // Stash edges for use in step 13 (index is stable because withConcurrency
           // preserves order for this mapping pattern).
-          (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill(
-            [],
-          ))[i] = edges;
+          (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill([]))[i] =
+            edges;
           return nodes;
         }
 
@@ -195,8 +192,7 @@ export class BulkEpisodeService {
 
     // 5. Embed all extracted nodes (batch)
     const allExtractedNodes = extractedNodesPerEpisode.flat();
-    const allEmbedded =
-      await this.embeddingService.embedNodes(allExtractedNodes);
+    const allEmbedded = await this.embeddingService.embedNodes(allExtractedNodes);
     const embeddedPerEpisode = reassembleByOffsets(
       allEmbedded,
       extractedNodesPerEpisode.map((a) => a.length),
@@ -209,9 +205,7 @@ export class BulkEpisodeService {
         this.collectNodeCandidates(nodes, episodicNodes[i].groupId),
       ),
     );
-    const existingNodesMap = new Map(
-      candidatesPerEpisode.flat().map((n) => [n.uuid, n]),
-    );
+    const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.uuid, n]));
 
     // 7. Pass 1 — resolve nodes vs live graph in parallel
     const nodeResolutions = await withConcurrency(
@@ -231,10 +225,7 @@ export class BulkEpisodeService {
 
     // 8. Merge duplicate pairs from pass 1
     const pass1Pairs: [Uuid, Uuid][] = nodeResolutions.flatMap((r) =>
-      r.duplicatePairs.map((p): [Uuid, Uuid] => [
-        p.extractedUuid,
-        p.canonicalUuid,
-      ]),
+      r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedUuid, p.canonicalUuid]),
     );
 
     // 9. Pass 2 — within-batch dedup: exact name match first, then cosine
@@ -269,8 +260,7 @@ export class BulkEpisodeService {
       // Include existing nodes referenced as canonical targets
       const matchedExisting = resolution.duplicatePairs
         .map((p) => {
-          const canonical =
-            finalUuidMap.get(p.canonicalUuid) ?? p.canonicalUuid;
+          const canonical = finalUuidMap.get(p.canonicalUuid) ?? p.canonicalUuid;
           return existingNodesMap.get(canonical);
         })
         .filter((n): n is NonNullable<typeof n> => n !== undefined);
@@ -312,8 +302,7 @@ export class BulkEpisodeService {
 
     // 12. Embed all extracted edges (batch)
     const allExtractedEdges = pointedEdgesPerEpisode.flat();
-    const allEmbeddedEdges =
-      await this.embeddingService.embedEdges(allExtractedEdges);
+    const allEmbeddedEdges = await this.embeddingService.embedEdges(allExtractedEdges);
     const embeddedEdgesPerEpisode = reassembleByOffsets(
       allEmbeddedEdges,
       pointedEdgesPerEpisode.map((a) => a.length),
@@ -345,22 +334,17 @@ export class BulkEpisodeService {
     );
 
     const allResolvedEdges = edgeResolutions.flatMap((r) => r.resolvedEdges);
-    const allInvalidatedEdges = edgeResolutions.flatMap(
-      (r) => r.invalidatedEdges,
-    );
+    const allInvalidatedEdges = edgeResolutions.flatMap((r) => r.invalidatedEdges);
 
     edgeResolutions.forEach((res, i) => {
-      episodicNodes[i].entityEdges = [
-        ...res.resolvedEdges,
-        ...res.invalidatedEdges,
-      ].map((e) => e.uuid);
+      episodicNodes[i].entityEdges = [...res.resolvedEdges, ...res.invalidatedEdges].map(
+        (e) => e.uuid,
+      );
     });
 
     // 14.5. Extract edge attributes for resolved edges (custom edge types)
     const allCanonicalNodes = [
-      ...new Map(
-        canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n]),
-      ).values(),
+      ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n])).values(),
     ];
     if (edgeTypes && effectiveEdgeTypeMappings) {
       const uuidToNode = new Map<Uuid, EntityNode>(
@@ -417,9 +401,7 @@ export class BulkEpisodeService {
     }
 
     // 15. Generate node summaries for all new canonical nodes
-    const newNodesOnly = allCanonicalNodes.filter(
-      (n) => !existingNodesMap.has(n.uuid),
-    );
+    const newNodesOnly = allCanonicalNodes.filter((n) => !existingNodesMap.has(n.uuid));
 
     if (newNodesOnly.length > 0) {
       const nodesInput = newNodesOnly.map((n) => ({
@@ -427,9 +409,7 @@ export class BulkEpisodeService {
         name: n.name,
         summary: n.summary,
         facts: allResolvedEdges
-          .filter(
-            (e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid,
-          )
+          .filter((e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid)
           .map((e) => e.fact),
       }));
 
@@ -486,8 +466,7 @@ export class BulkEpisodeService {
         const ctx = nodeToEpisodeCtx.get(node.uuid);
         if (!ctx) continue;
         const nodeEdges = allResolvedEdges.filter(
-          (e) =>
-            e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+          (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
         );
         const attrMessages = buildExtractEntityAttributesMessages({
           episodeContent: ctx.episode.content,
@@ -530,9 +509,7 @@ export class BulkEpisodeService {
     // enabling concurrent bulk ingestion.
     if (updateCommunities) {
       await Promise.all(
-        groupIds.map((gid) =>
-          this.communityService.buildCommunities(userId, gid),
-        ),
+        groupIds.map((gid) => this.communityService.buildCommunities(userId, gid)),
       );
     }
 

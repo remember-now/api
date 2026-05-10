@@ -58,8 +58,7 @@ export class NodeResolutionService {
       // Mirrors Python: _normalize_name_for_fuzzy strips to [a-z0-9' ] (no spaces)
       // and _name_entropy computes entropy over that form.
       if (
-        shannonEntropy(normalizeNameForEntropy(normalizedName)) <
-          LOW_ENTROPY_THRESHOLD &&
+        shannonEntropy(normalizeNameForEntropy(normalizedName)) < LOW_ENTROPY_THRESHOLD &&
         existingNodes.length > 0
       ) {
         llmCandidates.set(extracted.uuid, existingNodes);
@@ -67,9 +66,7 @@ export class NodeResolutionService {
       }
 
       // Cosine similarity scan
-      const embeddingCandidates = existingNodes.filter(
-        (n) => n.nameEmbedding !== null,
-      );
+      const embeddingCandidates = existingNodes.filter((n) => n.nameEmbedding !== null);
 
       if (extracted.nameEmbedding !== null && embeddingCandidates.length > 0) {
         const scored = embeddingCandidates

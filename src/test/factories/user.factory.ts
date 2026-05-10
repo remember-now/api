@@ -1,7 +1,4 @@
-import {
-  Role as PrismaRole,
-  User as PrismaUser,
-} from '@generated/prisma/client';
+import { Role as PrismaRole, User as PrismaUser } from '@generated/prisma/client';
 
 import { Role, RoleSchema, User, UserWithoutPassword } from '@/user/dto';
 
@@ -73,9 +70,7 @@ export class UserFactory {
    * Creates a user service return type (what createUser method returns)
    * This has agentId: null specifically (not string | null)
    */
-  static createUserServiceResult(
-    options: Omit<UserFactoryOptions, 'passwordHash'> = {},
-  ) {
+  static createUserServiceResult(options: Omit<UserFactoryOptions, 'passwordHash'> = {}) {
     const { passwordHash: _, ...userOptions } = this.defaultUser;
     const result = {
       ...userOptions,

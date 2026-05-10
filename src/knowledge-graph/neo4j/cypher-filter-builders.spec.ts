@@ -1,8 +1,5 @@
 import { TemporalComparison } from '../search/search-filters.types';
-import {
-  buildEdgeFilterClause,
-  buildNodeFilterClause,
-} from './cypher-filter-builders';
+import { buildEdgeFilterClause, buildNodeFilterClause } from './cypher-filter-builders';
 import { luceneSanitize } from './neo4j-utils';
 
 // ─── luceneSanitize ───────────────────────────────────────────────────────────
@@ -79,9 +76,7 @@ describe('buildNodeFilterClause', () => {
   });
 
   it('nodeLabels: throws on label with space (injection attempt)', () => {
-    expect(() =>
-      buildNodeFilterClause({ nodeLabels: ['Bad Label'] }, 'n'),
-    ).toThrow();
+    expect(() => buildNodeFilterClause({ nodeLabels: ['Bad Label'] }, 'n')).toThrow();
   });
 
   it('nodeLabels: throws on label with Cypher injection characters', () => {
@@ -108,9 +103,7 @@ describe('buildNodeFilterClause', () => {
   it('single-group isNull: no param added, clause contains IS NULL', () => {
     const result = buildNodeFilterClause(
       {
-        temporalFilters: [
-          [{ field: 'invalid_at', op: TemporalComparison.isNull }],
-        ],
+        temporalFilters: [[{ field: 'invalid_at', op: TemporalComparison.isNull }]],
       },
       'n',
     );
@@ -157,9 +150,7 @@ describe('buildNodeFilterClause', () => {
     const result = buildNodeFilterClause(
       {
         nodeLabels: ['Person'],
-        temporalFilters: [
-          [{ field: 'valid_at', op: TemporalComparison.isNotNull }],
-        ],
+        temporalFilters: [[{ field: 'valid_at', op: TemporalComparison.isNotNull }]],
       },
       'n',
     );

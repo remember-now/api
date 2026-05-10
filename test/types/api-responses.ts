@@ -6,12 +6,7 @@ export type {
   UpdateSelf,
 } from '@/user/dto';
 
-export type {
-  Auth,
-  LoginResponse,
-  SignupResponse,
-  LogoutResponse,
-} from '@/auth/dto';
+export type { Auth, LoginResponse, SignupResponse, LogoutResponse } from '@/auth/dto';
 
 export type { PaginatedUsers, GetUsersQuery, GetUserParams } from '@/user/dto';
 

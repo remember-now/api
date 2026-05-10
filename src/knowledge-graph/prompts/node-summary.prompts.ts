@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { EpisodicNode } from '../models';
 import { MAX_SUMMARY_CHARS } from './text-utils';

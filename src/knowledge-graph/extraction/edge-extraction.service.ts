@@ -2,12 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
-import {
-  createEntityEdge,
-  EntityEdge,
-  EntityNode,
-  EpisodicNode,
-} from '../models';
+import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { buildExtractEdgesMessages } from '../prompts';
 import { extractedEdgesJsonSchema } from './extraction.types';
 
@@ -58,8 +53,7 @@ export class EdgeExtractionService {
           targetNodeUuid: targetNode.uuid,
           episodes: [episode.uuid],
           validAt: typeof e.validAt === 'string' ? new Date(e.validAt) : null,
-          invalidAt:
-            typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,
+          invalidAt: typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,
         });
       });
   }

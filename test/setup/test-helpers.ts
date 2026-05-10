@@ -82,9 +82,7 @@ export class TestHelpers {
   /**
    * Create and login a user in one step
    */
-  static async createUserWithSession(
-    userPrefix = 'test',
-  ): Promise<SessionResult> {
+  static async createUserWithSession(userPrefix = 'test'): Promise<SessionResult> {
     const { credentials } = await this.createUser(userPrefix);
 
     return await this.loginUser(credentials);
@@ -106,9 +104,7 @@ export class TestHelpers {
   /**
    * Create and login an admin in one step
    */
-  static async createAdminWithSession(
-    adminPrefix = 'admin',
-  ): Promise<SessionResult> {
+  static async createAdminWithSession(adminPrefix = 'admin'): Promise<SessionResult> {
     const { id: userId, credentials: adminCredentials } =
       await this.createUser(adminPrefix);
 

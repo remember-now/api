@@ -28,10 +28,7 @@ export class MessagesController {
 
   @Get('history')
   @ApiOperation({ summary: 'Get message history' })
-  getMessages(
-    @GetUser('id') userId: number,
-    @Query() query: GetMessagesQueryDto,
-  ) {
+  getMessages(@GetUser('id') userId: number, @Query() query: GetMessagesQueryDto) {
     return this.messagesService.getMessages(query, userId);
   }
 

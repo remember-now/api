@@ -30,8 +30,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should create admin user successfully', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-create-admin');
+        const { sessionKey } = await h.createAdminWithSession('admin-create-admin');
         const newAdminData = {
           ...f.createUserCredentials('new-admin'),
           role: 'ADMIN',
@@ -49,8 +48,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should default to USER role when not specified', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-default-role');
+        const { sessionKey } = await h.createAdminWithSession('admin-default-role');
         const newUserData = f.createUserCredentials('default-role');
 
         await h
@@ -64,8 +62,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should trim and lowercase email', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-trim-email');
+        const { sessionKey } = await h.createAdminWithSession('admin-trim-email');
         const emailWithSpaces = f.EMAIL_PATTERNS.withSpaces('admin-trim');
         const expectedEmail = emailWithSpaces.trim().toLowerCase();
 
@@ -83,8 +80,7 @@ describe('User Admin (e2e)', () => {
 
     describe('Validation Errors', () => {
       it('should fail with duplicate email', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-duplicate');
+        const { sessionKey } = await h.createAdminWithSession('admin-duplicate');
         const existingUser = await h.createUser('existing');
 
         await h
@@ -98,8 +94,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with various validation scenarios', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-validation');
+        const { sessionKey } = await h.createAdminWithSession('admin-validation');
         const scenarios = f.createSignupValidationScenarios();
 
         for (const { data, expectedField } of scenarios) {
@@ -112,8 +107,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with invalid role', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-invalid-role');
+        const { sessionKey } = await h.createAdminWithSession('admin-invalid-role');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -170,8 +164,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should return users with pagination parameters', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-pagination');
+        const { sessionKey } = await h.createAdminWithSession('admin-pagination');
 
         const response: PaginatedUsers = await h
           .authenticatedRequest(sessionKey)
@@ -196,16 +189,15 @@ describe('User Admin (e2e)', () => {
           .expectStatus(200)
           .returns('');
 
-        expect(
-          response.users.some((user) => user.email.includes('searchable')),
-        ).toBe(true);
+        expect(response.users.some((user) => user.email.includes('searchable'))).toBe(
+          true,
+        );
       });
     });
 
     describe('Validation Errors', () => {
       it('should fail with invalid page parameter', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-invalid-page');
+        const { sessionKey } = await h.createAdminWithSession('admin-invalid-page');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -215,9 +207,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with invalid limit parameter', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-invalid-limit',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-invalid-limit');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -246,8 +236,7 @@ describe('User Admin (e2e)', () => {
   describe('GET /users/:id (Admin Only)', () => {
     describe('Success Cases', () => {
       it('should return specific user by id', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-get-by-id');
+        const { sessionKey } = await h.createAdminWithSession('admin-get-by-id');
         const targetUser = await h.createUser('target');
 
         await h
@@ -274,8 +263,7 @@ describe('User Admin (e2e)', () => {
 
     describe('Error Cases', () => {
       it('should fail with non-existent user id', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-not-found');
+        const { sessionKey } = await h.createAdminWithSession('admin-not-found');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -284,8 +272,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with invalid user id format', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-invalid-id');
+        const { sessionKey } = await h.createAdminWithSession('admin-invalid-id');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -313,8 +300,7 @@ describe('User Admin (e2e)', () => {
   describe('PUT /users/:id (Admin Only)', () => {
     describe('Success Cases', () => {
       it('should update user email', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-update-email');
+        const { sessionKey } = await h.createAdminWithSession('admin-update-email');
         const targetUser = await h.createUser('update-target');
         const newEmail = f.EMAIL_PATTERNS.valid('updated');
 
@@ -327,9 +313,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should update user password', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-update-password',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-update-password');
         const targetUser = await h.createUser('password-update');
         const newPassword = f.PASSWORD_PATTERNS.valid();
 
@@ -350,8 +334,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should update user role', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-update-role');
+        const { sessionKey } = await h.createAdminWithSession('admin-update-role');
         const targetUser = await h.createUser('role-update');
 
         await h
@@ -363,9 +346,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should update multiple fields at once', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-update-multiple',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-update-multiple');
         const targetUser = await h.createUser('multiple-update');
         const newEmail = f.EMAIL_PATTERNS.valid('multi-updated');
         const newPassword = f.PASSWORD_PATTERNS.valid();
@@ -393,8 +374,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should trim and lowercase email updates', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-trim-update');
+        const { sessionKey } = await h.createAdminWithSession('admin-trim-update');
         const targetUser = await h.createUser('trim-update');
         const emailWithSpaces = f.EMAIL_PATTERNS.withSpaces('trimmed-update');
         const expectedEmail = emailWithSpaces.trim().toLowerCase();
@@ -410,8 +390,7 @@ describe('User Admin (e2e)', () => {
 
     describe('Validation Errors', () => {
       it('should fail when no fields provided', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-no-fields');
+        const { sessionKey } = await h.createAdminWithSession('admin-no-fields');
         const targetUser = await h.createUser('no-fields');
 
         await h
@@ -422,9 +401,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with duplicate email', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-duplicate-update',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-duplicate-update');
         const existingUser = await h.createUser('existing-update');
         const targetUser = await h.createUser('target-update');
 
@@ -436,9 +413,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with invalid email format', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-invalid-email',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-invalid-email');
         const targetUser = await h.createUser('invalid-email-update');
 
         await h
@@ -449,9 +424,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with short password', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-short-password',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-short-password');
         const targetUser = await h.createUser('short-password');
 
         await h
@@ -477,9 +450,7 @@ describe('User Admin (e2e)', () => {
 
     describe('Error Cases', () => {
       it('should fail with non-existent user id', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-update-not-found',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-update-not-found');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -529,8 +500,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should delete admin user successfully', async () => {
-        const { sessionKey } =
-          await h.createAdminWithSession('admin-delete-admin');
+        const { sessionKey } = await h.createAdminWithSession('admin-delete-admin');
         const targetAdmin = await h.createAdmin('delete-admin-target');
 
         await h
@@ -548,9 +518,7 @@ describe('User Admin (e2e)', () => {
 
     describe('Error Cases', () => {
       it('should fail with non-existent user id', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-delete-not-found',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-delete-not-found');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -559,9 +527,7 @@ describe('User Admin (e2e)', () => {
       });
 
       it('should fail with invalid user id format', async () => {
-        const { sessionKey } = await h.createAdminWithSession(
-          'admin-delete-invalid-id',
-        );
+        const { sessionKey } = await h.createAdminWithSession('admin-delete-invalid-id');
 
         await h
           .authenticatedRequest(sessionKey)

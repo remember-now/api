@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma } from '@generated/prisma/client';
 
@@ -59,8 +55,7 @@ export class UserService {
         },
       });
 
-      const { passwordHash: _, ...userWithoutPassword } =
-        this.transformUserDates(user);
+      const { passwordHash: _, ...userWithoutPassword } = this.transformUserDates(user);
       return userWithoutPassword;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -138,10 +133,7 @@ export class UserService {
     return this.transformUserDates(user);
   }
 
-  async updateUser(
-    id: number,
-    dto: UpdateUserDto,
-  ): Promise<UserWithoutPassword> {
+  async updateUser(id: number, dto: UpdateUserDto): Promise<UserWithoutPassword> {
     const updateData: Partial<User> = {};
 
     if (dto.email) {
@@ -175,10 +167,7 @@ export class UserService {
     }
   }
 
-  async updateSelf(
-    userId: number,
-    dto: UpdateSelfDto,
-  ): Promise<UserWithoutPassword> {
+  async updateSelf(userId: number, dto: UpdateSelfDto): Promise<UserWithoutPassword> {
     const existingUser = await this.getUserById(userId);
 
     const pwMatches = await this.passwordService.verify(
@@ -221,10 +210,7 @@ export class UserService {
         where: { id },
       });
     } catch (error) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException('User not found');
       }
       throw error;
@@ -247,20 +233,14 @@ export class UserService {
     });
   }
 
-  async updateUserAgentId(
-    userId: number,
-    agentId: string | null,
-  ): Promise<void> {
+  async updateUserAgentId(userId: number, agentId: string | null): Promise<void> {
     try {
       await this.prisma.user.update({
         where: { id: userId },
         data: { agentId },
       });
     } catch (error) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException('User not found');
       }
       throw error;

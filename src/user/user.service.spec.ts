@@ -100,13 +100,10 @@ describe('UserService', () => {
     });
 
     it('should throw ForbiddenException when email is already taken', async () => {
-      const prismaError = new PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        },
-      );
+      const prismaError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
       prismaService.user.create.mockRejectedValueOnce(prismaError);
 
       await expect(
@@ -289,9 +286,9 @@ describe('UserService', () => {
     it('should throw NotFoundException when user not found', async () => {
       prismaService.user.findUnique.mockResolvedValueOnce(null);
 
-      await expect(
-        userService.getUserByEmail('notfound@example.com'),
-      ).rejects.toThrow(new NotFoundException('User not found'));
+      await expect(userService.getUserByEmail('notfound@example.com')).rejects.toThrow(
+        new NotFoundException('User not found'),
+      );
     });
   });
 
@@ -356,13 +353,10 @@ describe('UserService', () => {
         email: 'taken@example.com',
       };
 
-      const prismaError = new PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        },
-      );
+      const prismaError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
       await expect(userService.updateUser(1, updateDto)).rejects.toThrow(
@@ -463,13 +457,10 @@ describe('UserService', () => {
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
       passwordService.verify.mockResolvedValueOnce(true);
 
-      const prismaError = new PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        },
-      );
+      const prismaError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
       await expect(userService.updateSelf(1, updateDto)).rejects.toThrow(
@@ -623,9 +614,9 @@ describe('UserService', () => {
       });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
-      await expect(
-        userService.updateUserAgentId(999, 'agent-123'),
-      ).rejects.toThrow(new NotFoundException('User not found'));
+      await expect(userService.updateUserAgentId(999, 'agent-123')).rejects.toThrow(
+        new NotFoundException('User not found'),
+      );
 
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 999 },
@@ -637,9 +628,9 @@ describe('UserService', () => {
       const unknownError = new Error('Database connection failed');
       prismaService.user.update.mockRejectedValueOnce(unknownError);
 
-      await expect(
-        userService.updateUserAgentId(1, 'agent-123'),
-      ).rejects.toThrow(unknownError);
+      await expect(userService.updateUserAgentId(1, 'agent-123')).rejects.toThrow(
+        unknownError,
+      );
     });
   });
 });

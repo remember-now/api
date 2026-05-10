@@ -56,9 +56,7 @@ export class TestLlmFactory {
    * Creates a Prisma LlmConfig row with an encrypted apiKey in the config blob.
    * Note: the apiKey field in the blob is ciphertext, not plaintext.
    */
-  static createPrismaLlmConfig(
-    options: PrismaLlmConfigOptions = {},
-  ): LlmConfig {
+  static createPrismaLlmConfig(options: PrismaLlmConfigOptions = {}): LlmConfig {
     const provider = options.provider ?? LlmProvider.ANTHROPIC;
     const model = options.model ?? this.getDefaultModel(provider);
     const configBlob: Record<string, unknown> = {
@@ -113,9 +111,7 @@ export class TestLlmFactory {
   /**
    * Creates a SaveLlmConfig with a plaintext apiKey (as expected by the service input).
    */
-  static createSaveLlmConfig(
-    options: SaveLlmConfigOptions = {},
-  ): SaveLlmConfig {
+  static createSaveLlmConfig(options: SaveLlmConfigOptions = {}): SaveLlmConfig {
     const provider = options.provider ?? LlmProvider.ANTHROPIC;
     const model = options.model ?? this.getDefaultModel(provider);
     // If apiKey is explicitly in options (even as undefined), honour it; otherwise default to PLAIN_API_KEY.

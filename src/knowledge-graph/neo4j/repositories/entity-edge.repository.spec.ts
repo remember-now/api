@@ -146,9 +146,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeRead.mockResolvedValue([]);
       await repo.getByNodeUuid(sourceNodeUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'source.uuid = $nodeUuid OR target.uuid = $nodeUuid',
-        ),
+        expect.stringContaining('source.uuid = $nodeUuid OR target.uuid = $nodeUuid'),
         expect.objectContaining({ nodeUuid: sourceNodeUuid }),
       );
     });
@@ -275,9 +273,7 @@ describe('EntityEdgeRepository', () => {
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('db.index.fulltext.queryRelationships'),
         expect.objectContaining({
-          luceneQuery: expect.stringContaining(
-            'Alice works',
-          ) as unknown as string,
+          luceneQuery: expect.stringContaining('Alice works') as unknown as string,
         }),
       );
     });
@@ -337,7 +333,9 @@ describe('EntityEdgeRepository', () => {
       expect(result).toBe(true);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
-        { groupId: KG_TEST_GROUP_ID },
+        {
+          groupId: KG_TEST_GROUP_ID,
+        },
       );
     });
 

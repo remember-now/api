@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 const SYSTEM_PROMPT = `You are a helpful assistant that extracts entity properties from the provided text.
 

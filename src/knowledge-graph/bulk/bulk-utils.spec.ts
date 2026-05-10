@@ -147,11 +147,7 @@ describe('buildDirectedUuidMap', () => {
   });
 });
 
-const makeEdge = (
-  uuid: string,
-  sourceNodeUuid: string,
-  targetNodeUuid: string,
-) => ({
+const makeEdge = (uuid: string, sourceNodeUuid: string, targetNodeUuid: string) => ({
   uuid: u(uuid),
   sourceNodeUuid: u(sourceNodeUuid),
   targetNodeUuid: u(targetNodeUuid),

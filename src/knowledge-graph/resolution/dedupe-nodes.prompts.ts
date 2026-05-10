@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { EpisodicNode } from '../models';
 import { episodeToContext } from '../prompts/prompts.types';
@@ -28,9 +24,7 @@ function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
     .join('\n');
 }
 
-function formatExtractedEntities(
-  entities: Array<{ id: number; name: string }>,
-): string {
+function formatExtractedEntities(entities: Array<{ id: number; name: string }>): string {
   if (entities.length === 0) return 'None';
   return entities.map((e) => `- id: ${e.id}, name: "${e.name}"`).join('\n');
 }

@@ -7,10 +7,7 @@ import { PrismaClient } from '@generated/prisma/client';
 import { PostgresConfigService } from '@/config/postgres';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private pool: Pool;
 
   constructor(postgresConfig: PostgresConfigService) {

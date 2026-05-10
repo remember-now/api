@@ -66,7 +66,9 @@ export class CommunityEdgeRepository implements OnModuleInit {
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH ()-[e:HAS_MEMBER {uuid: $uuid}]->() DELETE e',
-      { uuid },
+      {
+        uuid,
+      },
     );
   }
 

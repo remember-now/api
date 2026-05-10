@@ -21,73 +21,65 @@ export class TestAssertions {
    * Initialize custom expect handlers
    */
   static initializeHandlers(): void {
-    handler.addExpectHandler(
-      'validUserResponse',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 200 && ctx.res.statusCode !== 201) {
-          throw new Error(
-            `Expected status 200 or 201 but got ${ctx.res.statusCode}`,
-          );
-        }
+    handler.addExpectHandler('validUserResponse', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 200 && ctx.res.statusCode !== 201) {
+        throw new Error(`Expected status 200 or 201 but got ${ctx.res.statusCode}`);
+      }
 
-        const result = UserWithoutPasswordSchema.safeParse(ctx.res.json);
-        if (!result.success) {
-          throw new Error(
-            `Response is not a valid UserWithoutPassword: ${result.error.message}`,
-          );
-        }
-        const body = result.data;
+      const result = UserWithoutPasswordSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid UserWithoutPassword: ${result.error.message}`,
+        );
+      }
+      const body = result.data;
 
-        // Validate specific user data if provided
-        const userData = ctx.data as Partial<UserWithoutPassword>;
+      // Validate specific user data if provided
+      const userData = ctx.data as Partial<UserWithoutPassword>;
 
-        if (userData) {
-          for (const [key, value] of Object.entries(userData)) {
-            if (body[key as keyof UserWithoutPassword] !== value) {
-              throw new Error(
-                `Expected ${key} to be ${String(value)} but got ${String(body[key as keyof UserWithoutPassword])}`,
-              );
-            }
+      if (userData) {
+        for (const [key, value] of Object.entries(userData)) {
+          if (body[key as keyof UserWithoutPassword] !== value) {
+            throw new Error(
+              `Expected ${key} to be ${String(value)} but got ${String(body[key as keyof UserWithoutPassword])}`,
+            );
           }
         }
-      },
-    );
+      }
+    });
 
-    handler.addExpectHandler(
-      'successfulSignup',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 201) {
-          throw new Error(`Expected status 201 but got ${ctx.res.statusCode}`);
-        }
+    handler.addExpectHandler('successfulSignup', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 201) {
+        throw new Error(`Expected status 201 but got ${ctx.res.statusCode}`);
+      }
 
-        const result = SignupResponseSchema.safeParse(ctx.res.json);
-        if (!result.success) {
-          throw new Error(
-            `Response is not a valid SignupResponse: ${result.error.message}`,
-          );
-        }
-        const body = result.data;
+      const result = SignupResponseSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid SignupResponse: ${result.error.message}`,
+        );
+      }
+      const body = result.data;
 
-        if (body.message !== 'Registration successful') {
-          throw new Error(
-            `Expected message 'Registration successful' but got '${body.message}'`,
-          );
-        }
+      if (body.message !== 'Registration successful') {
+        throw new Error(
+          `Expected message 'Registration successful' but got '${body.message}'`,
+        );
+      }
 
-        // Validate user data if provided
-        const userData = ctx.data as Partial<UserWithoutPassword>;
+      // Validate user data if provided
+      const userData = ctx.data as Partial<UserWithoutPassword>;
 
-        if (userData) {
-          for (const [key, value] of Object.entries(userData)) {
-            if (body.user[key as keyof UserWithoutPassword] !== value) {
-              throw new Error(
-                `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
-              );
-            }
+      if (userData) {
+        for (const [key, value] of Object.entries(userData)) {
+          if (body.user[key as keyof UserWithoutPassword] !== value) {
+            throw new Error(
+              `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
+            );
           }
         }
-      },
-    );
+      }
+    });
 
     handler.addExpectHandler('successfulAuth', (ctx: ExpectHandlerContext) => {
       if (ctx.res.statusCode !== 200) {
@@ -96,16 +88,12 @@ export class TestAssertions {
 
       const result = LoginResponseSchema.safeParse(ctx.res.json);
       if (!result.success) {
-        throw new Error(
-          `Response is not a valid LoginResponse: ${result.error.message}`,
-        );
+        throw new Error(`Response is not a valid LoginResponse: ${result.error.message}`);
       }
       const body = result.data;
 
       if (body.message !== 'Login successful') {
-        throw new Error(
-          `Expected message 'Login successful' but got '${body.message}'`,
-        );
+        throw new Error(`Expected message 'Login successful' but got '${body.message}'`);
       }
 
       // Validate user data if provided
@@ -168,113 +156,94 @@ export class TestAssertions {
       }
     });
 
-    handler.addExpectHandler(
-      'validLlmConfigResponse',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 200) {
-          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
-        }
+    handler.addExpectHandler('validLlmConfigResponse', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 200) {
+        throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+      }
 
-        const result = LlmConfigResponseSchema.safeParse(ctx.res.json);
-        if (!result.success) {
-          throw new Error(
-            `Response is not a valid LlmConfigResponse: ${result.error.message}`,
-          );
-        }
-        const body = result.data as Record<string, unknown>;
-        const assertions = ctx.data as Partial<LlmConfigResponse> | undefined;
+      const result = LlmConfigResponseSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid LlmConfigResponse: ${result.error.message}`,
+        );
+      }
+      const body = result.data as Record<string, unknown>;
+      const assertions = ctx.data as Partial<LlmConfigResponse> | undefined;
 
-        if (assertions) {
-          for (const [key, value] of Object.entries(assertions)) {
-            if (body[key] !== value) {
-              throw new Error(
-                `Expected ${key} to be ${String(value)} but got ${String(body[key])}`,
-              );
-            }
-          }
-        }
-      },
-    );
-
-    handler.addExpectHandler(
-      'validProvidersList',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 200) {
-          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
-        }
-
-        const result = LlmProvidersListSchema.safeParse(ctx.res.json);
-        if (!result.success) {
-          throw new Error(
-            `Response is not a valid LlmProvidersList: ${result.error.message}`,
-          );
-        }
-        const body = result.data;
-
-        const assertions = ctx.data as
-          | { activeProvider?: string | null }
-          | undefined;
-
-        if (assertions?.activeProvider !== undefined) {
-          if (body.activeProvider !== assertions.activeProvider) {
+      if (assertions) {
+        for (const [key, value] of Object.entries(assertions)) {
+          if (body[key] !== value) {
             throw new Error(
-              `Expected activeProvider to be ${String(assertions.activeProvider)} but got ${String(body.activeProvider)}`,
+              `Expected ${key} to be ${String(value)} but got ${String(body[key])}`,
             );
           }
         }
-      },
-    );
+      }
+    });
 
-    handler.addExpectHandler(
-      'validTestConfigResponse',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 200) {
-          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
-        }
+    handler.addExpectHandler('validProvidersList', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 200) {
+        throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+      }
 
-        const result = TestConfigResponseSchema.safeParse(ctx.res.json);
-        if (!result.success) {
+      const result = LlmProvidersListSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid LlmProvidersList: ${result.error.message}`,
+        );
+      }
+      const body = result.data;
+
+      const assertions = ctx.data as { activeProvider?: string | null } | undefined;
+
+      if (assertions?.activeProvider !== undefined) {
+        if (body.activeProvider !== assertions.activeProvider) {
           throw new Error(
-            `Response is not a valid TestConfigResponse: ${result.error.message}`,
+            `Expected activeProvider to be ${String(assertions.activeProvider)} but got ${String(body.activeProvider)}`,
           );
         }
-        const body = result.data;
-        const assertions = ctx.data as { success?: boolean } | undefined;
+      }
+    });
 
-        if (
-          assertions?.success !== undefined &&
-          body.success !== assertions.success
-        ) {
-          throw new Error(
-            `Expected success to be ${String(assertions.success)} but got ${String(body.success)}`,
-          );
-        }
-      },
-    );
+    handler.addExpectHandler('validTestConfigResponse', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 200) {
+        throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+      }
 
-    handler.addExpectHandler(
-      'successfulLogout',
-      (ctx: ExpectHandlerContext) => {
-        if (ctx.res.statusCode !== 200) {
-          throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
-        }
+      const result = TestConfigResponseSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid TestConfigResponse: ${result.error.message}`,
+        );
+      }
+      const body = result.data;
+      const assertions = ctx.data as { success?: boolean } | undefined;
 
-        // Use Zod to validate the response
-        const result = LogoutResponseSchema.safeParse(ctx.res.json);
-        if (!result.success) {
-          throw new Error(
-            `Response is not a valid LogoutResponse: ${result.error.message}`,
-          );
-        }
+      if (assertions?.success !== undefined && body.success !== assertions.success) {
+        throw new Error(
+          `Expected success to be ${String(assertions.success)} but got ${String(body.success)}`,
+        );
+      }
+    });
 
-        const body = result.data;
-        if (body.message !== 'Logout successful') {
-          throw new Error(
-            `Expected message 'Logout successful' but got '${body.message}'`,
-          );
-        }
-      },
-    );
+    handler.addExpectHandler('successfulLogout', (ctx: ExpectHandlerContext) => {
+      if (ctx.res.statusCode !== 200) {
+        throw new Error(`Expected status 200 but got ${ctx.res.statusCode}`);
+      }
+
+      // Use Zod to validate the response
+      const result = LogoutResponseSchema.safeParse(ctx.res.json);
+      if (!result.success) {
+        throw new Error(
+          `Response is not a valid LogoutResponse: ${result.error.message}`,
+        );
+      }
+
+      const body = result.data;
+      if (body.message !== 'Logout successful') {
+        throw new Error(`Expected message 'Logout successful' but got '${body.message}'`);
+      }
+    });
   }
 
   /**

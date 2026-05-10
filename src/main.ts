@@ -16,8 +16,7 @@ async function bootstrap() {
   logger.log(`NODE_ENV: ${appConfig.env}`);
 
   app.enableCors({
-    allowedHeaders:
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+    allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
     origin: [appConfig.frontendUrl],
     credentials: true,
   });

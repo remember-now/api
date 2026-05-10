@@ -52,10 +52,7 @@ describe('AuthService', () => {
       expect(passwordService.hash).toHaveBeenCalledWith(authDto.password);
       expect(passwordService.hash).toHaveBeenCalledTimes(1);
 
-      expect(userService.createUser).toHaveBeenCalledWith(
-        authDto.email,
-        hashedPassword,
-      );
+      expect(userService.createUser).toHaveBeenCalledWith(authDto.email, hashedPassword);
       expect(userService.createUser).toHaveBeenCalledTimes(1);
       expect(result).toEqual(expectedResult);
     });
@@ -120,9 +117,7 @@ describe('AuthService', () => {
       const unexpectedError = new Error('Database connection failed');
       userService.getUserByEmail.mockRejectedValueOnce(unexpectedError);
 
-      await expect(authService.validateUser(authDto)).rejects.toThrow(
-        unexpectedError,
-      );
+      await expect(authService.validateUser(authDto)).rejects.toThrow(unexpectedError);
 
       expect(userService.getUserByEmail).toHaveBeenCalledWith(authDto.email);
       expect(passwordService.verify).not.toHaveBeenCalled();
@@ -136,9 +131,7 @@ describe('AuthService', () => {
         return mockSession;
       });
 
-      await expect(
-        authService.destroyUserSession(mockSession),
-      ).resolves.toBeUndefined();
+      await expect(authService.destroyUserSession(mockSession)).resolves.toBeUndefined();
       expect(mockSession.destroy).toHaveBeenCalledTimes(1);
     });
 
@@ -149,13 +142,9 @@ describe('AuthService', () => {
         return mockSession;
       });
 
-      const loggerSpy = jest
-        .spyOn(authService['logger'], 'error')
-        .mockImplementation();
+      const loggerSpy = jest.spyOn(authService['logger'], 'error').mockImplementation();
 
-      await expect(
-        authService.destroyUserSession(mockSession),
-      ).resolves.toBeUndefined();
+      await expect(authService.destroyUserSession(mockSession)).resolves.toBeUndefined();
       expect(loggerSpy).toHaveBeenCalledWith(
         'Failed to destroy user session',
         sessionError,

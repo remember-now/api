@@ -14,9 +14,7 @@ export const UpdateUserSchema = z
   })
   .refine(
     (data) =>
-      data.email !== undefined ||
-      data.password !== undefined ||
-      data.role !== undefined,
+      data.email !== undefined || data.password !== undefined || data.role !== undefined,
     {
       message: 'At least one field (email, password, or role) must be provided',
     },

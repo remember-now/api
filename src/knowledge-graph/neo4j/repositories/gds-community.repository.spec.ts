@@ -1,9 +1,6 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import {
-  GraphNameSchema,
-  GroupIdSchema,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
+import { GraphNameSchema, GroupIdSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 
 import { GdsCommunityRepository } from './gds-community.repository';
@@ -45,7 +42,9 @@ describe('GdsCommunityRepository', () => {
       const result = await repo.runLeiden(myGraph);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('gds.leiden.stream'),
-        { graphName: myGraph },
+        {
+          graphName: myGraph,
+        },
       );
       expect(result).toEqual(rows);
     });
@@ -57,7 +56,9 @@ describe('GdsCommunityRepository', () => {
       await repo.dropGraph(myGraph);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('gds.graph.drop'),
-        { graphName: myGraph },
+        {
+          graphName: myGraph,
+        },
       );
     });
   });

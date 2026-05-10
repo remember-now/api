@@ -7,12 +7,7 @@ import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
 import { createCommunityEdge, createCommunityNode } from '../models';
-import {
-  GraphNameSchema,
-  GroupId,
-  NodeNameSchema,
-  Uuid,
-} from '../neo4j/neo4j.schemas';
+import { GraphNameSchema, GroupId, NodeNameSchema, Uuid } from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
@@ -27,9 +22,7 @@ export const CommunitySummarySchema = z.object({
   summary: z.string(),
 });
 
-export const communitySummaryJsonSchema = z.toJSONSchema(
-  CommunitySummarySchema,
-);
+export const communitySummaryJsonSchema = z.toJSONSchema(CommunitySummarySchema);
 
 @Injectable()
 export class CommunityService {
@@ -45,8 +38,7 @@ export class CommunityService {
 
   async buildCommunities(userId: number, groupId: GroupId): Promise<void> {
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
-    const hasEdges =
-      await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
+    const hasEdges = await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
 
     if (!hasEdges) {
       await this.communityNodeRepository.deleteByGroupId(groupId);
@@ -64,8 +56,7 @@ export class CommunityService {
 
     try {
       // 4. Run Leiden
-      const leidenResults =
-        await this.gdsCommunityRepository.runLeiden(graphName);
+      const leidenResults = await this.gdsCommunityRepository.runLeiden(graphName);
 
       // 5. Group entity UUIDs by communityId
       communityMap = new Map<number, Uuid[]>();
@@ -94,8 +85,7 @@ export class CommunityService {
     // batched query. On large graphs with many communities this may be slow.
     // https://github.com/getzep/graphiti/issues/992
     for (const [, memberUuids] of communityMap) {
-      const memberNodes =
-        await this.entityNodeRepository.getByUuids(memberUuids);
+      const memberNodes = await this.entityNodeRepository.getByUuids(memberUuids);
 
       const messages = buildCommunitySummaryMessages({ nodes: memberNodes });
 
@@ -108,9 +98,7 @@ export class CommunityService {
         summary: communitySummary.summary,
         groupId,
       });
-      const nameEmbedding = await this.embeddingService.embedText(
-        communityRaw.name,
-      );
+      const nameEmbedding = await this.embeddingService.embedText(communityRaw.name);
       const community = { ...communityRaw, nameEmbedding };
       communityNodes.push(community);
 

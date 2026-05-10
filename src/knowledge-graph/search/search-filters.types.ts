@@ -13,11 +13,7 @@ export enum TemporalComparison {
 
 // Types
 
-export type TemporalField =
-  | 'valid_at'
-  | 'invalid_at'
-  | 'created_at'
-  | 'expired_at';
+export type TemporalField = 'valid_at' | 'invalid_at' | 'created_at' | 'expired_at';
 
 // Interfaces
 

@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { EpisodicNode } from '../models';
 import { episodeToContext } from '../prompts/prompts.types';
@@ -31,9 +27,7 @@ function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
     .join('\n');
 }
 
-function formatEdges(
-  edges: Array<{ idx: number; name: string; fact: string }>,
-): string {
+function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>): string {
   if (edges.length === 0) return 'None';
   return edges
     .map((e) => `- idx: ${e.idx}, name: ${e.name}, fact: "${e.fact}"`)

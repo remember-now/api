@@ -2,11 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
-import {
-  EdgeTypeMap,
-  EdgeTypeMappings,
-  EntityTypeMap,
-} from '../episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings, EntityTypeMap } from '../episode/episode.types';
 import {
   createEntityEdge,
   createEntityNode,
@@ -173,8 +169,7 @@ export class CombinedExtractionService {
           targetNodeUuid: tgtNode.uuid,
           episodes: episodeUuids,
           validAt: typeof rawValidAt === 'string' ? new Date(rawValidAt) : null,
-          invalidAt:
-            typeof rawInvalidAt === 'string' ? new Date(rawInvalidAt) : null,
+          invalidAt: typeof rawInvalidAt === 'string' ? new Date(rawInvalidAt) : null,
         }),
       );
     }

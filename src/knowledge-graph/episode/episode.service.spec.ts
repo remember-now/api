@@ -115,8 +115,7 @@ describe('EpisodeService', () => {
   it('should save episode node before extraction', async () => {
     await service.addEpisode(baseOptions);
 
-    const saveOrder =
-      mockEpisodicNodeRepository.save.mock.invocationCallOrder[0];
+    const saveOrder = mockEpisodicNodeRepository.save.mock.invocationCallOrder[0];
     const extractOrder =
       mockNodeExtractionService.extractNodes.mock.invocationCallOrder[0];
 
@@ -130,9 +129,7 @@ describe('EpisodeService', () => {
       validAt: KG_REFERENCE_TIME,
       groupId: KG_TEST_GROUP_ID,
     });
-    mockEpisodicNodeRepository.retrieveEpisodes.mockResolvedValue([
-      prevEpisode,
-    ]);
+    mockEpisodicNodeRepository.retrieveEpisodes.mockResolvedValue([prevEpisode]);
 
     await service.addEpisode(baseOptions);
 
@@ -342,8 +339,7 @@ describe('EpisodeService', () => {
 
     await service.addEpisode(baseOptions);
 
-    const savedEpisodicEdges =
-      mockEpisodicEdgeRepository.saveBulk.mock.calls[0][0];
+    const savedEpisodicEdges = mockEpisodicEdgeRepository.saveBulk.mock.calls[0][0];
     expect(savedEpisodicEdges).toHaveLength(2);
     expect(savedEpisodicEdges.map((e) => e.targetNodeUuid)).toEqual(
       expect.arrayContaining([resolvedNode.uuid, existingNode.uuid]),
@@ -473,8 +469,7 @@ describe('EpisodeService', () => {
   it('should call communityService.buildCommunities after persist when updateCommunities is true', async () => {
     await service.addEpisode({ ...baseOptions, updateCommunities: true });
 
-    const persistOrder =
-      mockEntityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+    const persistOrder = mockEntityNodeRepository.saveBulk.mock.invocationCallOrder[0];
     const communityOrder =
       mockCommunityService.buildCommunities.mock.invocationCallOrder[0];
     expect(persistOrder).toBeLessThan(communityOrder);

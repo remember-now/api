@@ -1,9 +1,5 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { LlmConfig, LlmProvider } from '@generated/prisma/client';
 
@@ -107,9 +103,7 @@ export class LlmService {
     const existing = existingRow ? this.parseConfigRow(existingRow) : null;
 
     // Encrypt new plaintext key, or retain existing encrypted key
-    const apiKey = config.apiKey
-      ? this.crypto.encrypt(config.apiKey)
-      : existing?.apiKey;
+    const apiKey = config.apiKey ? this.crypto.encrypt(config.apiKey) : existing?.apiKey;
 
     // Merge: existing as base, incoming overrides (strip provider + apiKey)
     const {
@@ -131,10 +125,7 @@ export class LlmService {
     return this.toConfigResponse(result);
   }
 
-  async deleteProviderConfig(
-    userId: number,
-    provider: LlmProvider,
-  ): Promise<void> {
+  async deleteProviderConfig(userId: number, provider: LlmProvider): Promise<void> {
     if (provider === LlmProvider.PLATFORM) {
       throw new BadRequestException('Platform provider is server-managed');
     }
@@ -186,9 +177,7 @@ export class LlmService {
       }
       const config = this.parseConfigRow(configRow);
       if (!config.apiKey) {
-        throw new BadRequestException(
-          `Provider ${provider} is missing an API key`,
-        );
+        throw new BadRequestException(`Provider ${provider} is missing an API key`);
       }
     }
 
@@ -224,8 +213,7 @@ export class LlmService {
       return {
         provider,
         success: false,
-        message:
-          error instanceof Error ? error.message : 'Unknown error occurred',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
         responseTime,
       };
     }
@@ -255,16 +243,12 @@ export class LlmService {
       where: { userId_provider: { userId, provider } },
     });
     if (!configRow) {
-      throw new NotFoundException(
-        `No configuration found for provider ${provider}`,
-      );
+      throw new NotFoundException(`No configuration found for provider ${provider}`);
     }
 
     const config = this.parseConfigRow(configRow);
     if (!config.apiKey) {
-      throw new BadRequestException(
-        `Provider ${provider} is missing an API key`,
-      );
+      throw new BadRequestException(`Provider ${provider} is missing an API key`);
     }
 
     return this.factory.createModel({

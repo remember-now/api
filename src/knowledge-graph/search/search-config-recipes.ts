@@ -34,10 +34,7 @@ export const COMBINED_HYBRID_SEARCH_RRF: SearchConfig = {
     reranker: EpisodeReranker.rrf,
   },
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.rrf,
   },
 };
@@ -58,10 +55,7 @@ export const COMBINED_HYBRID_SEARCH_MMR: SearchConfig = {
     reranker: EpisodeReranker.rrf,
   },
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.mmr,
   },
 };
@@ -90,10 +84,7 @@ export const COMBINED_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
     reranker: EpisodeReranker.cross_encoder,
   },
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.cross_encoder,
   },
 };
@@ -206,10 +197,7 @@ export const COMMUNITY_HYBRID_SEARCH_RRF: SearchConfig = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.rrf,
   },
 };
@@ -218,10 +206,7 @@ export const COMMUNITY_HYBRID_SEARCH_MMR: SearchConfig = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.mmr,
   },
 };
@@ -230,10 +215,7 @@ export const COMMUNITY_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
   limit: 3,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
-    searchMethods: [
-      CommunitySearchMethod.bm25,
-      CommunitySearchMethod.cosine_similarity,
-    ],
+    searchMethods: [CommunitySearchMethod.bm25, CommunitySearchMethod.cosine_similarity],
     reranker: CommunityReranker.cross_encoder,
   },
 };

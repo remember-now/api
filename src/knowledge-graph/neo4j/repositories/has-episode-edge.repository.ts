@@ -98,9 +98,7 @@ export class HasEpisodeEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    params: GetByGroupIdsWithCursorParams,
-  ): Promise<HasEpisodeEdge[]> {
+  async getByGroupIds(params: GetByGroupIdsWithCursorParams): Promise<HasEpisodeEdge[]> {
     const { groupIds, limit, uuidCursor } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND e.uuid < $uuidCursor' : '';

@@ -74,9 +74,7 @@ export class SagaNodeRepository implements OnModuleInit {
               created_at: toNeo4jDateTime(n.createdAt),
               summary: n.summary,
               last_summarized_at:
-                n.lastSummarizedAt !== null
-                  ? toNeo4jDateTime(n.lastSummarizedAt)
-                  : null,
+                n.lastSummarizedAt !== null ? toNeo4jDateTime(n.lastSummarizedAt) : null,
             },
           })),
         },
@@ -87,7 +85,9 @@ export class SagaNodeRepository implements OnModuleInit {
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Saga {uuid: $uuid}) DETACH DELETE n',
-      { uuid },
+      {
+        uuid,
+      },
     );
   }
 
@@ -128,9 +128,7 @@ export class SagaNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getByGroupIds(
-    params: GetByGroupIdsWithCursorParams,
-  ): Promise<SagaNode[]> {
+  async getByGroupIds(params: GetByGroupIdsWithCursorParams): Promise<SagaNode[]> {
     const { groupIds, limit, uuidCursor } = params;
     const limitClause = limit !== undefined ? 'LIMIT $limit' : '';
     const cursorClause = uuidCursor ? 'AND n.uuid < $uuidCursor' : '';
@@ -159,9 +157,7 @@ export class SagaNodeRepository implements OnModuleInit {
       createdAt: row['created_at'] as Date,
       summary: (row['summary'] as string | undefined) ?? '',
       lastSummarizedAt:
-        row['last_summarized_at'] != null
-          ? (row['last_summarized_at'] as Date)
-          : null,
+        row['last_summarized_at'] != null ? (row['last_summarized_at'] as Date) : null,
     };
   }
 }

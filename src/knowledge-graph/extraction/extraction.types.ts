@@ -34,7 +34,5 @@ export type ExtractedEdges = z.infer<typeof ExtractedEdgesSchema>;
 
 // JSON Schemas
 
-export const extractedEntitiesJsonSchema = z.toJSONSchema(
-  ExtractedEntitiesSchema,
-);
+export const extractedEntitiesJsonSchema = z.toJSONSchema(ExtractedEntitiesSchema);
 export const extractedEdgesJsonSchema = z.toJSONSchema(ExtractedEdgesSchema);

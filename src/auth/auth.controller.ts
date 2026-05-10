@@ -16,12 +16,7 @@ import { UserWithoutPassword } from '@/user/dto';
 
 import { AuthService } from './auth.service';
 import { GetUser } from './decorator';
-import {
-  AuthDto,
-  LoginResponseDto,
-  LogoutResponseDto,
-  SignupResponseDto,
-} from './dto';
+import { AuthDto, LoginResponseDto, LogoutResponseDto, SignupResponseDto } from './dto';
 import { LocalGuard, LoggedInGuard } from './guard';
 
 @ApiTags('Authentication')
@@ -64,9 +59,7 @@ export class AuthController {
     description: 'User logged out successfully',
     type: LogoutResponseDto,
   })
-  async logoutUser(
-    @Req() req: Request & { logout: (done: (err: any) => void) => void },
-  ) {
+  async logoutUser(@Req() req: Request & { logout: (done: (err: any) => void) => void }) {
     return new Promise<{ message: string }>((resolve, reject) => {
       req.logout((err) => {
         if (err) {

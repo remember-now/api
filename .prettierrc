@@ -1,6 +1,7 @@
 {
   "singleQuote": true,
   "trailingComma": "all",
+  "printWidth": 90,
   "plugins": ["@trivago/prettier-plugin-sort-imports"],
   "importOrder": [
     "<BUILTIN_MODULES>",

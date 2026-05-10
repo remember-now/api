@@ -100,14 +100,10 @@ export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
 export type GraphName = z.infer<typeof GraphNameSchema>;
 export type Uuid = z.infer<typeof UuidSchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
-export type SearchBySimilarityParams = z.infer<
-  typeof SearchBySimilarityParamsSchema
->;
+export type SearchBySimilarityParams = z.infer<typeof SearchBySimilarityParamsSchema>;
 export type SearchByBfsParams = z.infer<typeof SearchByBfsParamsSchema>;
 export type GetByGroupIdsParams = z.infer<typeof GetByGroupIdsParamsSchema>;
 export type GetByGroupIdsWithCursorParams = z.infer<
   typeof GetByGroupIdsWithCursorParamsSchema
 >;
-export type RetrieveEpisodesParams = z.infer<
-  typeof RetrieveEpisodesParamsSchema
->;
+export type RetrieveEpisodesParams = z.infer<typeof RetrieveEpisodesParamsSchema>;

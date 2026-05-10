@@ -20,12 +20,6 @@ const GetMemoryBlockParamsSchema = z.object({
   blockLabel: z.string().min(1, 'Block label is required'),
 });
 
-export class CreateMemoryBlockDto extends createZodDto(
-  CreateMemoryBlockSchema,
-) {}
-export class UpdateMemoryBlockDto extends createZodDto(
-  UpdateMemoryBlockSchema,
-) {}
-export class GetMemoryBlockParamsDto extends createZodDto(
-  GetMemoryBlockParamsSchema,
-) {}
+export class CreateMemoryBlockDto extends createZodDto(CreateMemoryBlockSchema) {}
+export class UpdateMemoryBlockDto extends createZodDto(UpdateMemoryBlockSchema) {}
+export class GetMemoryBlockParamsDto extends createZodDto(GetMemoryBlockParamsSchema) {}

@@ -1,10 +1,6 @@
 import { ZodError } from 'zod';
 
-import {
-  GroupIdSchema,
-  NodeLabelsSchema,
-  RelationshipTypeSchema,
-} from './neo4j.schemas';
+import { GroupIdSchema, NodeLabelsSchema, RelationshipTypeSchema } from './neo4j.schemas';
 
 describe('NodeLabelsSchema', () => {
   it('should pass for a valid single label', () => {
@@ -24,9 +20,7 @@ describe('NodeLabelsSchema', () => {
   });
 
   it('should throw ZodError for Cypher injection attempt', () => {
-    expect(() => NodeLabelsSchema.parse(['Entity) WITH n MATCH (x'])).toThrow(
-      ZodError,
-    );
+    expect(() => NodeLabelsSchema.parse(['Entity) WITH n MATCH (x'])).toThrow(ZodError);
   });
 
   it('should throw ZodError for label starting with a digit', () => {
@@ -38,9 +32,9 @@ describe('NodeLabelsSchema', () => {
   });
 
   it('should throw ZodError when any label is invalid', () => {
-    expect(() =>
-      NodeLabelsSchema.parse(['bad-one', 'Entity', 'bad two']),
-    ).toThrow(ZodError);
+    expect(() => NodeLabelsSchema.parse(['bad-one', 'Entity', 'bad two'])).toThrow(
+      ZodError,
+    );
   });
 
   it('should throw ZodError for empty array', () => {
@@ -64,15 +58,11 @@ describe('RelationshipTypeSchema', () => {
 
   it('throws ZodError for lowercase', () => {
     expect(() => RelationshipTypeSchema.parse('knows')).toThrow(ZodError);
-    expect(() => RelationshipTypeSchema.parse('has_property')).toThrow(
-      ZodError,
-    );
+    expect(() => RelationshipTypeSchema.parse('has_property')).toThrow(ZodError);
   });
 
   it('throws ZodError for mixed case', () => {
-    expect(() => RelationshipTypeSchema.parse('Has_Property')).toThrow(
-      ZodError,
-    );
+    expect(() => RelationshipTypeSchema.parse('Has_Property')).toThrow(ZodError);
   });
 
   it('throws ZodError for leading underscore', () => {
@@ -84,9 +74,7 @@ describe('RelationshipTypeSchema', () => {
   });
 
   it('throws ZodError for double underscore', () => {
-    expect(() => RelationshipTypeSchema.parse('HAS__PROPERTY')).toThrow(
-      ZodError,
-    );
+    expect(() => RelationshipTypeSchema.parse('HAS__PROPERTY')).toThrow(ZodError);
   });
 
   it('throws ZodError for empty string', () => {
@@ -94,9 +82,7 @@ describe('RelationshipTypeSchema', () => {
   });
 
   it('throws ZodError for type with spaces', () => {
-    expect(() => RelationshipTypeSchema.parse('HAS PROPERTY')).toThrow(
-      ZodError,
-    );
+    expect(() => RelationshipTypeSchema.parse('HAS PROPERTY')).toThrow(ZodError);
   });
 });
 

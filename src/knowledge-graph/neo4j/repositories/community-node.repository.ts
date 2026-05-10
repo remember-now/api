@@ -210,9 +210,7 @@ export class CommunityNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async searchBySimilarity(
-    params: SearchBySimilarityParams,
-  ): Promise<CommunityNode[]> {
+  async searchBySimilarity(params: SearchBySimilarityParams): Promise<CommunityNode[]> {
     const { embedding, groupIds, limit, minScore } = params;
     if (groupIds.length === 0) return [];
 

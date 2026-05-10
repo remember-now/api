@@ -5,15 +5,7 @@ import { EdgeExtractionService } from './edge-extraction.service';
 import { NodeExtractionService } from './node-extraction.service';
 
 @Module({
-  providers: [
-    NodeExtractionService,
-    EdgeExtractionService,
-    CombinedExtractionService,
-  ],
-  exports: [
-    NodeExtractionService,
-    EdgeExtractionService,
-    CombinedExtractionService,
-  ],
+  providers: [NodeExtractionService, EdgeExtractionService, CombinedExtractionService],
+  exports: [NodeExtractionService, EdgeExtractionService, CombinedExtractionService],
 })
 export class ExtractionModule {}

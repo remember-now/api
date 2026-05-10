@@ -72,15 +72,9 @@ describe('Auth (e2e)', () => {
       it('should fail with duplicate email', async () => {
         const user = f.createUserCredentials('duplicate');
 
-        await spec()
-          .post(`${s.baseUrl}/auth/signup`)
-          .withBody(user)
-          .expectStatus(201);
+        await spec().post(`${s.baseUrl}/auth/signup`).withBody(user).expectStatus(201);
 
-        await spec()
-          .post(`${s.baseUrl}/auth/signup`)
-          .withBody(user)
-          .expectStatus(403);
+        await spec().post(`${s.baseUrl}/auth/signup`).withBody(user).expectStatus(403);
       });
     });
   });
@@ -173,8 +167,7 @@ describe('Auth (e2e)', () => {
       });
 
       it('should invalidate session after logout', async () => {
-        const { sessionKey } =
-          await h.createUserWithSession('logout-invalidate');
+        const { sessionKey } = await h.createUserWithSession('logout-invalidate');
 
         await a.validateAuthenticatedAccess(sessionKey);
 

@@ -25,14 +25,11 @@ export function convertValue(value: unknown): unknown {
   // fall through to the object branch and only their .properties are preserved
   // (elementId, labels, type, startNodeElementId, endNodeElementId are silently dropped).
   // Not currently a bug since all RETURN clauses use flat property projections.
-  if (typeof value === 'object')
-    return convertRecord(value as Record<string, unknown>);
+  if (typeof value === 'object') return convertRecord(value as Record<string, unknown>);
   return value;
 }
 
-export function convertRecord(
-  record: Record<string, unknown>,
-): Record<string, unknown> {
+export function convertRecord(record: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(record)) {
     result[key] = convertValue(val);
@@ -54,8 +51,6 @@ export function luceneSanitize(query: string): string {
  */
 export function buildFulltextQuery(query: string, groupIds: string[]): string {
   const sanitized = luceneSanitize(query);
-  const groupPart = groupIds
-    .map((id) => `group_id:"${luceneSanitize(id)}"`)
-    .join(' OR ');
+  const groupPart = groupIds.map((id) => `group_id:"${luceneSanitize(id)}"`).join(' OR ');
   return sanitized ? `(${sanitized}) AND (${groupPart})` : `(${groupPart})`;
 }

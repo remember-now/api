@@ -27,17 +27,13 @@ export class KgNodeFactory {
     const { name, labels, ...rest } = opts;
     return createEntityNode({
       name: NodeNameSchema.parse(name ?? 'TestEntity'),
-      labels: labels
-        ? NodeLabelsSchema.parse(labels)
-        : [NodeLabelSchema.parse('Entity')],
+      labels: labels ? NodeLabelsSchema.parse(labels) : [NodeLabelSchema.parse('Entity')],
       groupId: KG_TEST_GROUP_ID,
       ...rest,
     });
   }
 
-  static createEpisodicNode(
-    opts: WithStrings<EpisodicNode> = {},
-  ): EpisodicNode {
+  static createEpisodicNode(opts: WithStrings<EpisodicNode> = {}): EpisodicNode {
     const { name, labels, ...rest } = opts;
     return createEpisodicNode({
       name: NodeNameSchema.parse(name ?? 'Test Episode'),
@@ -52,9 +48,7 @@ export class KgNodeFactory {
     });
   }
 
-  static createCommunityNode(
-    opts: WithStrings<CommunityNode> = {},
-  ): CommunityNode {
+  static createCommunityNode(opts: WithStrings<CommunityNode> = {}): CommunityNode {
     const { name, labels, ...rest } = opts;
     return createCommunityNode({
       name: NodeNameSchema.parse(name ?? 'Test Community'),
@@ -71,9 +65,7 @@ export class KgNodeFactory {
     return createSagaNode({
       name: NodeNameSchema.parse(name ?? 'Test Saga'),
       groupId: KG_TEST_GROUP_ID,
-      labels: labels
-        ? NodeLabelsSchema.parse(labels)
-        : [NodeLabelSchema.parse('Saga')],
+      labels: labels ? NodeLabelsSchema.parse(labels) : [NodeLabelSchema.parse('Saga')],
       ...rest,
     });
   }

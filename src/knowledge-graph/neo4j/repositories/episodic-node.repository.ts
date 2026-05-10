@@ -100,7 +100,9 @@ export class EpisodicNodeRepository implements OnModuleInit {
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Episodic {uuid: $uuid}) DETACH DELETE n',
-      { uuid },
+      {
+        uuid,
+      },
     );
   }
 
@@ -176,9 +178,7 @@ export class EpisodicNodeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async retrieveEpisodes(
-    params: RetrieveEpisodesParams,
-  ): Promise<EpisodicNode[]> {
+  async retrieveEpisodes(params: RetrieveEpisodesParams): Promise<EpisodicNode[]> {
     const { referenceTime, groupIds, source, sagaUuid, lastN } = params;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (e:Episodic)

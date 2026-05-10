@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 import { EpisodicNode } from '../models';
@@ -44,9 +40,7 @@ export function buildSummarizeSagaMessages(ctx: {
   const { existingSummary, newEpisodes } = ctx;
 
   const episodesText = newEpisodes
-    .map(
-      (ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`,
-    )
+    .map((ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`)
     .join('\n\n');
 
   const existingText = existingSummary.trim()

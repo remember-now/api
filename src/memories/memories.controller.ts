@@ -45,10 +45,7 @@ export class MemoriesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new memory block' })
-  createMemoryBlock(
-    @Body() dto: CreateMemoryBlockDto,
-    @GetUser('id') userId: number,
-  ) {
+  createMemoryBlock(@Body() dto: CreateMemoryBlockDto, @GetUser('id') userId: number) {
     return this.memoriesService.createMemoryBlock(userId, dto);
   }
 
@@ -59,11 +56,7 @@ export class MemoriesController {
     @Body() dto: UpdateMemoryBlockDto,
     @GetUser('id') userId: number,
   ) {
-    return this.memoriesService.updateMemoryBlock(
-      userId,
-      params.blockLabel,
-      dto,
-    );
+    return this.memoriesService.updateMemoryBlock(userId, params.blockLabel, dto);
   }
 
   @Delete(':blockLabel')

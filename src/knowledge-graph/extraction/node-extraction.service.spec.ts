@@ -26,11 +26,7 @@ describe('NodeExtractionService', () => {
 
   it('should return EntityNode[] with correct names and groupId', async () => {
     mockRunnable.invoke.mockResolvedValue({
-      extractedEntities: [
-        { name: 'Alice' },
-        { name: 'Acme Corp' },
-        { name: 'Bob' },
-      ],
+      extractedEntities: [{ name: 'Alice' }, { name: 'Acme Corp' }, { name: 'Bob' }],
     });
 
     const nodes = await service.extractNodes(mockModel, baseEpisode, []);
@@ -78,12 +74,7 @@ describe('NodeExtractionService', () => {
       ],
     });
 
-    const nodes = await service.extractNodes(
-      mockModel,
-      baseEpisode,
-      [],
-      entityTypes,
-    );
+    const nodes = await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
 
     expect(nodes[0].labels).toEqual(['Entity', 'Person']);
     expect(nodes[1].labels).toEqual(['Entity', 'Organization']);
@@ -97,12 +88,7 @@ describe('NodeExtractionService', () => {
       extractedEntities: [{ name: 'Alice', entityTypeId: 99 }],
     });
 
-    const nodes = await service.extractNodes(
-      mockModel,
-      baseEpisode,
-      [],
-      entityTypes,
-    );
+    const nodes = await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
 
     expect(nodes[0].labels).toEqual(['Entity']);
   });
@@ -137,12 +123,7 @@ describe('NodeExtractionService', () => {
       extractedEntities: [{ name: 'Alice', entityTypeId: 0 }],
     });
 
-    const nodes = await service.extractNodes(
-      mockModel,
-      baseEpisode,
-      [],
-      entityTypes,
-    );
+    const nodes = await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
 
     // Only the entity-extraction LLM call; attribute extraction happens post-resolution
     expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(1);

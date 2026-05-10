@@ -43,11 +43,7 @@ import {
   nodeDistanceReranker,
   rrf,
 } from './search-utils';
-import {
-  emptySearchResults,
-  SearchOptions,
-  SearchResults,
-} from './search.types';
+import { emptySearchResults, SearchOptions, SearchResults } from './search.types';
 
 @Injectable()
 export class SearchService {
@@ -82,14 +78,7 @@ export class SearchService {
   async search(options: SearchOptions): Promise<SearchResults> {
     if (!options.query.trim()) return emptySearchResults();
 
-    const {
-      query,
-      groupIds,
-      config,
-      filters,
-      centerNodeUuid,
-      originNodeUuids,
-    } = options;
+    const { query, groupIds, config, filters, centerNodeUuid, originNodeUuids } = options;
 
     const limit = config.limit ?? DEFAULT_SEARCH_LIMIT;
     const minScore = config.rerankerMinScore ?? 0;
@@ -123,66 +112,61 @@ export class SearchService {
     );
 
     const [queryVector, model] = await Promise.all([
-      needsVector
-        ? this.embeddingService.embedText(query)
-        : Promise.resolve(null),
-      needsModel
-        ? this.llmService.getActiveModel(options.userId)
-        : Promise.resolve(null),
+      needsVector ? this.embeddingService.embedText(query) : Promise.resolve(null),
+      needsModel ? this.llmService.getActiveModel(options.userId) : Promise.resolve(null),
     ]);
 
-    const [edgeResult, nodeResult, episodeResult, communityResult] =
-      await Promise.all([
-        config.edgeConfig
-          ? this.edgeSearch(
-              query,
-              queryVector,
-              groupIds,
-              config.edgeConfig,
-              filters,
-              limit,
-              minScore,
-              model,
-              centerNodeUuid,
-              originNodeUuids,
-            )
-          : Promise.resolve([[], []] as [EntityEdge[], number[]]),
-        config.nodeConfig
-          ? this.nodeSearch(
-              query,
-              queryVector,
-              groupIds,
-              config.nodeConfig,
-              filters,
-              limit,
-              minScore,
-              model,
-              centerNodeUuid,
-              originNodeUuids,
-            )
-          : Promise.resolve([[], []] as [EntityNode[], number[]]),
-        config.episodeConfig
-          ? this.episodeSearch(
-              query,
-              groupIds,
-              config.episodeConfig,
-              limit,
-              minScore,
-              model,
-            )
-          : Promise.resolve([[], []] as [EpisodicNode[], number[]]),
-        config.communityConfig
-          ? this.communitySearch(
-              query,
-              queryVector,
-              groupIds,
-              config.communityConfig,
-              limit,
-              minScore,
-              model,
-            )
-          : Promise.resolve([[], []] as [CommunityNode[], number[]]),
-      ]);
+    const [edgeResult, nodeResult, episodeResult, communityResult] = await Promise.all([
+      config.edgeConfig
+        ? this.edgeSearch(
+            query,
+            queryVector,
+            groupIds,
+            config.edgeConfig,
+            filters,
+            limit,
+            minScore,
+            model,
+            centerNodeUuid,
+            originNodeUuids,
+          )
+        : Promise.resolve([[], []] as [EntityEdge[], number[]]),
+      config.nodeConfig
+        ? this.nodeSearch(
+            query,
+            queryVector,
+            groupIds,
+            config.nodeConfig,
+            filters,
+            limit,
+            minScore,
+            model,
+            centerNodeUuid,
+            originNodeUuids,
+          )
+        : Promise.resolve([[], []] as [EntityNode[], number[]]),
+      config.episodeConfig
+        ? this.episodeSearch(
+            query,
+            groupIds,
+            config.episodeConfig,
+            limit,
+            minScore,
+            model,
+          )
+        : Promise.resolve([[], []] as [EpisodicNode[], number[]]),
+      config.communityConfig
+        ? this.communitySearch(
+            query,
+            queryVector,
+            groupIds,
+            config.communityConfig,
+            limit,
+            minScore,
+            model,
+          )
+        : Promise.resolve([[], []] as [CommunityNode[], number[]]),
+    ]);
 
     const [edges, edgeScoreArr] = edgeResult;
     const [nodes, nodeScoreArr] = nodeResult;
@@ -195,13 +179,9 @@ export class SearchService {
       nodes,
       nodeScores: new Map(nodes.map((n, i) => [n.uuid, nodeScoreArr[i]])),
       episodes,
-      episodeScores: new Map(
-        episodes.map((ep, i) => [ep.uuid, episodeScoreArr[i]]),
-      ),
+      episodeScores: new Map(episodes.map((ep, i) => [ep.uuid, episodeScoreArr[i]])),
       communities,
-      communityScores: new Map(
-        communities.map((c, i) => [c.uuid, communityScoreArr[i]]),
-      ),
+      communityScores: new Map(communities.map((c, i) => [c.uuid, communityScoreArr[i]])),
     };
   }
 
@@ -231,9 +211,7 @@ export class SearchService {
     if (config.searchMethods.includes(EdgeSearchMethod.bm25)) {
       tasks.push(
         this.entityEdgeRepository
-          .searchByFact(
-            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
-          )
+          .searchByFact(SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }))
           .then((edges) => {
             for (const e of edges) edgeMap.set(e.uuid, e);
             bm25Uuids.push(...edges.map((e) => e.uuid));
@@ -318,9 +296,7 @@ export class SearchService {
       );
     } else if (reranker === EdgeReranker.node_distance) {
       if (!centerNodeUuid) {
-        throw new Error(
-          'centerNodeUuid is required for node_distance reranker',
-        );
+        throw new Error('centerNodeUuid is required for node_distance reranker');
       }
       const sourceUuids = [
         ...new Set([...edgeMap.values()].map((e) => e.sourceNodeUuid)),
@@ -370,9 +346,7 @@ export class SearchService {
       .slice(0, limit)
       .map((uuid) => edgeMap.get(uuid))
       .filter((e): e is EntityEdge => e !== undefined);
-    const resultScores = rankedScores
-      .slice(0, limit)
-      .slice(0, resultEdges.length);
+    const resultScores = rankedScores.slice(0, limit).slice(0, resultEdges.length);
 
     return [resultEdges, resultScores];
   }
@@ -491,9 +465,7 @@ export class SearchService {
       );
     } else if (reranker === NodeReranker.node_distance) {
       if (!centerNodeUuid) {
-        throw new Error(
-          'centerNodeUuid is required for node_distance reranker',
-        );
+        throw new Error('centerNodeUuid is required for node_distance reranker');
       }
       [rankedUuids, rankedScores] = await nodeDistanceReranker(
         this.entityNodeRepository,
@@ -518,9 +490,7 @@ export class SearchService {
       .slice(0, limit)
       .map((uuid) => nodeMap.get(uuid))
       .filter((n): n is EntityNode => n !== undefined);
-    const resultScores = rankedScores
-      .slice(0, limit)
-      .slice(0, resultNodes.length);
+    const resultScores = rankedScores.slice(0, limit).slice(0, resultNodes.length);
 
     return [resultNodes, resultScores];
   }
@@ -554,9 +524,7 @@ export class SearchService {
       [rankedUuids, rankedScores] = await crossEncoderReranker(
         model,
         query,
-        bm25Episodes
-          .slice(0, limit)
-          .map((ep) => ({ uuid: ep.uuid, text: ep.content })),
+        bm25Episodes.slice(0, limit).map((ep) => ({ uuid: ep.uuid, text: ep.content })),
         rerankerMin,
       );
     } else {
@@ -567,9 +535,7 @@ export class SearchService {
       .slice(0, limit)
       .map((uuid) => episodeMap.get(uuid))
       .filter((ep): ep is EpisodicNode => ep !== undefined);
-    const resultScores = rankedScores
-      .slice(0, limit)
-      .slice(0, resultEpisodes.length);
+    const resultScores = rankedScores.slice(0, limit).slice(0, resultEpisodes.length);
 
     return [resultEpisodes, resultScores];
   }
@@ -597,9 +563,7 @@ export class SearchService {
     if (config.searchMethods.includes(CommunitySearchMethod.bm25)) {
       tasks.push(
         this.communityNodeRepository
-          .searchByName(
-            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
-          )
+          .searchByName(SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }))
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.uuid, n);
             bm25Uuids.push(...nodes.map((n) => n.uuid));
@@ -641,8 +605,7 @@ export class SearchService {
     } else if (config.reranker === CommunityReranker.mmr && queryVector) {
       const vectorPairs = new Map<Uuid, number[]>();
       for (const [uuid, community] of communityMap) {
-        if (community.nameEmbedding)
-          vectorPairs.set(uuid, community.nameEmbedding);
+        if (community.nameEmbedding) vectorPairs.set(uuid, community.nameEmbedding);
       }
       [rankedUuids, rankedScores] = mmr(
         queryVector,
@@ -669,9 +632,7 @@ export class SearchService {
       .slice(0, limit)
       .map((uuid) => communityMap.get(uuid))
       .filter((c): c is CommunityNode => c !== undefined);
-    const resultScores = rankedScores
-      .slice(0, limit)
-      .slice(0, resultCommunities.length);
+    const resultScores = rankedScores.slice(0, limit).slice(0, resultCommunities.length);
 
     return [resultCommunities, resultScores];
   }

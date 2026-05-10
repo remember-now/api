@@ -23,11 +23,7 @@ export class MemoriesService {
     return { userId, dto };
   }
 
-  updateMemoryBlock(
-    userId: number,
-    blockLabel: string,
-    dto: UpdateMemoryBlockDto,
-  ) {
+  updateMemoryBlock(userId: number, blockLabel: string, dto: UpdateMemoryBlockDto) {
     // TODO: Implement
     return { userId, blockLabel, dto };
   }

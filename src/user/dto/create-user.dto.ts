@@ -40,9 +40,7 @@ export const UserWithoutPasswordSchema = UserSchema.omit({
 // DTO classes
 export class CreateUserDto extends createZodDto(CreateUserSchema) {}
 export class UserDto extends createZodDto(UserSchema) {}
-export class UserWithoutPasswordDto extends createZodDto(
-  UserWithoutPasswordSchema,
-) {}
+export class UserWithoutPasswordDto extends createZodDto(UserWithoutPasswordSchema) {}
 
 // Types
 export type Role = z.infer<typeof RoleSchema>;

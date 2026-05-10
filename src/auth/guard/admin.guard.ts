@@ -12,9 +12,6 @@ export class AdminGuard extends LoggedInGuard {
       }
     >();
 
-    return (
-      super.canActivate(context) &&
-      req.session?.passport?.user?.role === 'ADMIN'
-    );
+    return super.canActivate(context) && req.session?.passport?.user?.role === 'ADMIN';
   }
 }

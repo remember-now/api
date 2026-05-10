@@ -26,9 +26,7 @@ describe('Error Handling Integration (e2e)', () => {
             .withBody(scenario.body)
             .expectBodyContains('statusCode')
             .expect((r: ExpectHandlerContext) =>
-              [400, 415].includes(
-                (r.res.body as { statusCode: number }).statusCode,
-              ),
+              [400, 415].includes((r.res.body as { statusCode: number }).statusCode),
             );
         }
       }
@@ -86,8 +84,7 @@ describe('Error Handling Integration (e2e)', () => {
     });
 
     it('should handle rapid profile updates', async () => {
-      const { sessionKey, credentials } =
-        await h.createUserWithSession('rapid-updates');
+      const { sessionKey, credentials } = await h.createUserWithSession('rapid-updates');
 
       const updateScenarios = [
         f.createUpdateScenarios(credentials).emailOnly(),

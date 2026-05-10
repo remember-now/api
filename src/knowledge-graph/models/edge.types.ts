@@ -34,7 +34,7 @@ export const EntityEdgeSchema = EdgeBaseSchema.extend({
 
 // EpisodicEdge  = MENTIONS         (Episodic → Entity)
 // CommunityEdge = HAS_MEMBER       (Community → Entity)
-// HasEpisodeEdge = HAS_EPISODE     (Saga → Episodic)
+// HasEpisodeEdge = HAS_EPISODE     (Saga     → Episodic)
 // NextEpisodeEdge = NEXT_EPISODE   (Episodic → Episodic)
 export const EpisodicEdgeSchema = EdgeBaseSchema;
 export const CommunityEdgeSchema = EdgeBaseSchema;

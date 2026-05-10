@@ -1,7 +1,4 @@
-import {
-  SearchFilters,
-  TemporalComparison,
-} from '../search/search-filters.types';
+import { SearchFilters, TemporalComparison } from '../search/search-filters.types';
 import { NodeLabelsSchema } from './neo4j.schemas';
 
 export interface FilterClauseResult {
@@ -10,12 +7,7 @@ export interface FilterClauseResult {
   params: Record<string, unknown>;
 }
 
-const TEMPORAL_FIELDS = new Set([
-  'valid_at',
-  'invalid_at',
-  'created_at',
-  'expired_at',
-]);
+const TEMPORAL_FIELDS = new Set(['valid_at', 'invalid_at', 'created_at', 'expired_at']);
 
 const WHITELISTED_OPS = new Set<string>(Object.values(TemporalComparison));
 
@@ -89,9 +81,7 @@ export function buildEdgeFilterClause(
     conditions.push(`${alias}.name IN $filterEdgeTypes`);
     params['filterEdgeTypes'] = filters.edgeTypes;
   }
-  conditions.push(
-    ...buildTemporalConditions(filters.temporalFilters, alias, params),
-  );
+  conditions.push(...buildTemporalConditions(filters.temporalFilters, alias, params));
   return { clause: conditions.join(' AND '), params };
 }
 
@@ -110,13 +100,9 @@ export function buildNodeFilterClause(
 
   if (filters.nodeLabels && filters.nodeLabels.length > 0) {
     NodeLabelsSchema.parse(filters.nodeLabels);
-    conditions.push(
-      `ANY(label IN labels(${alias}) WHERE label IN $filterNodeLabels)`,
-    );
+    conditions.push(`ANY(label IN labels(${alias}) WHERE label IN $filterNodeLabels)`);
     params['filterNodeLabels'] = filters.nodeLabels;
   }
-  conditions.push(
-    ...buildTemporalConditions(filters.temporalFilters, alias, params),
-  );
+  conditions.push(...buildTemporalConditions(filters.temporalFilters, alias, params));
   return { clause: conditions.join(' AND '), params };
 }

@@ -3,14 +3,9 @@ import { z } from 'zod';
 
 import { LlmProvider } from '@generated/prisma/client';
 
-const PrismaLlmProvider = Object.values(LlmProvider) as [
-  LlmProvider,
-  ...LlmProvider[],
-];
+const PrismaLlmProvider = Object.values(LlmProvider) as [LlmProvider, ...LlmProvider[]];
 
-export const LlmProviderSchema = z
-  .enum(PrismaLlmProvider)
-  .meta({ id: 'LlmProvider' });
+export const LlmProviderSchema = z.enum(PrismaLlmProvider).meta({ id: 'LlmProvider' });
 
 //  Adding a new provider (e.g., OpenAI) requires touching 5 locations:
 //  1. Prisma enum
@@ -55,10 +50,7 @@ export const GoogleGeminiConfigSchema = BaseGoogleGeminiSchema.extend({
 });
 
 export const SaveLlmConfigSchema = z
-  .discriminatedUnion('provider', [
-    AnthropicConfigSchema,
-    GoogleGeminiConfigSchema,
-  ])
+  .discriminatedUnion('provider', [AnthropicConfigSchema, GoogleGeminiConfigSchema])
   .meta({ id: 'SaveLlmConfig' });
 
 // ── Response schemas (base with model optional + response fields) ───
@@ -70,8 +62,7 @@ const configResponseFields = {
   updatedAt: z.string().optional(),
 };
 
-const AnthropicConfigResponseSchema =
-  BaseAnthropicSchema.extend(configResponseFields);
+const AnthropicConfigResponseSchema = BaseAnthropicSchema.extend(configResponseFields);
 
 const GoogleGeminiConfigResponseSchema =
   BaseGoogleGeminiSchema.extend(configResponseFields);
@@ -101,7 +92,9 @@ export const TestConfigResponseSchema = z
 
 export const UserLlmProviderSchema = LlmProviderSchema.exclude([
   LlmProvider.PLATFORM,
-]).meta({ id: 'UserLlmProvider' });
+]).meta({
+  id: 'UserLlmProvider',
+});
 
 export const ProviderParamSchema = z
   .object({
@@ -137,13 +130,9 @@ Object.defineProperty(LlmConfigResponseDto, 'name', {
 export type LlmConfigResponseDto = InstanceType<typeof LlmConfigResponseDto>;
 
 export class LlmProvidersListDto extends createZodDto(LlmProvidersListSchema) {}
-export class TestConfigResponseDto extends createZodDto(
-  TestConfigResponseSchema,
-) {}
+export class TestConfigResponseDto extends createZodDto(TestConfigResponseSchema) {}
 export class ProviderParamDto extends createZodDto(ProviderParamSchema) {}
-export class SetActiveProviderDto extends createZodDto(
-  SetActiveProviderSchema,
-) {}
+export class SetActiveProviderDto extends createZodDto(SetActiveProviderSchema) {}
 export class ActiveProviderResponseDto extends createZodDto(
   ActiveProviderResponseSchema,
 ) {}
@@ -154,6 +143,4 @@ export type LlmConfigResponse = z.infer<typeof LlmConfigResponseSchema>;
 export type LlmProvidersList = z.infer<typeof LlmProvidersListSchema>;
 export type TestConfigResponse = z.infer<typeof TestConfigResponseSchema>;
 export type SetActiveProvider = z.infer<typeof SetActiveProviderSchema>;
-export type ActiveProviderResponse = z.infer<
-  typeof ActiveProviderResponseSchema
->;
+export type ActiveProviderResponse = z.infer<typeof ActiveProviderResponseSchema>;

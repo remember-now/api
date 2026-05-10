@@ -50,10 +50,7 @@ import {
   MAX_NODES_PER_SUMMARY_BATCH,
   PREVIOUS_EPISODES_WINDOW,
 } from './episode-constants';
-import {
-  getApplicableEdgeTypes,
-  getEffectiveTypeMappings,
-} from './episode-utils';
+import { getApplicableEdgeTypes, getEffectiveTypeMappings } from './episode-utils';
 import {
   AddEpisodeOptions,
   AddEpisodeOptionsInput,
@@ -122,8 +119,7 @@ export class EpisodeService {
     );
 
     // Load and delete entity edges first created by this episode
-    const edgeUuids =
-      await this.entityEdgeRepository.getUuidsForEpisodeDeletion(uuid);
+    const edgeUuids = await this.entityEdgeRepository.getUuidsForEpisodeDeletion(uuid);
     if (edgeUuids.length > 0) {
       await this.entityEdgeRepository.deleteByUuids(edgeUuids);
     }
@@ -266,23 +262,21 @@ export class EpisodeService {
     }
 
     // 5. Embed extracted nodes, then collect search-based candidates
-    const embeddedNodes =
-      await this.embeddingService.embedNodes(extractedNodes);
+    const embeddedNodes = await this.embeddingService.embedNodes(extractedNodes);
     const existingNodes = await this.collectNodeCandidates(
       embeddedNodes,
       episode.groupId,
     );
 
     // 6. Resolve nodes
-    const { resolvedNodes, uuidMap } =
-      await this.nodeResolutionService.resolveNodes(
-        model,
-        episodicNode,
-        embeddedNodes,
-        existingNodes,
-        previousEpisodes,
-        customInstructions,
-      );
+    const { resolvedNodes, uuidMap } = await this.nodeResolutionService.resolveNodes(
+      model,
+      episodicNode,
+      embeddedNodes,
+      existingNodes,
+      previousEpisodes,
+      customInstructions,
+    );
 
     const matchedExistingNodes = existingNodes.filter((n) =>
       [...uuidMap.values()].includes(n.uuid),
@@ -302,8 +296,7 @@ export class EpisodeService {
     );
 
     // 8. Embed extracted edges, then collect search-based candidates
-    const embeddedEdges =
-      await this.embeddingService.embedEdges(extractedEdges);
+    const embeddedEdges = await this.embeddingService.embedEdges(extractedEdges);
     const existingEdges = await this.collectEdgeCandidates(
       embeddedEdges,
       episode.groupId,
@@ -322,9 +315,7 @@ export class EpisodeService {
         customInstructions,
       );
 
-    episodicNode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map(
-      (e) => e.uuid,
-    );
+    episodicNode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map((e) => e.uuid);
 
     // 9.5. Extract entity attributes post-resolution (with resolved-edge context)
     for (const node of resolvedNodes) {
@@ -332,8 +323,7 @@ export class EpisodeService {
       const entityType = label ? entityTypes?.[label] : undefined;
       if (entityType) {
         const nodeEdges = resolvedEdges.filter(
-          (e) =>
-            e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+          (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
         );
         const attrMessages = buildExtractEntityAttributesMessages({
           episodeContent: episodicNode.content,
@@ -388,22 +378,13 @@ export class EpisodeService {
         name: n.name,
         summary: n.summary,
         facts: resolvedEdges
-          .filter(
-            (e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid,
-          )
+          .filter((e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid)
           .map((e) => e.fact),
       }));
 
       const summaryMap = new Map<string, string>();
-      for (
-        let i = 0;
-        i < nodeSummaryInput.length;
-        i += MAX_NODES_PER_SUMMARY_BATCH
-      ) {
-        const batch = nodeSummaryInput.slice(
-          i,
-          i + MAX_NODES_PER_SUMMARY_BATCH,
-        );
+      for (let i = 0; i < nodeSummaryInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
+        const batch = nodeSummaryInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
         const summaryMessages = buildNodeSummaryMessages({
           episode: episodicNode,
           previousEpisodes,

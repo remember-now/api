@@ -83,9 +83,7 @@ export class EdgeResolutionService {
       const cosineEdges: EntityEdge[] =
         edge.factEmbedding !== null
           ? existingEdges
-              .filter(
-                (e) => !endpointUuids.has(e.uuid) && e.factEmbedding !== null,
-              )
+              .filter((e) => !endpointUuids.has(e.uuid) && e.factEmbedding !== null)
               .map((e) => ({
                 edge: e,
                 score: cosineSimilarity(edge.factEmbedding!, e.factEmbedding!),

@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
@@ -36,9 +32,7 @@ export type CombinedEntity = z.infer<typeof CombinedEntitySchema>;
 export type CombinedFact = z.infer<typeof CombinedFactSchema>;
 export type CombinedExtraction = z.infer<typeof CombinedExtractionSchema>;
 
-export const combinedExtractionJsonSchema = z.toJSONSchema(
-  CombinedExtractionSchema,
-);
+export const combinedExtractionJsonSchema = z.toJSONSchema(CombinedExtractionSchema);
 
 // Prompt builder
 
@@ -113,13 +107,11 @@ export function buildExtractNodesAndEdgesMessages(ctx: {
   }
 
   if (edgeTypes) {
-    const edgeTypesContext = Object.entries(edgeTypes).map(
-      ([name, { description }]) => ({
-        fact_type_name: name,
-        fact_type_signatures: edgeTypeSignaturesMap[name] ?? ['Entity,Entity'],
-        fact_type_description: description,
-      }),
-    );
+    const edgeTypesContext = Object.entries(edgeTypes).map(([name, { description }]) => ({
+      fact_type_name: name,
+      fact_type_signatures: edgeTypeSignaturesMap[name] ?? ['Entity,Entity'],
+      fact_type_description: description,
+    }));
     humanContent += `\n\n<FACT_TYPES>\n${JSON.stringify(edgeTypesContext, null, 2)}\n</FACT_TYPES>`;
   }
 

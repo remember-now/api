@@ -53,8 +53,7 @@ export class NodeExtractionService {
       )
       .filter((node) => {
         if (!excludedEntityTypes?.length) return true;
-        const specificLabel =
-          node.labels.find((l) => l !== 'Entity') ?? 'Entity';
+        const specificLabel = node.labels.find((l) => l !== 'Entity') ?? 'Entity';
         return !excludedEntityTypes.includes(specificLabel);
       });
   }

@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Given a list of entities that belong to the same community, generate a short name (≤ 50 chars) and summary (≤ 300 chars) for the community. Capture the common theme or relationship. Be concise and factual.`;
 

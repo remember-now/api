@@ -11,8 +11,7 @@ describe('User (e2e)', () => {
   describe('GET /users/me', () => {
     describe('Success Cases', () => {
       it('should get current user info successfully', async () => {
-        const { sessionKey, userData } =
-          await h.createUserWithSession('get-me');
+        const { sessionKey, userData } = await h.createUserWithSession('get-me');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -62,8 +61,7 @@ describe('User (e2e)', () => {
   describe('PUT /users/me', () => {
     describe('Email Updates', () => {
       it('should update user email successfully', async () => {
-        const { credentials, sessionKey } =
-          await h.createUserWithSession('update-email');
+        const { credentials, sessionKey } = await h.createUserWithSession('update-email');
         const updateData = f.createUpdateScenarios(credentials).emailOnly();
 
         await h
@@ -83,8 +81,7 @@ describe('User (e2e)', () => {
       });
 
       it('should trim and lowercase email updates', async () => {
-        const { sessionKey, credentials } =
-          await h.createUserWithSession('trim-email');
+        const { sessionKey, credentials } = await h.createUserWithSession('trim-email');
         const updateData = f.createUpdateScenarios(credentials).trimmedEmail();
         const expectedEmail = updateData.email!.trim().toLowerCase();
 
@@ -196,9 +193,7 @@ describe('User (e2e)', () => {
       });
 
       it('should fail without current password', async () => {
-        const { sessionKey } = await h.createUserWithSession(
-          'no-current-password',
-        );
+        const { sessionKey } = await h.createUserWithSession('no-current-password');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -252,9 +247,7 @@ describe('User (e2e)', () => {
 
     describe('Validation Errors', () => {
       it('should fail with wrong current password', async () => {
-        const { sessionKey } = await h.createUserWithSession(
-          'delete-wrong-password',
-        );
+        const { sessionKey } = await h.createUserWithSession('delete-wrong-password');
 
         await h
           .authenticatedRequest(sessionKey)
@@ -269,8 +262,7 @@ describe('User (e2e)', () => {
       it.each(f.createDeleteScenarios('password123'))(
         'should fail with $case',
         async ({ data, expectedField }) => {
-          const { sessionKey } =
-            await h.createUserWithSession('delete-validation');
+          const { sessionKey } = await h.createUserWithSession('delete-validation');
 
           await h
             .authenticatedRequest(sessionKey)

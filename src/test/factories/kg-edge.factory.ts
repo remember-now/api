@@ -39,9 +39,7 @@ export class KgEdgeFactory {
     });
   }
 
-  static createHasEpisodeEdge(
-    opts: Partial<HasEpisodeEdge> = {},
-  ): HasEpisodeEdge {
+  static createHasEpisodeEdge(opts: Partial<HasEpisodeEdge> = {}): HasEpisodeEdge {
     return createHasEpisodeEdge({
       groupId: KG_TEST_GROUP_ID,
       sourceNodeUuid: kgUuid(),
@@ -50,9 +48,7 @@ export class KgEdgeFactory {
     });
   }
 
-  static createNextEpisodeEdge(
-    opts: Partial<NextEpisodeEdge> = {},
-  ): NextEpisodeEdge {
+  static createNextEpisodeEdge(opts: Partial<NextEpisodeEdge> = {}): NextEpisodeEdge {
     return createNextEpisodeEdge({
       groupId: KG_TEST_GROUP_ID,
       sourceNodeUuid: kgUuid(),

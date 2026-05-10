@@ -108,9 +108,7 @@ export class UnionFind<T extends string = string> {
  * Maps each UUID to the lexicographically smallest canonical UUID in its
  * duplicate cluster. Used for within-batch bidirectional deduplication.
  */
-export function compressUuidMap<T extends string = string>(
-  pairs: [T, T][],
-): Map<T, T> {
+export function compressUuidMap<T extends string = string>(pairs: [T, T][]): Map<T, T> {
   const allUuids = new Set<T>();
   for (const [a, b] of pairs) {
     allUuids.add(a);

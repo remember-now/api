@@ -20,10 +20,8 @@ export class TestDataFactory {
     valid: (prefix: string) =>
       `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`,
     withSpaces: (prefix: string) => `  ${prefix}-${Date.now()}@example.com  `,
-    uppercase: (prefix: string) =>
-      `${prefix.toUpperCase()}-${Date.now()}@EXAMPLE.COM`,
-    specialChars: (prefix: string) =>
-      `${prefix}+special-${Date.now()}@example.com`,
+    uppercase: (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}@EXAMPLE.COM`,
+    specialChars: (prefix: string) => `${prefix}+special-${Date.now()}@example.com`,
     invalid: () => `invalid-email-format-${Date.now()}`,
   } as const;
 
@@ -235,10 +233,7 @@ export class TestDataFactory {
   /**
    * Create profile update scenarios
    */
-  static createUpdateScenarios(currentCredentials: {
-    email: string;
-    password: string;
-  }) {
+  static createUpdateScenarios(currentCredentials: { email: string; password: string }) {
     return {
       emailOnly: (): ProfileUpdateData => ({
         email: this.EMAIL_PATTERNS.valid('updated'),
@@ -381,10 +376,7 @@ export class TestDataFactory {
       },
       {
         case: 'extremely large payload',
-        body:
-          '{"email": "test@example.com", "password": "' +
-          'a'.repeat(10000000) +
-          '"}',
+        body: '{"email": "test@example.com", "password": "' + 'a'.repeat(10000000) + '"}',
         contentType: 'application/json',
       },
       {

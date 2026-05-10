@@ -133,9 +133,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
         })
         .mockResolvedValueOnce({
           resolvedNodes: [],
-          duplicatePairs: [
-            { extractedUuid: alias.uuid, canonicalUuid: canonical.uuid },
-          ],
+          duplicatePairs: [{ extractedUuid: alias.uuid, canonicalUuid: canonical.uuid }],
           uuidMap: new Map([[alias.uuid, canonical.uuid]]),
         });
 
@@ -175,9 +173,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
       });
 
       // Existing canonical is included; alias is not
-      expect(
-        result.nodes.find((n) => n.uuid === existingCanonical.uuid),
-      ).toBeDefined();
+      expect(result.nodes.find((n) => n.uuid === existingCanonical.uuid)).toBeDefined();
       expect(result.nodes.find((n) => n.uuid === alias.uuid)).toBeUndefined();
     });
 
@@ -207,9 +203,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
         })
         .mockResolvedValueOnce({
           resolvedNodes: [canonical],
-          duplicatePairs: [
-            { extractedUuid: alias.uuid, canonicalUuid: canonical.uuid },
-          ],
+          duplicatePairs: [{ extractedUuid: alias.uuid, canonicalUuid: canonical.uuid }],
           uuidMap: new Map([[alias.uuid, canonical.uuid]]),
         });
 
@@ -220,9 +214,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
 
       // allCanonicalNodes deduplication (via Map in step 17) ensures exactly one save
       const savedNodes = mockEntityNodeRepo.saveBulk.mock.calls[0]?.[0];
-      expect(savedNodes.filter((n) => n.uuid === canonical.uuid)).toHaveLength(
-        1,
-      );
+      expect(savedNodes.filter((n) => n.uuid === canonical.uuid)).toHaveLength(1);
     });
   });
 
@@ -455,9 +447,7 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
         })
         .mockResolvedValueOnce({
           resolvedNodes: [],
-          duplicatePairs: [
-            { extractedUuid: nodeB.uuid, canonicalUuid: nodeA.uuid },
-          ],
+          duplicatePairs: [{ extractedUuid: nodeB.uuid, canonicalUuid: nodeA.uuid }],
           uuidMap: new Map([[nodeB.uuid, nodeA.uuid]]),
         })
         .mockResolvedValueOnce({

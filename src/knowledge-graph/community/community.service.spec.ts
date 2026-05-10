@@ -14,10 +14,7 @@ import {
   EntityNodeRepository,
   GdsCommunityRepository,
 } from '../neo4j/repositories';
-import {
-  CommunityService,
-  communitySummaryJsonSchema,
-} from './community.service';
+import { CommunityService, communitySummaryJsonSchema } from './community.service';
 
 describe('CommunityService', () => {
   let service: CommunityService;
@@ -73,9 +70,7 @@ describe('CommunityService', () => {
     it('should return early without projecting GDS graph', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      expect(
-        mockEntityEdgeRepository.hasRelatesEdgesForGroup,
-      ).toHaveBeenCalledTimes(1);
+      expect(mockEntityEdgeRepository.hasRelatesEdgesForGroup).toHaveBeenCalledTimes(1);
       expect(mockGdsCommunityRepository.projectGraph).not.toHaveBeenCalled();
       expect(mockLlmService.getActiveModel).not.toHaveBeenCalled();
     });
@@ -164,9 +159,7 @@ describe('CommunityService', () => {
 
       const savedNodes = mockCommunityNodeRepository.saveBulk.mock.calls[0][0];
       const names = savedNodes.map((n: { name: string }) => n.name);
-      expect(names).toEqual(
-        expect.arrayContaining(['Tech Cluster', 'Biz Cluster']),
-      );
+      expect(names).toEqual(expect.arrayContaining(['Tech Cluster', 'Biz Cluster']));
     });
 
     it('should save community edges (HAS_MEMBER) for all member uuids', async () => {
@@ -186,18 +179,15 @@ describe('CommunityService', () => {
 
       const deleteOrder =
         mockCommunityNodeRepository.deleteByGroupId.mock.invocationCallOrder[0];
-      const saveOrder =
-        mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+      const saveOrder = mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
       expect(deleteOrder).toBeLessThan(saveOrder);
     });
 
     it('should save community nodes before community edges', async () => {
       await service.buildCommunities(KG_TEST_USER_ID, KG_TEST_GROUP_ID);
 
-      const nodeOrder =
-        mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
-      const edgeOrder =
-        mockCommunityEdgeRepository.saveBulk.mock.invocationCallOrder[0];
+      const nodeOrder = mockCommunityNodeRepository.saveBulk.mock.invocationCallOrder[0];
+      const edgeOrder = mockCommunityEdgeRepository.saveBulk.mock.invocationCallOrder[0];
       expect(nodeOrder).toBeLessThan(edgeOrder);
     });
   });

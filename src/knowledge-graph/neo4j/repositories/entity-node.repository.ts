@@ -151,7 +151,9 @@ export class EntityNodeRepository implements OnModuleInit {
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
       '/*cypher*/ MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
-      { uuid },
+      {
+        uuid,
+      },
     );
   }
 
@@ -304,8 +306,7 @@ export class EntityNodeRepository implements OnModuleInit {
     const { originNodeUuids, groupIds, limit, maxDepth } = params;
     if (originNodeUuids.length === 0) return [];
 
-    const depth =
-      maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
+    const depth = maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
 
     const { clause, params: filterParams } = filters
       ? buildNodeFilterClause(filters, 'reachable')

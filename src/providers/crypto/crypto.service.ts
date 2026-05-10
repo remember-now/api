@@ -14,16 +14,9 @@ export class CryptoService {
 
   encrypt(plaintext: string): string {
     const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(
-      ALGORITHM,
-      this.cryptoConfig.encryptionKey,
-      iv,
-    );
+    const cipher = createCipheriv(ALGORITHM, this.cryptoConfig.encryptionKey, iv);
 
-    const encrypted = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
-      cipher.final(),
-    ]);
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     const authTag = cipher.getAuthTag();
 
     // Format: base64(iv + authTag + ciphertext)
@@ -38,17 +31,10 @@ export class CryptoService {
     const authTag = combined.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
     const encrypted = combined.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-    const decipher = createDecipheriv(
-      ALGORITHM,
-      this.cryptoConfig.encryptionKey,
-      iv,
-    );
+    const decipher = createDecipheriv(ALGORITHM, this.cryptoConfig.encryptionKey, iv);
     decipher.setAuthTag(authTag);
 
-    const decrypted = Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ]);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
   }
 }

@@ -239,9 +239,7 @@ describe('EdgeResolutionService', () => {
     expect(result.resolvedEdges).toHaveLength(1);
     expect(result.invalidatedEdges).toHaveLength(1);
     expect(result.invalidatedEdges[0].uuid).toBe('old-edge-uuid');
-    expect(result.invalidatedEdges[0].invalidAt).toEqual(
-      new Date('2024-06-01'),
-    );
+    expect(result.invalidatedEdges[0].invalidAt).toEqual(new Date('2024-06-01'));
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });
 
@@ -304,9 +302,7 @@ describe('EdgeResolutionService', () => {
       KG_REFERENCE_TIME,
     );
 
-    expect(result.resolvedEdges[0].factEmbedding).toEqual(
-      KG_HIGH_SIM_EMBEDDING,
-    );
+    expect(result.resolvedEdges[0].factEmbedding).toEqual(KG_HIGH_SIM_EMBEDDING);
   });
 
   it('should include keyword-only edge in similar candidates when no factEmbedding', async () => {

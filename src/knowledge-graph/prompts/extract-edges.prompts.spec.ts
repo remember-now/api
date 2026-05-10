@@ -1,8 +1,4 @@
-import {
-  KG_REFERENCE_TIME,
-  KG_TEST_GROUP_ID,
-  KgNodeFactory,
-} from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildExtractEdgesMessages } from './extract-edges.prompts';
 

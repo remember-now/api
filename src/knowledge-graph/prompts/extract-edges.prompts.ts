@@ -1,8 +1,4 @@
-import {
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-} from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
 import { EntityNode, EpisodicNode } from '../models';

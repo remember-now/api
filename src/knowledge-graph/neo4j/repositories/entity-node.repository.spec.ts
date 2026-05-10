@@ -345,7 +345,10 @@ describe('EntityNodeRepository', () => {
       await repo.getNodeDistanceScores(nodeUuids, centerUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('RELATES_TO'),
-        { nodeUuids, centerUuid },
+        {
+          nodeUuids,
+          centerUuid,
+        },
       );
     });
   });
@@ -357,7 +360,9 @@ describe('EntityNodeRepository', () => {
       await repo.getEpisodeMentionCounts(nodeUuids);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
         expect.stringContaining('MENTIONS'),
-        { nodeUuids },
+        {
+          nodeUuids,
+        },
       );
     });
   });

@@ -133,9 +133,7 @@ describe('LLM Lifecycle Integration (e2e)', () => {
     const flow = e2e('Active Provider Lifecycle');
 
     it('should complete active provider lifecycle', async () => {
-      const { sessionKey } = await h.createUserWithSession(
-        'llm-active-lifecycle',
-      );
+      const { sessionKey } = await h.createUserWithSession('llm-active-lifecycle');
 
       await flow
         .step('Save ANTHROPIC config with key')

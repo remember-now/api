@@ -68,9 +68,7 @@ describe('LlmService', () => {
       expect(result.providers).toHaveLength(expectedProviders.size);
 
       for (const provider of expectedProviders) {
-        expect(result.providers.some((p) => p.provider === provider)).toBe(
-          true,
-        );
+        expect(result.providers.some((p) => p.provider === provider)).toBe(true);
       }
     });
 
@@ -82,9 +80,7 @@ describe('LlmService', () => {
 
       const result = await llmService.listProviders(1);
 
-      expect(result.providers.map((p) => p.provider)).not.toContain(
-        LlmProvider.PLATFORM,
-      );
+      expect(result.providers.map((p) => p.provider)).not.toContain(LlmProvider.PLATFORM);
     });
 
     it('should correctly map hasApiKey: true when config blob has apiKey', async () => {
@@ -151,9 +147,7 @@ describe('LlmService', () => {
 
   describe('getProviderConfig', () => {
     it('should throw BadRequestException for PLATFORM', async () => {
-      await expect(
-        llmService.getProviderConfig(1, LlmProvider.PLATFORM),
-      ).rejects.toThrow(
+      await expect(llmService.getProviderConfig(1, LlmProvider.PLATFORM)).rejects.toThrow(
         new BadRequestException('Platform provider is server-managed'),
       );
     });
@@ -161,10 +155,7 @@ describe('LlmService', () => {
     it('should return { hasApiKey: false } shell when no row exists', async () => {
       prismaService.llmConfig.findUnique.mockResolvedValueOnce(null);
 
-      const result = await llmService.getProviderConfig(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.getProviderConfig(1, LlmProvider.ANTHROPIC);
 
       expect(result.provider).toBe(LlmProvider.ANTHROPIC);
       expect(result.hasApiKey).toBe(false);
@@ -174,10 +165,7 @@ describe('LlmService', () => {
       const mockConfig = TestLlmFactory.createPrismaLlmConfig();
       prismaService.llmConfig.findUnique.mockResolvedValueOnce(mockConfig);
 
-      const result = await llmService.getProviderConfig(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.getProviderConfig(1, LlmProvider.ANTHROPIC);
 
       expect(result.provider).toBe(LlmProvider.ANTHROPIC);
       expect(result.hasApiKey).toBe(true);
@@ -306,9 +294,9 @@ describe('LlmService', () => {
 
       expect(cryptoService.encrypt).not.toHaveBeenCalled();
       const upsertCall = prismaService.llmConfig.upsert.mock.calls[0][0];
-      expect(
-        upsertCall.create.config as Record<string, unknown>,
-      ).not.toHaveProperty('apiKey');
+      expect(upsertCall.create.config as Record<string, unknown>).not.toHaveProperty(
+        'apiKey',
+      );
     });
   });
 
@@ -322,9 +310,7 @@ describe('LlmService', () => {
     it('should throw BadRequestException for PLATFORM', async () => {
       await expect(
         llmService.deleteProviderConfig(1, LlmProvider.PLATFORM),
-      ).rejects.toThrow(
-        new BadRequestException('Platform provider is server-managed'),
-      );
+      ).rejects.toThrow(new BadRequestException('Platform provider is server-managed'));
     });
 
     it('should throw NotFoundException inside transaction when config not found', async () => {
@@ -355,9 +341,7 @@ describe('LlmService', () => {
 
   describe('setActiveProvider', () => {
     it('should set null without querying the config table', async () => {
-      prismaService.user.update.mockResolvedValueOnce(
-        UserFactory.createPrismaUser(),
-      );
+      prismaService.user.update.mockResolvedValueOnce(UserFactory.createPrismaUser());
       const result = await llmService.setActiveProvider(1, null);
 
       expect(prismaService.llmConfig.findUnique).not.toHaveBeenCalled();
@@ -374,9 +358,7 @@ describe('LlmService', () => {
         configurable: true,
       });
 
-      await expect(
-        llmService.setActiveProvider(1, LlmProvider.PLATFORM),
-      ).rejects.toThrow(
+      await expect(llmService.setActiveProvider(1, LlmProvider.PLATFORM)).rejects.toThrow(
         new BadRequestException('Platform model is not enabled'),
       );
     });
@@ -386,14 +368,9 @@ describe('LlmService', () => {
         get: () => true,
         configurable: true,
       });
-      prismaService.user.update.mockResolvedValueOnce(
-        UserFactory.createPrismaUser(),
-      );
+      prismaService.user.update.mockResolvedValueOnce(UserFactory.createPrismaUser());
 
-      const result = await llmService.setActiveProvider(
-        1,
-        LlmProvider.PLATFORM,
-      );
+      const result = await llmService.setActiveProvider(1, LlmProvider.PLATFORM);
 
       expect(result).toEqual({ activeProvider: LlmProvider.PLATFORM });
     });
@@ -411,11 +388,8 @@ describe('LlmService', () => {
     });
 
     it('should throw BadRequestException when config row has no apiKey in blob', async () => {
-      const configWithoutApiKey =
-        TestLlmFactory.createPrismaLlmConfigWithoutApiKey();
-      prismaService.llmConfig.findUnique.mockResolvedValueOnce(
-        configWithoutApiKey,
-      );
+      const configWithoutApiKey = TestLlmFactory.createPrismaLlmConfigWithoutApiKey();
+      prismaService.llmConfig.findUnique.mockResolvedValueOnce(configWithoutApiKey);
 
       await expect(
         llmService.setActiveProvider(1, LlmProvider.ANTHROPIC),
@@ -429,14 +403,9 @@ describe('LlmService', () => {
     it('should succeed and return { activeProvider: provider } when config has apiKey', async () => {
       const mockConfig = TestLlmFactory.createPrismaLlmConfig();
       prismaService.llmConfig.findUnique.mockResolvedValueOnce(mockConfig);
-      prismaService.user.update.mockResolvedValueOnce(
-        UserFactory.createPrismaUser(),
-      );
+      prismaService.user.update.mockResolvedValueOnce(UserFactory.createPrismaUser());
 
-      const result = await llmService.setActiveProvider(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.setActiveProvider(1, LlmProvider.ANTHROPIC);
 
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -450,9 +419,7 @@ describe('LlmService', () => {
     it('should throw BadRequestException for PLATFORM', async () => {
       await expect(
         llmService.testProviderConfig(1, LlmProvider.PLATFORM),
-      ).rejects.toThrow(
-        new BadRequestException('Platform model is not testable'),
-      );
+      ).rejects.toThrow(new BadRequestException('Platform model is not testable'));
     });
 
     it('should return success result when model.invoke succeeds', async () => {
@@ -461,10 +428,7 @@ describe('LlmService', () => {
       } as unknown as BaseChatModel;
       jest.spyOn(llmService, 'getActiveModel').mockResolvedValueOnce(mockModel);
 
-      const result = await llmService.testProviderConfig(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.testProviderConfig(1, LlmProvider.ANTHROPIC);
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('Connection successful');
@@ -477,10 +441,7 @@ describe('LlmService', () => {
       } as unknown as BaseChatModel;
       jest.spyOn(llmService, 'getActiveModel').mockResolvedValueOnce(mockModel);
 
-      const result = await llmService.testProviderConfig(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.testProviderConfig(1, LlmProvider.ANTHROPIC);
 
       expect(result.success).toBe(false);
       expect(result.message).toBe('Auth failed');
@@ -493,10 +454,7 @@ describe('LlmService', () => {
       } as unknown as BaseChatModel;
       jest.spyOn(llmService, 'getActiveModel').mockResolvedValueOnce(mockModel);
 
-      const result = await llmService.testProviderConfig(
-        1,
-        LlmProvider.ANTHROPIC,
-      );
+      const result = await llmService.testProviderConfig(1, LlmProvider.ANTHROPIC);
 
       expect(result.success).toBe(false);
       expect(result.message).toBe('Unknown error occurred');
@@ -541,9 +499,7 @@ describe('LlmService', () => {
     it('should throw NotFoundException when no config row exists for user provider', async () => {
       prismaService.llmConfig.findUnique.mockResolvedValueOnce(null);
 
-      await expect(
-        llmService.getActiveModel(1, LlmProvider.ANTHROPIC),
-      ).rejects.toThrow(
+      await expect(llmService.getActiveModel(1, LlmProvider.ANTHROPIC)).rejects.toThrow(
         new NotFoundException(
           `No configuration found for provider ${LlmProvider.ANTHROPIC}`,
         ),
@@ -551,15 +507,10 @@ describe('LlmService', () => {
     });
 
     it('should throw BadRequestException when config row has no apiKey', async () => {
-      const configWithoutApiKey =
-        TestLlmFactory.createPrismaLlmConfigWithoutApiKey();
-      prismaService.llmConfig.findUnique.mockResolvedValueOnce(
-        configWithoutApiKey,
-      );
+      const configWithoutApiKey = TestLlmFactory.createPrismaLlmConfigWithoutApiKey();
+      prismaService.llmConfig.findUnique.mockResolvedValueOnce(configWithoutApiKey);
 
-      await expect(
-        llmService.getActiveModel(1, LlmProvider.ANTHROPIC),
-      ).rejects.toThrow(
+      await expect(llmService.getActiveModel(1, LlmProvider.ANTHROPIC)).rejects.toThrow(
         new BadRequestException(
           `Provider ${LlmProvider.ANTHROPIC} is missing an API key`,
         ),

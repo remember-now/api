@@ -250,10 +250,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     return results.map((r) => this.mapRow(r));
   }
 
-  async getBetweenNodes(
-    sourceUuid: Uuid,
-    targetUuid: Uuid,
-  ): Promise<EntityEdge[]> {
+  async getBetweenNodes(sourceUuid: Uuid, targetUuid: Uuid): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
       /* cypher */ `MATCH (source:Entity {uuid: $sourceUuid})-[e:RELATES_TO]->(target:Entity {uuid: $targetUuid})
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -359,8 +356,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const { originNodeUuids, groupIds, limit, maxDepth } = params;
     if (originNodeUuids.length === 0) return [];
 
-    const depth =
-      maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
+    const depth = maxDepth !== undefined ? fromNeo4jInt(maxDepth) : MAX_SEARCH_DEPTH;
 
     const { clause, params: filterParams } = filters
       ? buildEdgeFilterClause(filters, 'e')

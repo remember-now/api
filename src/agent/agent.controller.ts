@@ -96,17 +96,11 @@ export class AgentController {
       config: {
         limit: 10,
         edgeConfig: {
-          searchMethods: [
-            EdgeSearchMethod.bm25,
-            EdgeSearchMethod.cosine_similarity,
-          ],
+          searchMethods: [EdgeSearchMethod.bm25, EdgeSearchMethod.cosine_similarity],
           reranker: EdgeReranker.rrf,
         },
         nodeConfig: {
-          searchMethods: [
-            NodeSearchMethod.bm25,
-            NodeSearchMethod.cosine_similarity,
-          ],
+          searchMethods: [NodeSearchMethod.bm25, NodeSearchMethod.cosine_similarity],
           reranker: NodeReranker.rrf,
         },
       },

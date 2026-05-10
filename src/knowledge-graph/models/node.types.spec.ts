@@ -296,9 +296,7 @@ describe('EpisodicNode', () => {
         content: 'content',
         validAt,
       });
-      expect(() =>
-        EpisodicNodeSchema.parse({ ...node, source: 'invalid' }),
-      ).toThrow();
+      expect(() => EpisodicNodeSchema.parse({ ...node, source: 'invalid' })).toThrow();
     });
 
     it('should accept all valid source types', () => {
@@ -345,9 +343,7 @@ describe('EpisodicNode', () => {
         content: 'content',
         validAt,
       });
-      expect(() =>
-        EpisodicNodeSchema.parse({ ...node, entityEdges: [123] }),
-      ).toThrow();
+      expect(() => EpisodicNodeSchema.parse({ ...node, entityEdges: [123] })).toThrow();
     });
 
     it('should reject empty groupId', () => {
@@ -357,9 +353,7 @@ describe('EpisodicNode', () => {
         content: 'content',
         validAt,
       });
-      expect(() =>
-        EpisodicNodeSchema.parse({ ...node, groupId: '' }),
-      ).toThrow();
+      expect(() => EpisodicNodeSchema.parse({ ...node, groupId: '' })).toThrow();
     });
   });
 });
@@ -425,9 +419,7 @@ describe('CommunityNode', () => {
         name: n('Community'),
         groupId: KG_TEST_GROUP_ID,
       });
-      expect(() =>
-        CommunityNodeSchema.parse({ ...node, groupId: '' }),
-      ).toThrow();
+      expect(() => CommunityNodeSchema.parse({ ...node, groupId: '' })).toThrow();
     });
 
     it('should accept null nameEmbedding', () => {
@@ -506,9 +498,7 @@ describe('SagaNode', () => {
         name: n('Saga'),
         groupId: KG_TEST_GROUP_ID,
       });
-      expect(() =>
-        SagaNodeSchema.parse({ ...node, uuid: 'not-a-uuid' }),
-      ).toThrow();
+      expect(() => SagaNodeSchema.parse({ ...node, uuid: 'not-a-uuid' })).toThrow();
     });
   });
 });

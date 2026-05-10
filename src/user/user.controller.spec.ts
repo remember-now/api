@@ -58,10 +58,7 @@ describe('UserController', () => {
       userService.updateSelf.mockResolvedValueOnce(mockUser);
       const result = await userController.updateMe(mockUser, updateSelfDto);
 
-      expect(userService.updateSelf).toHaveBeenCalledWith(
-        mockUser.id,
-        updateSelfDto,
-      );
+      expect(userService.updateSelf).toHaveBeenCalledWith(mockUser.id, updateSelfDto);
       expect(userService.updateSelf).toHaveBeenCalledTimes(1);
       expect(result).toEqual(mockUser);
     });
@@ -71,9 +68,9 @@ describe('UserController', () => {
       const error = new Error('Update failed');
       userService.updateSelf.mockRejectedValueOnce(error);
 
-      await expect(
-        userController.updateMe(mockUser, updateSelfDto),
-      ).rejects.toThrow('Update failed');
+      await expect(userController.updateMe(mockUser, updateSelfDto)).rejects.toThrow(
+        'Update failed',
+      );
     });
   });
 
@@ -83,15 +80,8 @@ describe('UserController', () => {
       userService.deleteSelf.mockResolvedValueOnce(undefined);
       authService.destroyUserSession.mockResolvedValueOnce(undefined);
 
-      const result = await userController.deleteMe(
-        mockUser,
-        deleteSelfDto,
-        mockSession,
-      );
-      expect(userService.deleteSelf).toHaveBeenCalledWith(
-        mockUser.id,
-        deleteSelfDto,
-      );
+      const result = await userController.deleteMe(mockUser, deleteSelfDto, mockSession);
+      expect(userService.deleteSelf).toHaveBeenCalledWith(mockUser.id, deleteSelfDto);
       expect(userService.deleteSelf).toHaveBeenCalledTimes(1);
 
       expect(authService.destroyUserSession).toHaveBeenCalledWith(mockSession);
@@ -115,9 +105,7 @@ describe('UserController', () => {
       const deleteSelfDto = UserDtoFactory.createDeleteSelfDto();
 
       userService.deleteSelf.mockResolvedValueOnce(undefined);
-      authService.destroyUserSession.mockRejectedValueOnce(
-        new Error('Session error'),
-      );
+      authService.destroyUserSession.mockRejectedValueOnce(new Error('Session error'));
       const loggerSpy = jest
         .spyOn(userController['logger'], 'error')
         .mockImplementation(() => {});
@@ -196,9 +184,7 @@ describe('UserController', () => {
       const error = new Error('Query failed');
       userService.getAllUsers.mockRejectedValueOnce(error);
 
-      await expect(userController.getAllUsers(query)).rejects.toThrow(
-        'Query failed',
-      );
+      await expect(userController.getAllUsers(query)).rejects.toThrow('Query failed');
     });
   });
 
@@ -221,9 +207,7 @@ describe('UserController', () => {
       const error = new Error('User not found');
       userService.getUserById.mockRejectedValueOnce(error);
 
-      await expect(userController.getUserById(params)).rejects.toThrow(
-        'User not found',
-      );
+      await expect(userController.getUserById(params)).rejects.toThrow('User not found');
     });
   });
 
@@ -238,10 +222,7 @@ describe('UserController', () => {
 
       const result = await userController.updateUser(params, updateUserDto);
 
-      expect(userService.updateUser).toHaveBeenCalledWith(
-        params.id,
-        updateUserDto,
-      );
+      expect(userService.updateUser).toHaveBeenCalledWith(params.id, updateUserDto);
       expect(userService.updateUser).toHaveBeenCalledTimes(1);
       expect(result).toEqual(mockUser);
     });
@@ -254,9 +235,9 @@ describe('UserController', () => {
       const error = new Error('Update failed');
       userService.updateUser.mockRejectedValueOnce(error);
 
-      await expect(
-        userController.updateUser(params, updateUserDto),
-      ).rejects.toThrow('Update failed');
+      await expect(userController.updateUser(params, updateUserDto)).rejects.toThrow(
+        'Update failed',
+      );
     });
   });
 
@@ -278,9 +259,7 @@ describe('UserController', () => {
       const error = new Error('Deletion failed');
       userService.deleteUser.mockRejectedValueOnce(error);
 
-      await expect(userController.deleteUser(params)).rejects.toThrow(
-        'Deletion failed',
-      );
+      await expect(userController.deleteUser(params)).rejects.toThrow('Deletion failed');
     });
   });
 });

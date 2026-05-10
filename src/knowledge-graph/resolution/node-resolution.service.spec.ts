@@ -83,9 +83,7 @@ describe('NodeResolutionService', () => {
     existing[0].uuid = u('cosine-uuid');
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'Alice Johnson', duplicate_name: 'Alice J.' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_name: 'Alice J.' }],
     });
 
     const result = await service.resolveNodes(
@@ -106,9 +104,7 @@ describe('NodeResolutionService', () => {
     existing[0].uuid = u('cosine-uuid');
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'Alice Johnson', duplicate_name: '' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_name: '' }],
     });
 
     const result = await service.resolveNodes(
@@ -137,9 +133,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
     });
 
     const result = await service.resolveNodes(
@@ -167,9 +161,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
     });
 
     const result = await service.resolveNodes(
@@ -231,9 +223,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [
-        { id: 0, name: 'Alice', duplicate_name: 'Alice Smith' },
-      ],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
     });
 
     const result = await service.resolveNodes(
@@ -331,12 +321,7 @@ describe('NodeResolutionService', () => {
       makeNode('Bob', KG_HIGH_SIM_EMBEDDING),
     ];
 
-    const result = await service.resolveNodes(
-      mockModel,
-      baseEpisode,
-      extracted,
-      [],
-    );
+    const result = await service.resolveNodes(mockModel, baseEpisode, extracted, []);
 
     expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
     expect(result.resolvedNodes).toHaveLength(2);

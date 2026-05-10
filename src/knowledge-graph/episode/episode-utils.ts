@@ -1,9 +1,4 @@
-import {
-  NodeLabel,
-  NodeLabels,
-  NodeLabelSchema,
-  RelationshipType,
-} from '../neo4j';
+import { NodeLabel, NodeLabels, NodeLabelSchema, RelationshipType } from '../neo4j';
 import { EdgeTypeMap, EdgeTypeMappings } from './episode.types';
 
 /**

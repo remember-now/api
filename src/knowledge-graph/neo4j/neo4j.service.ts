@@ -1,10 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import neo4j, {
-  Driver,
-  ManagedTransaction,
-  RecordShape,
-  Session,
-} from 'neo4j-driver';
+import neo4j, { Driver, ManagedTransaction, RecordShape, Session } from 'neo4j-driver';
 
 import { Neo4jConfigService } from '@/config/neo4j';
 

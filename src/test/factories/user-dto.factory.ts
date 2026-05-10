@@ -3,9 +3,7 @@ import { Role } from '@generated/prisma/client';
 import { CreateUserDto, DeleteSelfDto, UpdateSelfDto } from '@/user/dto';
 
 export class UserDtoFactory {
-  static createCreateUserDto(
-    options: Partial<CreateUserDto> = {},
-  ): CreateUserDto {
+  static createCreateUserDto(options: Partial<CreateUserDto> = {}): CreateUserDto {
     return {
       email: 'admin@example.com',
       password: 'password123',
@@ -14,9 +12,7 @@ export class UserDtoFactory {
     };
   }
 
-  static createUpdateSelfDto(
-    options: Partial<UpdateSelfDto> = {},
-  ): UpdateSelfDto {
+  static createUpdateSelfDto(options: Partial<UpdateSelfDto> = {}): UpdateSelfDto {
     return {
       email: 'newemail@example.com',
       currentPassword: 'currentPassword123',
@@ -24,9 +20,7 @@ export class UserDtoFactory {
     };
   }
 
-  static createDeleteSelfDto(
-    options: Partial<DeleteSelfDto> = {},
-  ): DeleteSelfDto {
+  static createDeleteSelfDto(options: Partial<DeleteSelfDto> = {}): DeleteSelfDto {
     return {
       currentPassword: 'currentPassword123',
       confirmationText: 'DELETE MY ACCOUNT',

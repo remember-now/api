@@ -82,10 +82,7 @@ export class UserController {
     try {
       await this.authService.destroyUserSession(session);
     } catch (error) {
-      this.logger.error(
-        'Failed to destroy session after account deletion',
-        error,
-      );
+      this.logger.error('Failed to destroy session after account deletion', error);
     }
   }
 

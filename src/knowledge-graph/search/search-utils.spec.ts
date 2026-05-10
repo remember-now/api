@@ -176,11 +176,7 @@ describe('nodeDistanceReranker', () => {
   it('does not prepend the center node when it is absent from the input list', async () => {
     repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
 
-    const [uuids] = await nodeDistanceReranker(
-      repo,
-      [u('b'), u('c')],
-      u('center'),
-    );
+    const [uuids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'));
     expect(uuids[0]).toBe('b');
     expect(uuids).not.toContain('center');
   });
@@ -189,12 +185,7 @@ describe('nodeDistanceReranker', () => {
     repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
 
     // unconnected 'c' gets score 0, which is below minScore=0.5
-    const [uuids] = await nodeDistanceReranker(
-      repo,
-      [u('b'), u('c')],
-      u('center'),
-      0.5,
-    );
+    const [uuids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'), 0.5);
     expect(uuids).not.toContain('c');
     expect(uuids).toContain('b');
   });
@@ -207,11 +198,7 @@ describe('nodeDistanceReranker', () => {
   });
 
   it('returns only the center node and makes no DB call when it is the only input', async () => {
-    const [uuids, scores] = await nodeDistanceReranker(
-      repo,
-      [u('center')],
-      u('center'),
-    );
+    const [uuids, scores] = await nodeDistanceReranker(repo, [u('center')], u('center'));
     expect(uuids).toEqual(['center']);
     expect(scores[0]).toBeCloseTo(10); // 1 / 0.1
     expect(repo.getNodeDistanceScores).not.toHaveBeenCalled();

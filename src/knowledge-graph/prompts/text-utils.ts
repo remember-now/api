@@ -38,10 +38,7 @@ function isSentenceEnd(text: string, pos: number): boolean {
   return true;
 }
 
-export function truncateAtSentence(
-  text: string,
-  maxChars = MAX_SUMMARY_CHARS,
-): string {
+export function truncateAtSentence(text: string, maxChars = MAX_SUMMARY_CHARS): string {
   if (text.length <= maxChars) return text;
 
   let lastBoundary = -1;
@@ -55,8 +52,6 @@ export function truncateAtSentence(
 
 export function concatenateEpisodes(episodes: EpisodicNode[]): string {
   return episodes
-    .map(
-      (ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`,
-    )
+    .map((ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`)
     .join('\n\n');
 }
