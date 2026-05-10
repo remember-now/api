@@ -201,8 +201,6 @@ export class EpisodeService {
       edgeTypeMappings,
       edgeTypes,
     );
-
-    // 1. Get active model
     const model = await this.llmService.getActiveModel(userId);
 
     // 2. Retrieve previous episodes

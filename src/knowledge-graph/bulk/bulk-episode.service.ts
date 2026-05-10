@@ -50,20 +50,12 @@ import {
 import {
   buildDirectedUuidMap,
   LLM_CONCURRENCY_LIMIT,
+  reassembleByOffsets,
   resolveEdgePointers,
   withConcurrency,
 } from './bulk-utils';
 import { AddBulkEpisodeOptions, AddBulkEpisodeResult } from './bulk.types';
 import { chunkContent, shouldChunk } from './content-chunking';
-
-function reassembleByOffsets<T>(flat: T[], lengths: number[]): T[][] {
-  let offset = 0;
-  return lengths.map((len) => {
-    const slice = flat.slice(offset, offset + len);
-    offset += len;
-    return slice;
-  });
-}
 
 @Injectable()
 export class BulkEpisodeService {
@@ -99,7 +91,6 @@ export class BulkEpisodeService {
       edgeTypeMappings,
       edgeTypes,
     );
-    // 1. Get model
     const model = await this.llmService.getActiveModel(userId);
 
     // 2. Retrieve previous episodes in parallel

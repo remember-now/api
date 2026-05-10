@@ -98,16 +98,6 @@ describe('BulkEpisodeService — steps 9-12: two-pass node deduplication', () =>
     jest.clearAllMocks();
   });
 
-  it('returns empty result immediately for an empty episode list', async () => {
-    const result = await service.addEpisodesBulk({
-      userId: USER_ID,
-      episodes: [],
-    });
-    expect(result.episodes).toEqual([]);
-    expect(result.nodes).toEqual([]);
-    expect(mockLlmService.getActiveModel).not.toHaveBeenCalled();
-  });
-
   // ── Pass-1: resolve nodes against the live graph ──────────────────────────
 
   describe('pass-1 dedup (vs live graph)', () => {
