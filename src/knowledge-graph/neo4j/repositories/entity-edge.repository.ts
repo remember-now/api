@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { EntityEdge } from '@/knowledge-graph/models';
 import { buildEdgeFilterClause } from '@/knowledge-graph/neo4j/cypher-filter-builders';
@@ -17,7 +18,6 @@ import {
   SearchByBfsParams,
   SearchBySimilarityParams,
   SearchByTextParams,
-  Uuid,
 } from '@/knowledge-graph/neo4j/types';
 import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/types';
 import { SearchFilters } from '@/knowledge-graph/search/types';

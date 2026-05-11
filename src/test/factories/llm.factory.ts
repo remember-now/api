@@ -7,19 +7,20 @@ import {
   SaveLlmConfigSchema,
 } from '@/llm/dto';
 
-import { UserFactory } from './user.factory';
+import { TEST_USER_UUID, UserFactory } from './user.factory';
 
 const DEFAULT_ANTHROPIC_MODEL = 'claude-3-5-haiku-20241022';
 const DEFAULT_GOOGLE_MODEL = 'gemini-2.0-flash';
 const ENCRYPTED_PLACEHOLDER = 'ENCRYPTED_PLACEHOLDER';
 const PLAIN_API_KEY = 'plain-api-key';
 const DEFAULT_DATE = new Date('2025-01-01');
+const DEFAULT_LLM_CONFIG_ID = '00000000-0000-4000-8000-000000000010';
 
 type NonPlatformProvider = Exclude<LlmProvider, 'PLATFORM'>;
 
 export interface PrismaLlmConfigOptions {
-  id?: number;
-  userId?: number;
+  id?: string;
+  userId?: string;
   provider?: NonPlatformProvider;
   model?: string;
   temperature?: number;
@@ -72,8 +73,8 @@ export class TestLlmFactory {
     }
 
     return {
-      id: options.id ?? 1,
-      userId: options.userId ?? 1,
+      id: options.id ?? DEFAULT_LLM_CONFIG_ID,
+      userId: options.userId ?? TEST_USER_UUID,
       provider,
       config: configBlob as Prisma.JsonValue,
       createdAt: options.createdAt ?? DEFAULT_DATE,
@@ -99,8 +100,8 @@ export class TestLlmFactory {
     }
 
     return {
-      id: options.id ?? 1,
-      userId: options.userId ?? 1,
+      id: options.id ?? DEFAULT_LLM_CONFIG_ID,
+      userId: options.userId ?? TEST_USER_UUID,
       provider,
       config: configBlob as Prisma.JsonValue,
       createdAt: options.createdAt ?? DEFAULT_DATE,

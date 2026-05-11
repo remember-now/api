@@ -267,7 +267,7 @@ describe('User Admin (e2e)', () => {
 
         await h
           .authenticatedRequest(sessionKey)
-          .get(`${s.baseUrl}/users/99999`)
+          .get(`${s.baseUrl}/users/00000000-0000-4000-8000-000000000999`)
           .expectStatus(404);
       });
 
@@ -454,7 +454,7 @@ describe('User Admin (e2e)', () => {
 
         await h
           .authenticatedRequest(sessionKey)
-          .put(`${s.baseUrl}/users/99999`)
+          .put(`${s.baseUrl}/users/00000000-0000-4000-8000-000000000999`)
           .withBody({ email: f.EMAIL_PATTERNS.valid('not-found') })
           .expectStatus(404);
       });
@@ -522,7 +522,7 @@ describe('User Admin (e2e)', () => {
 
         await h
           .authenticatedRequest(sessionKey)
-          .delete(`${s.baseUrl}/users/99999`)
+          .delete(`${s.baseUrl}/users/00000000-0000-4000-8000-000000000999`)
           .expectStatus(404);
       });
 

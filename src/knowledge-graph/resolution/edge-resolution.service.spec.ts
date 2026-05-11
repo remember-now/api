@@ -2,6 +2,7 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { Uuid } from '@/common/schemas';
 import {
   KG_HIGH_SIM_EMBEDDING,
   KG_NEAR_SAME_EMBEDDING,
@@ -13,7 +14,6 @@ import {
 
 import { EntityEdge } from '../models';
 import { EntityEdgeRepository } from '../neo4j/repositories';
-import { Uuid } from '../neo4j/types';
 import { EdgeResolutionService } from './edge-resolution.service';
 
 const u = (s: string) => s as Uuid;

@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { LlmProvider } from '@generated/prisma/client';
 
-import { TestLlmFactory } from '@/test/factories';
+import { TEST_USER_UUID, TestLlmFactory } from '@/test/factories';
 
 import { ProviderParamDto, SaveLlmConfigDto, SetActiveProviderDto } from './dto';
 import { LlmController } from './llm.controller';
@@ -14,7 +14,7 @@ describe('LlmController', () => {
   let llmController: LlmController;
   let llmService: DeepMocked<LlmService>;
 
-  const userId = 1;
+  const userId = TEST_USER_UUID;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

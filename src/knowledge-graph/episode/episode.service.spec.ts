@@ -2,6 +2,7 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
 import {
   KG_REFERENCE_TIME,
@@ -29,7 +30,7 @@ import {
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
 } from '../neo4j/repositories';
-import { GroupIdSchema, Uuid } from '../neo4j/types';
+import { GroupIdSchema } from '../neo4j/types';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { EpisodeService } from './episode.service';
 

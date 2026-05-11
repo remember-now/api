@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { Role as PrismaRole } from '@generated/prisma/client';
 
-import { PasswordSchema } from '@/common/schemas';
+import { PasswordSchema, UuidSchema } from '@/common/schemas';
 import { LlmProviderSchema } from '@/llm/dto';
 
 // Schemas
@@ -24,9 +24,8 @@ export const CreateUserSchema = z
 
 export const UserSchema = CreateUserSchema.omit({ password: true })
   .extend({
-    id: z.coerce.number().int().positive(),
+    id: UuidSchema,
     passwordHash: z.string(),
-    agentId: z.string().nullable(),
     activeLlmProvider: LlmProviderSchema.nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

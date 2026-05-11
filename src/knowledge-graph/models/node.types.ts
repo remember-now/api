@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import { Uuid, UuidSchema } from '@/common/schemas';
+
 import {
   EpisodeType,
   GroupId,
@@ -9,8 +11,6 @@ import {
   NodeLabelSchema,
   NodeName,
   NodeNameSchema,
-  Uuid,
-  UuidSchema,
 } from '../neo4j/types';
 
 // Schemas

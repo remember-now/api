@@ -5,8 +5,14 @@ import { DeepMockProxy, mockDeep, mockReset } from 'jest-mock-extended';
 import { Prisma } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
+import { Uuid } from '@/common/schemas';
 import { PrismaService } from '@/providers/database/postgres';
-import { UserDtoFactory, UserFactory } from '@/test/factories';
+import {
+  TEST_USER_UUID,
+  TEST_USER_UUID_2,
+  UserDtoFactory,
+  UserFactory,
+} from '@/test/factories';
 
 import {
   DeleteSelfDto,
@@ -28,19 +34,17 @@ describe('UserService', () => {
 
   // Create matching DTO expectations with same data but string dates
   const expectedUser = UserFactory.createUser({
-    id: mockUser.id,
+    id: mockUser.id as Uuid,
     email: mockUser.email,
     role: mockUser.role,
-    agentId: mockUser.agentId,
     createdAt: mockUser.createdAt.toISOString(),
     updatedAt: mockUser.updatedAt.toISOString(),
     passwordHash: mockUser.passwordHash,
   });
   const expectedUserWithoutPassword = UserFactory.createUserWithoutPassword({
-    id: mockUser.id,
+    id: mockUser.id as Uuid,
     email: mockUser.email,
     role: mockUser.role,
-    agentId: mockUser.agentId,
     createdAt: mockUser.createdAt.toISOString(),
     updatedAt: mockUser.updatedAt.toISOString(),
   });
@@ -254,10 +258,10 @@ describe('UserService', () => {
     it('should return user when found', async () => {
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
 
-      const result = await userService.getUserById(1);
+      const result = await userService.getUserById(TEST_USER_UUID);
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
       });
       expect(result).toEqual(expectedUser);
     });
@@ -265,7 +269,7 @@ describe('UserService', () => {
     it('should throw NotFoundException when user not found', async () => {
       prismaService.user.findUnique.mockResolvedValueOnce(null);
 
-      await expect(userService.getUserById(999)).rejects.toThrow(
+      await expect(userService.getUserById(TEST_USER_UUID_2)).rejects.toThrow(
         new NotFoundException('User not found'),
       );
     });
@@ -303,10 +307,10 @@ describe('UserService', () => {
         email: 'updated@example.com',
       });
 
-      const result = await userService.updateUser(1, updateDto);
+      const result = await userService.updateUser(TEST_USER_UUID, updateDto);
 
       expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
         data: { email: 'updated@example.com' },
       });
       expect(result.email).toBe('updated@example.com');
@@ -321,11 +325,11 @@ describe('UserService', () => {
       passwordService.hash.mockResolvedValueOnce(hashedPassword);
       prismaService.user.update.mockResolvedValueOnce(mockUser);
 
-      await userService.updateUser(1, updateDto);
+      await userService.updateUser(TEST_USER_UUID, updateDto);
 
       expect(passwordService.hash).toHaveBeenCalledWith('newPassword123');
       expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
         data: { passwordHash: hashedPassword },
       });
     });
@@ -340,10 +344,10 @@ describe('UserService', () => {
         role: RoleSchema.enum.ADMIN,
       });
 
-      await userService.updateUser(1, updateDto);
+      await userService.updateUser(TEST_USER_UUID, updateDto);
 
       expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
         data: { role: RoleSchema.enum.ADMIN },
       });
     });
@@ -359,7 +363,7 @@ describe('UserService', () => {
       });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
-      await expect(userService.updateUser(1, updateDto)).rejects.toThrow(
+      await expect(userService.updateUser(TEST_USER_UUID, updateDto)).rejects.toThrow(
         new ForbiddenException('Email already taken'),
       );
     });
@@ -375,7 +379,7 @@ describe('UserService', () => {
       });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
-      await expect(userService.updateUser(1, updateDto)).rejects.toThrow(
+      await expect(userService.updateUser(TEST_USER_UUID, updateDto)).rejects.toThrow(
         new NotFoundException('User not found'),
       );
     });
@@ -395,17 +399,17 @@ describe('UserService', () => {
         email: 'newemail@example.com',
       });
 
-      const result = await userService.updateSelf(1, updateDto);
+      const result = await userService.updateSelf(TEST_USER_UUID, updateDto);
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
       });
       expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
         'currentPassword123',
       );
       expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
         data: { email: 'newemail@example.com' },
       });
       expect(result.email).toBe('newemail@example.com');
@@ -423,11 +427,11 @@ describe('UserService', () => {
       passwordService.hash.mockResolvedValueOnce(hashedNewPassword);
       prismaService.user.update.mockResolvedValueOnce(mockUser);
 
-      await userService.updateSelf(1, updateDto);
+      await userService.updateSelf(TEST_USER_UUID, updateDto);
 
       expect(passwordService.hash).toHaveBeenCalledWith('newPassword123');
       expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
         data: { passwordHash: hashedNewPassword },
       });
     });
@@ -441,7 +445,7 @@ describe('UserService', () => {
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
       passwordService.verify.mockResolvedValueOnce(false);
 
-      await expect(userService.updateSelf(1, updateDto)).rejects.toThrow(
+      await expect(userService.updateSelf(TEST_USER_UUID, updateDto)).rejects.toThrow(
         new ForbiddenException('Current password is incorrect'),
       );
 
@@ -463,7 +467,7 @@ describe('UserService', () => {
       });
       prismaService.user.update.mockRejectedValueOnce(prismaError);
 
-      await expect(userService.updateSelf(1, updateDto)).rejects.toThrow(
+      await expect(userService.updateSelf(TEST_USER_UUID, updateDto)).rejects.toThrow(
         new ForbiddenException('Email already taken'),
       );
     });
@@ -471,28 +475,13 @@ describe('UserService', () => {
 
   describe('deleteUser', () => {
     it('should delete user successfully', async () => {
-      const userWithAgent = UserFactory.createPrismaUser({
-        agentId: 'test-agent-id',
-      });
-      prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);
-      prismaService.user.delete.mockResolvedValueOnce(userWithAgent);
+      prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
+      prismaService.user.delete.mockResolvedValueOnce(mockUser);
 
-      await userService.deleteUser(1);
+      await userService.deleteUser(TEST_USER_UUID);
 
       expect(prismaService.user.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
-      });
-    });
-
-    it('should delete user without agentId', async () => {
-      const userWithoutAgent = UserFactory.createPrismaUser({ agentId: null });
-      prismaService.user.findUnique.mockResolvedValueOnce(userWithoutAgent);
-      prismaService.user.delete.mockResolvedValueOnce(userWithoutAgent);
-
-      await userService.deleteUser(1);
-
-      expect(prismaService.user.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
       });
     });
 
@@ -504,7 +493,7 @@ describe('UserService', () => {
         }),
       );
 
-      await expect(userService.deleteUser(1)).rejects.toThrow(
+      await expect(userService.deleteUser(TEST_USER_UUID)).rejects.toThrow(
         new NotFoundException('User not found'),
       );
     });
@@ -515,7 +504,7 @@ describe('UserService', () => {
       const error = new Error('Deletion failed');
       prismaService.user.delete.mockRejectedValueOnce(error);
 
-      await expect(userService.deleteUser(1)).rejects.toThrow(error);
+      await expect(userService.deleteUser(TEST_USER_UUID)).rejects.toThrow(error);
     });
   });
 
@@ -526,24 +515,21 @@ describe('UserService', () => {
         confirmationText: 'DELETE MY ACCOUNT',
       };
 
-      const userWithAgent = UserFactory.createPrismaUser({
-        agentId: 'test-agent-id',
-      });
-      prismaService.user.findUnique.mockResolvedValueOnce(userWithAgent);
+      prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
       passwordService.verify.mockResolvedValueOnce(true);
-      prismaService.user.delete.mockResolvedValueOnce(userWithAgent);
+      prismaService.user.delete.mockResolvedValueOnce(mockUser);
 
-      await userService.deleteSelf(1, deleteDto);
+      await userService.deleteSelf(TEST_USER_UUID, deleteDto);
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
       });
       expect(passwordService.verify).toHaveBeenCalledWith(
-        userWithAgent.passwordHash,
+        mockUser.passwordHash,
         'currentPassword123',
       );
       expect(prismaService.user.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+        where: { id: TEST_USER_UUID },
       });
     });
 
@@ -556,7 +542,7 @@ describe('UserService', () => {
       prismaService.user.findUnique.mockResolvedValueOnce(mockUser);
       passwordService.verify.mockResolvedValueOnce(false);
 
-      await expect(userService.deleteSelf(1, deleteDto)).rejects.toThrow(
+      await expect(userService.deleteSelf(TEST_USER_UUID, deleteDto)).rejects.toThrow(
         new ForbiddenException('Current password is incorrect'),
       );
 
@@ -575,61 +561,8 @@ describe('UserService', () => {
       const error = new Error('Deletion failed');
       prismaService.user.delete.mockRejectedValueOnce(error);
 
-      await expect(userService.deleteSelf(1, deleteDto)).rejects.toThrow(error);
-    });
-  });
-
-  describe('updateUserAgentId', () => {
-    it('should update user agentId successfully', async () => {
-      const agentId = 'agent-123';
-      const updatedUser = { ...mockUser, agentId };
-
-      prismaService.user.update.mockResolvedValueOnce(updatedUser);
-
-      await userService.updateUserAgentId(1, agentId);
-
-      expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: { agentId },
-      });
-    });
-
-    it('should set agentId to null successfully', async () => {
-      const updatedUser = { ...mockUser, agentId: null };
-
-      prismaService.user.update.mockResolvedValueOnce(updatedUser);
-
-      await userService.updateUserAgentId(1, null);
-
-      expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: { agentId: null },
-      });
-    });
-
-    it('should throw NotFoundException when user is not found', async () => {
-      const prismaError = new PrismaClientKnownRequestError('User not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
-      prismaService.user.update.mockRejectedValueOnce(prismaError);
-
-      await expect(userService.updateUserAgentId(999, 'agent-123')).rejects.toThrow(
-        new NotFoundException('User not found'),
-      );
-
-      expect(prismaService.user.update).toHaveBeenCalledWith({
-        where: { id: 999 },
-        data: { agentId: 'agent-123' },
-      });
-    });
-
-    it('should rethrow unknown errors', async () => {
-      const unknownError = new Error('Database connection failed');
-      prismaService.user.update.mockRejectedValueOnce(unknownError);
-
-      await expect(userService.updateUserAgentId(1, 'agent-123')).rejects.toThrow(
-        unknownError,
+      await expect(userService.deleteSelf(TEST_USER_UUID, deleteDto)).rejects.toThrow(
+        error,
       );
     });
   });

@@ -1,6 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
@@ -10,7 +11,6 @@ import {
   SearchByBfsParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
-  Uuid,
 } from '../neo4j';
 import {
   CommunityNodeRepository,
@@ -63,7 +63,7 @@ export class SearchService {
     query: string;
     groupIds: GroupId[];
     config: SearchConfigInput;
-    userId: number;
+    userId: Uuid;
     filters?: SearchFilters;
   }): Promise<SearchResults> {
     return this.search({

@@ -2,8 +2,9 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import { Uuid } from '@/common/schemas';
+
 import { EntityNodeRepository } from '../neo4j/repositories';
-import { Uuid } from '../neo4j/types';
 import { DEFAULT_MMR_LAMBDA } from './types';
 
 // ─── RRF ─────────────────────────────────────────────────────────────────────

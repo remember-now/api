@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
 import { EpisodicNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
@@ -16,7 +17,6 @@ import {
   NodeName,
   RetrieveEpisodesParams,
   SearchByTextParams,
-  Uuid,
 } from '@/knowledge-graph/neo4j/types';
 
 @Injectable()

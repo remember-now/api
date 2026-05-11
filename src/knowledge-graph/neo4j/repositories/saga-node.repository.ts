@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
 import { SagaNode } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
@@ -12,7 +13,6 @@ import {
   GroupId,
   NodeLabels,
   NodeName,
-  Uuid,
 } from '@/knowledge-graph/neo4j/types';
 
 @Injectable()

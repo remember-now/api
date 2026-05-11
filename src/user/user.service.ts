@@ -3,6 +3,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { Prisma } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
+import { Uuid } from '@/common/schemas';
 import { PrismaService } from '@/providers/database/postgres';
 
 import {
@@ -28,14 +29,16 @@ export class UserService {
     private readonly passwordService: PasswordService,
   ) {}
 
-  private transformUserDates<T extends { createdAt: Date; updatedAt: Date }>(
+  private transformUserDates<T extends { id: string; createdAt: Date; updatedAt: Date }>(
     user: T,
-  ): Omit<T, 'createdAt' | 'updatedAt'> & {
+  ): Omit<T, 'id' | 'createdAt' | 'updatedAt'> & {
+    id: Uuid;
     createdAt: string;
     updatedAt: string;
   } {
     return {
       ...user,
+      id: user.id as Uuid,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };
@@ -113,7 +116,7 @@ export class UserService {
     };
   }
 
-  async getUserById(id: number): Promise<User> {
+  async getUserById(id: Uuid): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -133,7 +136,7 @@ export class UserService {
     return this.transformUserDates(user);
   }
 
-  async updateUser(id: number, dto: UpdateUserDto): Promise<UserWithoutPassword> {
+  async updateUser(id: Uuid, dto: UpdateUserDto): Promise<UserWithoutPassword> {
     const updateData: Partial<User> = {};
 
     if (dto.email) {
@@ -167,7 +170,7 @@ export class UserService {
     }
   }
 
-  async updateSelf(userId: number, dto: UpdateSelfDto): Promise<UserWithoutPassword> {
+  async updateSelf(userId: Uuid, dto: UpdateSelfDto): Promise<UserWithoutPassword> {
     const existingUser = await this.getUserById(userId);
 
     const pwMatches = await this.passwordService.verify(
@@ -204,7 +207,7 @@ export class UserService {
     }
   }
 
-  async deleteUser(id: number): Promise<void> {
+  async deleteUser(id: Uuid): Promise<void> {
     try {
       await this.prisma.user.delete({
         where: { id },
@@ -217,7 +220,7 @@ export class UserService {
     }
   }
 
-  async deleteSelf(userId: number, dto: DeleteSelfDto): Promise<void> {
+  async deleteSelf(userId: Uuid, dto: DeleteSelfDto): Promise<void> {
     const existingUser = await this.getUserById(userId);
 
     const pwMatches = await this.passwordService.verify(
@@ -231,19 +234,5 @@ export class UserService {
     await this.prisma.user.delete({
       where: { id: userId },
     });
-  }
-
-  async updateUserAgentId(userId: number, agentId: string | null): Promise<void> {
-    try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { agentId },
-      });
-    } catch (error) {
-      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
-        throw new NotFoundException('User not found');
-      }
-      throw error;
-    }
   }
 }

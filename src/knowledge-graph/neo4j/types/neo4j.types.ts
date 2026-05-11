@@ -1,6 +1,8 @@
 import neo4j from 'neo4j-driver';
 import { z } from 'zod';
 
+import { UuidSchema } from '@/common/schemas';
+
 import { luceneSanitize, toNeo4jDateTime } from '../neo4j-utils';
 
 const neoInt = z.int().transform((v) => neo4j.int(v));
@@ -47,8 +49,6 @@ export const GroupIdSchema = z
   .brand<'GroupId'>();
 
 export const GraphNameSchema = z.string().min(1).brand<'GraphName'>();
-
-export const UuidSchema = z.uuid().brand<'Uuid'>();
 
 export const SearchByTextParamsSchema = z.object({
   // TODO: Should this string be optional?
@@ -98,7 +98,6 @@ export type NodeName = z.infer<typeof NodeNameSchema>;
 export type GroupId = z.infer<typeof GroupIdSchema>;
 export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
 export type GraphName = z.infer<typeof GraphNameSchema>;
-export type Uuid = z.infer<typeof UuidSchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
 export type SearchBySimilarityParams = z.infer<typeof SearchBySimilarityParamsSchema>;
 export type SearchByBfsParams = z.infer<typeof SearchByBfsParamsSchema>;

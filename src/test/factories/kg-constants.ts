@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
+import { UuidSchema } from '@/common/schemas';
 import { Episode, EpisodeSchema } from '@/knowledge-graph/episode';
-import { EpisodeType, GroupIdSchema, UuidSchema } from '@/knowledge-graph/neo4j/types';
+import { EpisodeType, GroupIdSchema } from '@/knowledge-graph/neo4j/types';
 
 export const KG_TEST_GROUP_ID = GroupIdSchema.parse('test-group');
-export const KG_TEST_USER_ID = 42;
+export const KG_TEST_USER_ID = UuidSchema.parse('00000000-0000-4000-8000-000000000042');
 export const KG_REFERENCE_TIME = new Date('2024-01-01T00:00:00.000Z');
 
 export const KG_HIGH_SIM_EMBEDDING = [1, 0, 0];

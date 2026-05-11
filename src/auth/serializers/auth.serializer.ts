@@ -3,6 +3,7 @@ import { PassportSerializer } from '@nestjs/passport';
 
 import { Role, User } from '@generated/prisma/client';
 
+import { Uuid } from '@/common/schemas';
 import { UserWithoutPassword } from '@/user/dto';
 import { UserService } from '@/user/user.service';
 
@@ -14,13 +15,13 @@ export class AuthSerializer extends PassportSerializer {
 
   serializeUser(
     user: User,
-    done: (err: Error | null, user: { id: number; role: Role }) => void,
+    done: (err: Error | null, user: { id: Uuid; role: Role }) => void,
   ) {
-    done(null, { id: user.id, role: user.role });
+    done(null, { id: user.id as Uuid, role: user.role });
   }
 
   async deserializeUser(
-    payload: { id: number; role: Role },
+    payload: { id: Uuid; role: Role },
     done: (err: Error | null, user: UserWithoutPassword | null) => void,
   ) {
     try {

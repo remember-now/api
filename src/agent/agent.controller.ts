@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
+import { Uuid } from '@/common/schemas';
 import { EpisodeService } from '@/knowledge-graph/episode';
 import { EpisodeType } from '@/knowledge-graph/models';
 import { GroupIdSchema } from '@/knowledge-graph/neo4j/types';
@@ -46,7 +47,7 @@ export class AgentController {
 
   @Get()
   @ApiOperation({ summary: 'Get agent information and configuration' })
-  getAgentInfo(@GetUser('id') userId: number) {
+  getAgentInfo(@GetUser('id') userId: Uuid) {
     return this.agentService.getAgentInfo(userId);
   }
 
@@ -55,7 +56,7 @@ export class AgentController {
   @ApiOperation({
     summary: '[TEST] Ingest an episode into the knowledge graph',
   })
-  async testIngest(@Body() body: TestIngestDto, @GetUser('id') userId: number) {
+  async testIngest(@Body() body: TestIngestDto, @GetUser('id') userId: Uuid) {
     const [result] = await this.episodeService.addEpisodes({
       userId,
       episodes: [
@@ -90,7 +91,7 @@ export class AgentController {
   // TODO: REMOVE
   @Post('test/search')
   @ApiOperation({ summary: '[TEST] Search the knowledge graph' })
-  async testSearch(@Body() body: TestSearchDto, @GetUser('id') userId: number) {
+  async testSearch(@Body() body: TestSearchDto, @GetUser('id') userId: Uuid) {
     const results = await this.searchService.search({
       userId,
       query: body.query,

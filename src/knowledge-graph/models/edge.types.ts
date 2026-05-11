@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import { Uuid, UuidSchema } from '@/common/schemas';
+
 import {
   GroupId,
   GroupIdSchema,
   RelationshipType,
   RelationshipTypeSchema,
-  Uuid,
-  UuidSchema,
 } from '../neo4j/types';
 
 // Schemas

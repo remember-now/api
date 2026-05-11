@@ -1,6 +1,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
+import { Uuid } from '@/common/schemas';
 import {
   KG_DIFF_EMBEDDING,
   KG_HIGH_SIM_EMBEDDING,
@@ -10,7 +11,6 @@ import {
 } from '@/test/factories';
 
 import { EntityNode } from '../models';
-import { Uuid } from '../neo4j/types';
 import { NodeResolutionService } from './node-resolution.service';
 
 const u = (s: string) => s as Uuid;

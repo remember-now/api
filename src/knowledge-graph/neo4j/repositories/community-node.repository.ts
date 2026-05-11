@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
 import { CommunityNode } from '@/knowledge-graph/models';
 import {
@@ -20,7 +21,6 @@ import {
   NodeName,
   SearchBySimilarityParams,
   SearchByTextParams,
-  Uuid,
 } from '@/knowledge-graph/neo4j/types';
 
 @Injectable()

@@ -14,6 +14,7 @@ import { ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
+import { Uuid } from '@/common/schemas';
 
 import {
   CreateMemoryBlockDto,
@@ -30,22 +31,19 @@ export class MemoriesController {
 
   @Get()
   @ApiOperation({ summary: 'List all memory blocks for the current user' })
-  listMemoryBlocks(@GetUser('id') userId: number) {
+  listMemoryBlocks(@GetUser('id') userId: Uuid) {
     return this.memoriesService.listMemoryBlocks(userId);
   }
 
   @Get(':blockLabel')
   @ApiOperation({ summary: 'Get a specific memory block by label' })
-  getMemoryBlock(
-    @Param() params: GetMemoryBlockParamsDto,
-    @GetUser('id') userId: number,
-  ) {
+  getMemoryBlock(@Param() params: GetMemoryBlockParamsDto, @GetUser('id') userId: Uuid) {
     return this.memoriesService.getMemoryBlock(userId, params.blockLabel);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a new memory block' })
-  createMemoryBlock(@Body() dto: CreateMemoryBlockDto, @GetUser('id') userId: number) {
+  createMemoryBlock(@Body() dto: CreateMemoryBlockDto, @GetUser('id') userId: Uuid) {
     return this.memoriesService.createMemoryBlock(userId, dto);
   }
 
@@ -54,7 +52,7 @@ export class MemoriesController {
   updateMemoryBlock(
     @Param() params: GetMemoryBlockParamsDto,
     @Body() dto: UpdateMemoryBlockDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     return this.memoriesService.updateMemoryBlock(userId, params.blockLabel, dto);
   }
@@ -65,7 +63,7 @@ export class MemoriesController {
   @ApiNoContentResponse({ description: 'Memory block successfully deleted' })
   deleteMemoryBlock(
     @Param() params: GetMemoryBlockParamsDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     this.memoriesService.deleteMemoryBlock(userId, params.blockLabel);
   }

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
+
 import { CreateMemoryBlockDto, UpdateMemoryBlockDto } from './dto';
 
 @Injectable()
@@ -8,27 +10,27 @@ export class MemoriesService {
 
   constructor() {}
 
-  listMemoryBlocks(userId: number) {
+  listMemoryBlocks(userId: Uuid) {
     // TODO: Implement
     return userId;
   }
 
-  getMemoryBlock(userId: number, blockLabel: string) {
+  getMemoryBlock(userId: Uuid, blockLabel: string) {
     // TODO: Implement
     return { userId, blockLabel };
   }
 
-  createMemoryBlock(userId: number, dto: CreateMemoryBlockDto) {
+  createMemoryBlock(userId: Uuid, dto: CreateMemoryBlockDto) {
     // TODO: Implement
     return { userId, dto };
   }
 
-  updateMemoryBlock(userId: number, blockLabel: string, dto: UpdateMemoryBlockDto) {
+  updateMemoryBlock(userId: Uuid, blockLabel: string, dto: UpdateMemoryBlockDto) {
     // TODO: Implement
     return { userId, blockLabel, dto };
   }
 
-  deleteMemoryBlock(userId: number, blockLabel: string) {
+  deleteMemoryBlock(userId: Uuid, blockLabel: string) {
     // TODO: Implement
     return { userId, blockLabel };
   }

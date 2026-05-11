@@ -1,8 +1,10 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
+
 import { EntityEdge, EpisodicNode } from '../models';
-import { SearchByTextParamsSchema, Uuid } from '../neo4j';
+import { SearchByTextParamsSchema } from '../neo4j';
 import { EntityEdgeRepository } from '../neo4j/repositories';
 import { buildDedupeEdgesMessages } from '../prompts';
 import {

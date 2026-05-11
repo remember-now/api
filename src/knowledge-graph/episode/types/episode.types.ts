@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { UuidSchema } from '@/common/schemas';
+
 import {
   EntityEdgeSchema,
   EntityNodeSchema,
@@ -12,7 +14,6 @@ import {
   NodeLabelSchema,
   NodeNameSchema,
   RelationshipTypeSchema,
-  UuidSchema,
 } from '../../neo4j';
 
 // Constants
@@ -66,7 +67,7 @@ export const EdgeTypeMappingsSchema = z.map(
 );
 
 export const AddEpisodeOptionsSchema = z.object({
-  userId: z.number(),
+  userId: UuidSchema,
   episodes: z.array(EpisodeSchema).min(1),
   entityTypes: EntityTypeMapSchema.optional(),
   edgeTypes: EdgeTypeMapSchema.optional(),

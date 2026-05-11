@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { NodeLabelSchema, RelationshipTypeSchema, UuidSchema } from '../../neo4j/types';
+import { UuidSchema } from '@/common/schemas';
+
+import { NodeLabelSchema, RelationshipTypeSchema } from '../../neo4j/types';
 
 // Enums
 

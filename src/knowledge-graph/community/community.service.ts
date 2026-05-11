@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
+import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
 
 import { EmbeddingService } from '../embedding';
@@ -14,7 +15,7 @@ import {
   EntityNodeRepository,
   GdsCommunityRepository,
 } from '../neo4j/repositories';
-import { GraphNameSchema, GroupId, NodeNameSchema, Uuid } from '../neo4j/types';
+import { GraphNameSchema, GroupId, NodeNameSchema } from '../neo4j/types';
 import { buildCommunitySummaryMessages } from '../prompts';
 
 export const CommunitySummarySchema = z.object({
@@ -36,7 +37,7 @@ export class CommunityService {
     private readonly gdsCommunityRepository: GdsCommunityRepository,
   ) {}
 
-  async buildCommunities(userId: number, groupId: GroupId): Promise<void> {
+  async buildCommunities(userId: Uuid, groupId: GroupId): Promise<void> {
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
     const hasEdges = await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
 

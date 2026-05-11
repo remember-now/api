@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
+import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
 
 import { CommunityService } from '../community';
@@ -28,7 +29,6 @@ import {
   RetrieveEpisodesParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
-  Uuid,
 } from '../neo4j';
 import {
   EntityEdgeRepository,
@@ -155,7 +155,7 @@ export class EpisodeService {
   }
 
   async summarizeSaga(options: {
-    userId: number;
+    userId: Uuid;
     sagaUuid: Uuid;
     groupId: GroupId;
   }): Promise<string> {

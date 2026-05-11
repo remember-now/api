@@ -7,7 +7,7 @@ import { TestDataFactory } from './test-data-factory';
 import { TestSetup } from './test-setup';
 
 export interface SessionResult {
-  userId: number;
+  userId: string;
   credentials: {
     email: string;
     password: string;
@@ -36,9 +36,9 @@ export class TestHelpers {
    */
   static async createUser(
     userPrefix = 'test',
-  ): Promise<{ id: number; credentials: { email: string; password: string } }> {
+  ): Promise<{ id: string; credentials: { email: string; password: string } }> {
     const credentials = TestDataFactory.createUserCredentials(userPrefix);
-    const id: number = await spec()
+    const id: string = await spec()
       .post(`${TestSetup.baseUrl}/auth/signup`)
       .withBody(credentials)
       .expectStatus(201)
@@ -93,7 +93,7 @@ export class TestHelpers {
    */
   static async createAdmin(
     adminPrefix = 'admin',
-  ): Promise<{ id: number; credentials: { email: string; password: string } }> {
+  ): Promise<{ id: string; credentials: { email: string; password: string } }> {
     const { id, credentials } = await this.createUser(adminPrefix);
 
     await this.promoteUserToAdmin(id);
@@ -116,7 +116,7 @@ export class TestHelpers {
   /**
    * Promote an existing user to admin role
    */
-  static async promoteUserToAdmin(userId: number): Promise<void> {
+  static async promoteUserToAdmin(userId: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: { role: Role.ADMIN },

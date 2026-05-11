@@ -16,6 +16,7 @@ import { ZodResponse } from 'nestjs-zod';
 
 import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
+import { Uuid } from '@/common/schemas';
 
 import {
   ActiveProviderResponseDto,
@@ -41,7 +42,7 @@ export class LlmController {
     description: 'All providers with config status',
     type: LlmProvidersListDto,
   })
-  async listProviders(@GetUser('id') userId: number) {
+  async listProviders(@GetUser('id') userId: Uuid) {
     return this.llmService.listProviders(userId);
   }
 
@@ -54,7 +55,7 @@ export class LlmController {
   })
   async setActiveProvider(
     @Body() body: SetActiveProviderDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     return this.llmService.setActiveProvider(userId, body.provider);
   }
@@ -68,7 +69,7 @@ export class LlmController {
   })
   async getProviderConfig(
     @Param() params: ProviderParamDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     return this.llmService.getProviderConfig(userId, params.provider);
   }
@@ -83,7 +84,7 @@ export class LlmController {
   async saveProviderConfig(
     @Param() params: ProviderParamDto,
     @Body() body: SaveLlmConfigDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     if (params.provider !== body.provider) {
       throw new BadRequestException('Body provider does not match URL provider');
@@ -97,7 +98,7 @@ export class LlmController {
   @ApiNoContentResponse({ description: 'Provider config successfully deleted' })
   async deleteProviderConfig(
     @Param() params: ProviderParamDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     await this.llmService.deleteProviderConfig(userId, params.provider);
   }
@@ -111,7 +112,7 @@ export class LlmController {
   })
   async testProviderConfig(
     @Param() params: ProviderParamDto,
-    @GetUser('id') userId: number,
+    @GetUser('id') userId: Uuid,
   ) {
     return this.llmService.testProviderConfig(userId, params.provider);
   }

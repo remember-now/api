@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 
 import { LlmConfig, LlmProvider } from '@generated/prisma/client';
 
+import { Uuid } from '@/common/schemas';
 import { LlmConfigService } from '@/config/llm';
 import { CryptoService } from '@/providers/crypto';
 import { PrismaService } from '@/providers/database/postgres';
@@ -50,7 +51,7 @@ export class LlmService {
     });
   }
 
-  async listProviders(userId: number): Promise<LlmProvidersList> {
+  async listProviders(userId: Uuid): Promise<LlmProvidersList> {
     const [user, configs] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
@@ -77,7 +78,7 @@ export class LlmService {
   }
 
   async getProviderConfig(
-    userId: number,
+    userId: Uuid,
     provider: LlmProvider,
   ): Promise<LlmConfigResponse> {
     if (provider === LlmProvider.PLATFORM) {
@@ -94,7 +95,7 @@ export class LlmService {
   }
 
   async saveProviderConfig(
-    userId: number,
+    userId: Uuid,
     config: SaveLlmConfig,
   ): Promise<LlmConfigResponse> {
     const existingRow = await this.prisma.llmConfig.findUnique({
@@ -125,7 +126,7 @@ export class LlmService {
     return this.toConfigResponse(result);
   }
 
-  async deleteProviderConfig(userId: number, provider: LlmProvider): Promise<void> {
+  async deleteProviderConfig(userId: Uuid, provider: LlmProvider): Promise<void> {
     if (provider === LlmProvider.PLATFORM) {
       throw new BadRequestException('Platform provider is server-managed');
     }
@@ -151,7 +152,7 @@ export class LlmService {
   }
 
   async setActiveProvider(
-    userId: number,
+    userId: Uuid,
     provider: LlmProvider | null,
   ): Promise<ActiveProviderResponse> {
     if (provider === null) {
@@ -189,7 +190,7 @@ export class LlmService {
   }
 
   async testProviderConfig(
-    userId: number,
+    userId: Uuid,
     provider: LlmProvider,
   ): Promise<TestConfigResponse> {
     if (provider === LlmProvider.PLATFORM) {
@@ -220,7 +221,7 @@ export class LlmService {
   }
 
   async getActiveModel(
-    userId: number,
+    userId: Uuid,
     providerOverride?: LlmProvider,
   ): Promise<BaseChatModel> {
     const provider =

@@ -1,7 +1,9 @@
+import { UuidSchema } from '@/common/schemas';
+
 import { TemporalComparison } from '../search/types';
 import { buildEdgeFilterClause, buildNodeFilterClause } from './cypher-filter-builders';
 import { luceneSanitize } from './neo4j-utils';
-import { NodeLabelSchema, RelationshipTypeSchema, UuidSchema } from './types';
+import { NodeLabelSchema, RelationshipTypeSchema } from './types';
 
 const label = (s: string) => NodeLabelSchema.parse(s);
 const edgeType = (s: string) => RelationshipTypeSchema.parse(s);

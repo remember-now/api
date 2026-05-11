@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { Uuid } from '@/common/schemas';
+
 import { ChatRequestDto, GetMessagesQueryDto } from './dto';
 
 /**
@@ -11,17 +13,17 @@ export class MessagesService {
 
   constructor() {}
 
-  getMessages(dto: GetMessagesQueryDto, userId: number) {
+  getMessages(dto: GetMessagesQueryDto, userId: Uuid) {
     // TODO: Implement
     return { dto, userId };
   }
 
-  sendMessage(dto: ChatRequestDto, userId: number) {
+  sendMessage(dto: ChatRequestDto, userId: Uuid) {
     // TODO: Implement
     return { dto, userId };
   }
 
-  sendMessageStream(dto: ChatRequestDto, userId: number) {
+  sendMessageStream(dto: ChatRequestDto, userId: Uuid) {
     // TODO: Implement
     return { dto, userId };
   }

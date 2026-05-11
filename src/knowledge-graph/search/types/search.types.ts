@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
+import { UuidSchema } from '@/common/schemas';
+
 import {
   CommunityNodeSchema,
   EntityEdgeSchema,
   EntityNodeSchema,
   EpisodicNodeSchema,
 } from '../../models';
-import { GroupIdSchema, UuidSchema } from '../../neo4j/types';
+import { GroupIdSchema } from '../../neo4j/types';
 import { SearchConfigSchema } from './search-config.types';
 import { SearchFiltersSchema } from './search-filters.types';
 
@@ -24,7 +26,7 @@ export const SearchResultsSchema = z.object({
 });
 
 export const SearchOptionsSchema = z.object({
-  userId: z.number(),
+  userId: UuidSchema,
   query: z.string(),
   groupIds: z.array(GroupIdSchema),
   config: SearchConfigSchema,

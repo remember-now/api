@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { UuidSchema } from '@/common/schemas';
+
 import { EntityEdgeSchema, EntityNodeSchema } from '../../models';
-import { NodeNameSchema, UuidSchema } from '../../neo4j';
+import { NodeNameSchema } from '../../neo4j';
 
 // Schemas
 

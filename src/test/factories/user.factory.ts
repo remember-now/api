@@ -1,22 +1,24 @@
 import { Role as PrismaRole, User as PrismaUser } from '@generated/prisma/client';
 
+import { Uuid, UuidSchema } from '@/common/schemas';
 import { Role, RoleSchema, User, UserWithoutPassword } from '@/user/dto';
 
+export const TEST_USER_UUID = UuidSchema.parse('00000000-0000-4000-8000-000000000001');
+export const TEST_USER_UUID_2 = UuidSchema.parse('00000000-0000-4000-8000-000000000002');
+
 export interface UserFactoryOptions {
-  id?: number;
+  id?: Uuid;
   email?: string;
   role?: Role;
-  agentId?: string | null;
   createdAt?: string;
   updatedAt?: string;
   passwordHash?: string;
 }
 
 export interface PrismaUserFactoryOptions {
-  id?: number;
+  id?: string;
   email?: string;
   role?: PrismaRole;
-  agentId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
   passwordHash?: string;
@@ -24,10 +26,9 @@ export interface PrismaUserFactoryOptions {
 
 export class UserFactory {
   private static defaultUser: User = {
-    id: 1,
+    id: TEST_USER_UUID,
     email: 'test@example.com',
     role: RoleSchema.enum.USER,
-    agentId: null,
     activeLlmProvider: null,
     createdAt: new Date('2025-01-01').toISOString(),
     updatedAt: new Date('2025-01-01').toISOString(),
@@ -35,10 +36,9 @@ export class UserFactory {
   };
 
   private static defaultPrismaUser: PrismaUser = {
-    id: 1,
+    id: TEST_USER_UUID,
     email: 'test@example.com',
     role: PrismaRole.USER,
-    agentId: null,
     activeLlmProvider: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
@@ -68,27 +68,19 @@ export class UserFactory {
 
   /**
    * Creates a user service return type (what createUser method returns)
-   * This has agentId: null specifically (not string | null)
    */
   static createUserServiceResult(options: Omit<UserFactoryOptions, 'passwordHash'> = {}) {
     const { passwordHash: _, ...userOptions } = this.defaultUser;
-    const result = {
+    return {
       ...userOptions,
       ...options,
-    };
-    return {
-      ...result,
-      agentId: null,
     };
   }
 
   /**
    * Creates an auth service return type (what registerUser/validateUser returns)
-   * This excludes both passwordHash and agentId
    */
-  static createAuthServiceResult(
-    options: Omit<UserFactoryOptions, 'passwordHash' | 'agentId'> = {},
-  ) {
+  static createAuthServiceResult(options: Omit<UserFactoryOptions, 'passwordHash'> = {}) {
     const { passwordHash: _, ...userOptions } = this.defaultUser;
     return {
       ...userOptions,

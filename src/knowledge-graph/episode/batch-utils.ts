@@ -1,5 +1,5 @@
+import { Uuid } from '@/common/schemas';
 import { EntityEdge } from '@/knowledge-graph/models';
-import { Uuid } from '@/knowledge-graph/neo4j/types';
 
 /**
  * Maximum number of concurrent LLM API calls in bulk ingestion.

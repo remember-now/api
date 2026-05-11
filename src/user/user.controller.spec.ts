@@ -3,7 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Session as ExpressSession } from 'express-session';
 
 import { AuthService } from '@/auth/auth.service';
-import { UserDtoFactory, UserFactory } from '@/test/factories';
+import {
+  TEST_USER_UUID,
+  TEST_USER_UUID_2,
+  UserDtoFactory,
+  UserFactory,
+} from '@/test/factories';
 
 import {
   GetUserParamsDto,
@@ -190,7 +195,7 @@ describe('UserController', () => {
 
   describe('getUserById (Admin only)', () => {
     it('should call userService.getUserById with correct parameters', async () => {
-      const params: GetUserParamsDto = { id: 1 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID };
       const mockFullUser = UserFactory.createUser();
 
       userService.getUserById.mockResolvedValueOnce(mockFullUser);
@@ -203,7 +208,7 @@ describe('UserController', () => {
     });
 
     it('should handle user not found errors', async () => {
-      const params: GetUserParamsDto = { id: 999 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID_2 };
       const error = new Error('User not found');
       userService.getUserById.mockRejectedValueOnce(error);
 
@@ -213,7 +218,7 @@ describe('UserController', () => {
 
   describe('updateUser (Admin only)', () => {
     it('should call userService.updateUser with correct parameters', async () => {
-      const params: GetUserParamsDto = { id: 1 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID };
       const updateUserDto: UpdateUserDto = {
         email: 'updated@example.com',
         role: RoleSchema.enum.ADMIN,
@@ -228,7 +233,7 @@ describe('UserController', () => {
     });
 
     it('should handle update errors', async () => {
-      const params: GetUserParamsDto = { id: 1 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID };
       const updateUserDto: UpdateUserDto = {
         email: 'updated@example.com',
       };
@@ -243,7 +248,7 @@ describe('UserController', () => {
 
   describe('deleteUser (Admin only)', () => {
     it('should call userService.deleteUser with correct parameters', async () => {
-      const params: GetUserParamsDto = { id: 1 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID };
 
       userService.deleteUser.mockResolvedValueOnce(undefined);
 
@@ -255,7 +260,7 @@ describe('UserController', () => {
     });
 
     it('should handle deletion errors', async () => {
-      const params: GetUserParamsDto = { id: 1 };
+      const params: GetUserParamsDto = { id: TEST_USER_UUID };
       const error = new Error('Deletion failed');
       userService.deleteUser.mockRejectedValueOnce(error);
 
