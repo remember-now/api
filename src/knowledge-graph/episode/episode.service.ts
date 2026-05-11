@@ -60,22 +60,20 @@ import {
   withConcurrency,
 } from './batch-utils';
 import { chunkContent, shouldChunk } from './content-chunking';
-import {
-  CANDIDATE_LIMIT,
-  MAX_NODES_PER_SUMMARY_BATCH,
-  PREVIOUS_EPISODES_WINDOW,
-} from './episode-constants';
 import { getApplicableEdgeTypes, getEffectiveTypeMappings } from './episode-utils';
 import {
   AddEpisodeOptions,
   AddEpisodeOptionsInput,
   AddEpisodeOptionsSchema,
   AddEpisodeResult,
+  CANDIDATE_LIMIT,
   EdgeTypeMap,
   EdgeTypeMappings,
   EntityTypeMap,
+  MAX_NODES_PER_SUMMARY_BATCH,
   nodeSummaryJsonSchema,
-} from './episode.types';
+  PREVIOUS_EPISODES_WINDOW,
+} from './types';
 
 @Injectable()
 export class EpisodeService {

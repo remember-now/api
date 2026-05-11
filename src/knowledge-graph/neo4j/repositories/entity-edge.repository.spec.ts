@@ -1,12 +1,12 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
 import { EmbeddingService } from '@/knowledge-graph/embedding/embedding.service';
+import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   GetByGroupIdsParamsSchema,
   SearchBySimilarityParamsSchema,
   SearchByTextParamsSchema,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
-import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+} from '@/knowledge-graph/neo4j/types';
 import { KG_TEST_GROUP_ID, KgEdgeFactory, kgUuid } from '@/test/factories';
 
 import { EntityEdgeRepository } from './entity-edge.repository';

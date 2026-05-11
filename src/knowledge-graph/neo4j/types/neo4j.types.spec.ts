@@ -1,6 +1,6 @@
 import { ZodError } from 'zod';
 
-import { GroupIdSchema, NodeLabelsSchema, RelationshipTypeSchema } from './neo4j.schemas';
+import { GroupIdSchema, NodeLabelsSchema, RelationshipTypeSchema } from './neo4j.types';
 
 describe('NodeLabelsSchema', () => {
   it('should pass for a valid single label', () => {

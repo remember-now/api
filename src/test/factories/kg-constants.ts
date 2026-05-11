@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Episode, EpisodeSchema } from '@/knowledge-graph/episode';
-import {
-  EpisodeType,
-  GroupIdSchema,
-  UuidSchema,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
+import { EpisodeType, GroupIdSchema, UuidSchema } from '@/knowledge-graph/neo4j/types';
 
 export const KG_TEST_GROUP_ID = GroupIdSchema.parse('test-group');
 export const KG_TEST_USER_ID = 42;

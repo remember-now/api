@@ -1,11 +1,11 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
-import { EntityTypeMap } from '../episode/episode.types';
+import { EntityTypeMap } from '../episode/types';
 import { createEntityNode, EntityNode, EpisodicNode } from '../models';
 import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
 import { buildExtractNodesMessages } from '../prompts';
-import { extractedEntitiesJsonSchema } from './extraction.types';
+import { extractedEntitiesJsonSchema } from './types';
 
 function resolveLabels(
   entityTypeId: number | undefined,

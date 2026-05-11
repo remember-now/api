@@ -1,5 +1,5 @@
-import { SearchFilters, TemporalComparison } from '../search/search-filters.types';
-import { NodeLabelsSchema } from './neo4j.schemas';
+import { SearchFilters, TemporalComparison } from '../search/types';
+import { NodeLabelsSchema } from './types';
 
 export interface FilterClauseResult {
   /** Zero or more AND-joined conditions (no leading WHERE/AND keyword). */

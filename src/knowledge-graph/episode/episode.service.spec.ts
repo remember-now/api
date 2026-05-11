@@ -20,7 +20,6 @@ import {
   EdgeExtractionService,
   NodeExtractionService,
 } from '../extraction';
-import { GroupIdSchema, Uuid } from '../neo4j/neo4j.schemas';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -30,6 +29,7 @@ import {
   NextEpisodeEdgeRepository,
   SagaNodeRepository,
 } from '../neo4j/repositories';
+import { GroupIdSchema, Uuid } from '../neo4j/types';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { EpisodeService } from './episode.service';
 

@@ -2,7 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
 import { EntityNode, EpisodicNode } from '../models';
-import { Uuid } from '../neo4j/neo4j.schemas';
+import { Uuid } from '../neo4j/types';
 import { buildDedupeNodesMessages } from '../prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,
@@ -13,7 +13,7 @@ import {
   normalizeString,
   shannonEntropy,
 } from './resolution-utils';
-import { nodeResolutionsJsonSchema } from './resolution.types';
+import { nodeResolutionsJsonSchema } from './types';
 
 export interface NodeResolutionResult {
   resolvedNodes: EntityNode[];

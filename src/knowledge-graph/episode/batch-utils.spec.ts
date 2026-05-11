@@ -1,4 +1,4 @@
-import { GroupId, RelationshipTypeSchema, Uuid } from '../neo4j/neo4j.schemas';
+import { GroupId, RelationshipTypeSchema, Uuid } from '../neo4j/types';
 import {
   buildDirectedUuidMap,
   compressUuidMap,

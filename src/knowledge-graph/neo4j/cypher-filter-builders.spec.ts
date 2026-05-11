@@ -1,4 +1,4 @@
-import { TemporalComparison } from '../search/search-filters.types';
+import { TemporalComparison } from '../search/types';
 import { buildEdgeFilterClause, buildNodeFilterClause } from './cypher-filter-builders';
 import { luceneSanitize } from './neo4j-utils';
 

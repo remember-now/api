@@ -1,8 +1,8 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
-import { Uuid } from '../neo4j/neo4j.schemas';
 import { EntityNodeRepository } from '../neo4j/repositories';
+import { Uuid } from '../neo4j/types';
 import {
   crossEncoderReranker,
   episodeMentionsReranker,

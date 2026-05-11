@@ -1,4 +1,4 @@
-import { NodeLabelsSchema } from './neo4j.schemas';
+import { NodeLabelsSchema } from './types';
 
 /** Validates, deduplicates, and sorts labels into a colon-joined Cypher label string
  * (e.g. `"Entity:Person"`).

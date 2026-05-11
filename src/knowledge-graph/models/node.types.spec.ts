@@ -2,12 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
 
-import {
-  EpisodeType,
-  GroupIdSchema,
-  NodeNameSchema,
-  UuidSchema,
-} from '../neo4j/neo4j.schemas';
+import { EpisodeType, GroupIdSchema, NodeNameSchema, UuidSchema } from '../neo4j/types';
 import {
   CommunityNodeSchema,
   createCommunityNode,

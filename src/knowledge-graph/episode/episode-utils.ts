@@ -1,5 +1,5 @@
 import { NodeLabel, NodeLabels, NodeLabelSchema, RelationshipType } from '../neo4j';
-import { EdgeTypeMap, EdgeTypeMappings } from './episode.types';
+import { EdgeTypeMap, EdgeTypeMappings } from './types';
 
 /**
  * Returns the subset of `edgeTypes` that are valid for the given source/target

@@ -6,7 +6,6 @@ import { LlmService } from '@/llm/llm.service';
 import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
-import { Uuid } from '../neo4j/neo4j.schemas';
 import {
   CommunityEdgeRepository,
   CommunityNodeRepository,
@@ -14,6 +13,7 @@ import {
   EntityNodeRepository,
   GdsCommunityRepository,
 } from '../neo4j/repositories';
+import { Uuid } from '../neo4j/types';
 import { CommunityService, communitySummaryJsonSchema } from './community.service';
 
 describe('CommunityService', () => {

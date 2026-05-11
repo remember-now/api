@@ -1,7 +1,7 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { GetByGroupIdsWithCursorParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { GetByGroupIdsWithCursorParamsSchema } from '@/knowledge-graph/neo4j/types';
 import { KG_TEST_UUID_CURSOR, KgEdgeFactory, kgUuid } from '@/test/factories';
 
 import { EpisodicEdgeRepository } from './episodic-edge.repository';

@@ -12,7 +12,7 @@ import {
   MAX_KEYWORD_CANDIDATES,
   normalizeString,
 } from './resolution-utils';
-import { edgeDedupeJsonSchema } from './resolution.types';
+import { edgeDedupeJsonSchema } from './types';
 
 export interface EdgeResolutionResult {
   resolvedEdges: EntityEdge[];

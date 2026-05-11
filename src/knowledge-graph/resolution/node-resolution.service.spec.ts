@@ -10,7 +10,7 @@ import {
 } from '@/test/factories';
 
 import { EntityNode } from '../models';
-import { Uuid } from '../neo4j/neo4j.schemas';
+import { Uuid } from '../neo4j/types';
 import { NodeResolutionService } from './node-resolution.service';
 
 const u = (s: string) => s as Uuid;

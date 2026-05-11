@@ -1,7 +1,7 @@
 import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 
-import { GraphNameSchema, GroupIdSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { GraphNameSchema, GroupIdSchema } from '@/knowledge-graph/neo4j/types';
 
 import { GdsCommunityRepository } from './gds-community.repository';
 

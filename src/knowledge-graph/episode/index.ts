@@ -1,3 +1,3 @@
 export * from './episode.service';
-export * from './episode.types';
+export * from './types';
 export * from './episode-utils';

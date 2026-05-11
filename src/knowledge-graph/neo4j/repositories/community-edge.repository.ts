@@ -2,12 +2,8 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { CommunityEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
-import {
-  GetByGroupIdsParams,
-  GroupId,
-  Uuid,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { GetByGroupIdsParams, GroupId, Uuid } from '@/knowledge-graph/neo4j/types';
 
 @Injectable()
 export class CommunityEdgeRepository implements OnModuleInit {

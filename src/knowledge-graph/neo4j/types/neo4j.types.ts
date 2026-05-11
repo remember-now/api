@@ -1,7 +1,7 @@
 import neo4j from 'neo4j-driver';
 import { z } from 'zod';
 
-import { luceneSanitize, toNeo4jDateTime } from './neo4j-utils';
+import { luceneSanitize, toNeo4jDateTime } from '../neo4j-utils';
 
 const neoInt = z.int().transform((v) => neo4j.int(v));
 

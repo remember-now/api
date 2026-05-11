@@ -12,8 +12,8 @@ import {
 } from '@/test/factories';
 
 import { EntityEdge } from '../models';
-import { Uuid } from '../neo4j/neo4j.schemas';
 import { EntityEdgeRepository } from '../neo4j/repositories';
+import { Uuid } from '../neo4j/types';
 import { EdgeResolutionService } from './edge-resolution.service';
 
 const u = (s: string) => s as Uuid;

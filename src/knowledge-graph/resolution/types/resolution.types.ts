@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { NodeNameSchema } from '../neo4j';
+import { NodeNameSchema } from '../../neo4j';
 
 // Schemas
 

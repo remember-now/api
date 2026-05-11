@@ -2,8 +2,8 @@ import { DeepMockProxy, mockDeep } from 'jest-mock-extended';
 import neoDriver from 'neo4j-driver';
 
 import { EpisodeType } from '@/knowledge-graph/models';
-import { RetrieveEpisodesParamsSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { RetrieveEpisodesParamsSchema } from '@/knowledge-graph/neo4j/types';
 import { KG_REFERENCE_TIME, KgNodeFactory, kgUuid } from '@/test/factories';
 
 import { EpisodicNodeRepository } from './episodic-node.repository';

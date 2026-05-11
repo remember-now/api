@@ -19,6 +19,13 @@ import {
   EpisodicNodeRepository,
 } from '../neo4j/repositories';
 import {
+  crossEncoderReranker,
+  episodeMentionsReranker,
+  mmr,
+  nodeDistanceReranker,
+  rrf,
+} from './search-utils';
+import {
   CommunityReranker,
   CommunitySearchConfig,
   CommunitySearchMethod,
@@ -34,16 +41,9 @@ import {
   NodeSearchConfig,
   NodeSearchMethod,
   SearchConfig,
-} from './search-config.types';
-import { SearchFilters } from './search-filters.types';
-import {
-  crossEncoderReranker,
-  episodeMentionsReranker,
-  mmr,
-  nodeDistanceReranker,
-  rrf,
-} from './search-utils';
-import { emptySearchResults, SearchOptions, SearchResults } from './search.types';
+} from './types';
+import { SearchFilters } from './types';
+import { emptySearchResults, SearchOptions, SearchResults } from './types';
 
 @Injectable()
 export class SearchService {

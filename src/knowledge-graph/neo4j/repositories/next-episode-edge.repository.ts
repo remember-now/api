@@ -2,12 +2,12 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { NextEpisodeEdge } from '@/knowledge-graph/models';
 import { toNeo4jDateTime } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
 import {
   GetByGroupIdsWithCursorParams,
   GroupId,
   Uuid,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
-import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+} from '@/knowledge-graph/neo4j/types';
 
 @Injectable()
 export class NextEpisodeEdgeRepository implements OnModuleInit {

@@ -2,7 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
-import { EdgeTypeMap, EdgeTypeMappings, EntityTypeMap } from '../episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings, EntityTypeMap } from '../episode/types';
 import {
   createEntityEdge,
   createEntityNode,

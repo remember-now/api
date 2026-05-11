@@ -1,6 +1,6 @@
 import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from '@/test/factories';
 
-import { RelationshipTypeSchema } from '../neo4j/neo4j.schemas';
+import { RelationshipTypeSchema } from '../neo4j/types';
 import {
   CommunityEdgeSchema,
   createCommunityEdge,

@@ -9,7 +9,7 @@ import {
   RelationshipTypeSchema,
   Uuid,
   UuidSchema,
-} from '../neo4j/neo4j.schemas';
+} from '../neo4j/types';
 
 // Schemas
 

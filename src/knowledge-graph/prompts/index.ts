@@ -1,4 +1,4 @@
-export * from './prompts.types';
+export * from './types';
 export * from './episode';
 export * from './extraction';
 export * from './resolution';

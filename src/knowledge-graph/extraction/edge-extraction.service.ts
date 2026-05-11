@@ -1,10 +1,10 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Injectable } from '@nestjs/common';
 
-import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { buildExtractEdgesMessages } from '../prompts';
-import { extractedEdgesJsonSchema } from './extraction.types';
+import { extractedEdgesJsonSchema } from './types';
 
 @Injectable()
 export class EdgeExtractionService {

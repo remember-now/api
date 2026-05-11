@@ -5,7 +5,7 @@ import {
   EntityNodeSchema,
   EpisodicEdgeSchema,
   EpisodicNodeSchema,
-} from '../models';
+} from '../../models';
 import {
   EpisodeTypeSchema,
   GroupIdSchema,
@@ -13,7 +13,13 @@ import {
   NodeNameSchema,
   RelationshipTypeSchema,
   UuidSchema,
-} from '../neo4j';
+} from '../../neo4j';
+
+// Constants
+
+export const PREVIOUS_EPISODES_WINDOW = 20;
+export const MAX_NODES_PER_SUMMARY_BATCH = 30;
+export const CANDIDATE_LIMIT = 10;
 
 // Schemas
 

@@ -9,6 +9,11 @@ import {
   toNeo4jInt,
 } from '@/knowledge-graph/neo4j/neo4j-utils';
 import { buildFulltextQuery } from '@/knowledge-graph/neo4j/neo4j-utils';
+import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import {
+  buildLabelString,
+  groupNodesByLabel,
+} from '@/knowledge-graph/neo4j/node-label.utils';
 import {
   GetByGroupIdsParams,
   GroupId,
@@ -18,14 +23,9 @@ import {
   SearchBySimilarityParams,
   SearchByTextParams,
   Uuid,
-} from '@/knowledge-graph/neo4j/neo4j.schemas';
-import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
-import {
-  buildLabelString,
-  groupNodesByLabel,
-} from '@/knowledge-graph/neo4j/node-label.utils';
-import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/search-config.types';
-import { SearchFilters } from '@/knowledge-graph/search/search-filters.types';
+} from '@/knowledge-graph/neo4j/types';
+import { MAX_SEARCH_DEPTH } from '@/knowledge-graph/search/types';
+import { SearchFilters } from '@/knowledge-graph/search/types';
 
 @Injectable()
 export class EntityNodeRepository implements OnModuleInit {

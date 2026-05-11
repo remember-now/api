@@ -1,5 +1,5 @@
-import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import { GroupId, Uuid } from '../neo4j/neo4j.schemas';
+import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../../models';
+import { GroupId, Uuid } from '../../neo4j/types';
 import { SearchConfig } from './search-config.types';
 import { SearchFilters } from './search-filters.types';
 

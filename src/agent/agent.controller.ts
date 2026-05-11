@@ -7,14 +7,14 @@ import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
 import { EpisodeService } from '@/knowledge-graph/episode';
 import { EpisodeType } from '@/knowledge-graph/models';
-import { GroupIdSchema } from '@/knowledge-graph/neo4j/neo4j.schemas';
+import { GroupIdSchema } from '@/knowledge-graph/neo4j/types';
 import { SearchService } from '@/knowledge-graph/search';
 import {
   EdgeReranker,
   EdgeSearchMethod,
   NodeReranker,
   NodeSearchMethod,
-} from '@/knowledge-graph/search/search-config.types';
+} from '@/knowledge-graph/search/types';
 
 import { AgentService } from './agent.service';
 

@@ -10,7 +10,7 @@ import {
   NodeReranker,
   NodeSearchMethod,
   SearchConfig,
-} from './search-config.types';
+} from './types';
 
 // NOTE: None of these recipes include temporal filters, matching the Python
 // Graphiti source (search_config_recipes.py). Temporal filters (e.g. excluding

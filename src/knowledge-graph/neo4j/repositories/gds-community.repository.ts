@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { GraphName, GroupId, Uuid } from '@/knowledge-graph/neo4j/neo4j.schemas';
 import { Neo4jService } from '@/knowledge-graph/neo4j/neo4j.service';
+import { GraphName, GroupId, Uuid } from '@/knowledge-graph/neo4j/types';
 
 @Injectable()
 export class GdsCommunityRepository {

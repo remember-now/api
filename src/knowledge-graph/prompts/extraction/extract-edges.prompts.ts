@@ -1,9 +1,9 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/episode.types';
+import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
 import { EntityNode, EpisodicNode } from '@/knowledge-graph/models';
 
-import { episodeToContext } from '../prompts.types';
+import { episodeToContext } from '../types';
 
 const SYSTEM_PROMPT = `You are an expert at extracting relationships between entities from text.
 
