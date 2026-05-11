@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 
 import { EntityNode, EpisodicNode } from '../models';
 import { Uuid } from '../neo4j/neo4j.schemas';
-import { buildDedupeNodesMessages } from './dedupe-nodes.prompts';
+import { buildDedupeNodesMessages } from '../prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,

@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityEdge, EpisodicNode } from '../models';
 import { SearchByTextParamsSchema, Uuid } from '../neo4j';
 import { EntityEdgeRepository } from '../neo4j/repositories';
-import { buildDedupeEdgesMessages } from './dedupe-edges.prompts';
+import { buildDedupeEdgesMessages } from '../prompts';
 import {
   cosineSimilarity,
   FACT_SIMILARITY_THRESHOLD,

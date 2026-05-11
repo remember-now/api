@@ -1,7 +1,8 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-import { EpisodicNode } from '../models';
-import { MAX_SUMMARY_CHARS } from './text-utils';
+import { EpisodicNode } from '@/knowledge-graph/models';
+
+import { MAX_SUMMARY_CHARS } from '../text-utils';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a factual summary (≤ ${MAX_SUMMARY_CHARS} characters) for each entity using the provided episode context.
 

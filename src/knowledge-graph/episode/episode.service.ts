@@ -42,12 +42,10 @@ import {
 import {
   buildExtractEdgeAttributesMessages,
   buildExtractEntityAttributesMessages,
-} from '../prompts';
-import { buildNodeSummaryMessages } from '../prompts/node-summary.prompts';
-import {
+  buildNodeSummaryMessages,
   buildSummarizeSagaMessages,
   sagaSummaryJsonSchema,
-} from '../prompts/summarize-sagas.prompts';
+} from '../prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,

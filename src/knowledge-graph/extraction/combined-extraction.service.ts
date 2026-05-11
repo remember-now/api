@@ -11,11 +11,11 @@ import {
   EpisodicNode,
 } from '../models';
 import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
-import { buildExtractTimestampsBatchMessages } from '../prompts/extract-edges.prompts';
 import {
   buildExtractNodesAndEdgesMessages,
+  buildExtractTimestampsBatchMessages,
   combinedExtractionJsonSchema,
-} from '../prompts/extract-nodes-and-edges.prompts';
+} from '../prompts';
 
 const TimestampsBatchSchema = z.object({
   facts: z.array(

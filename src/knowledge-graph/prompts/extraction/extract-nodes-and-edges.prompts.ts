@@ -1,10 +1,11 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
-import { EdgeTypeMap, EdgeTypeMappings } from '../episode/episode.types';
-import { EpisodicNode } from '../models';
-import { NodeNameSchema, RelationshipTypeSchema } from '../neo4j';
-import { concatenateEpisodes } from './text-utils';
+import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/episode.types';
+import { EpisodicNode } from '@/knowledge-graph/models';
+import { NodeNameSchema, RelationshipTypeSchema } from '@/knowledge-graph/neo4j';
+
+import { concatenateEpisodes } from '../text-utils';
 
 // Schemas
 

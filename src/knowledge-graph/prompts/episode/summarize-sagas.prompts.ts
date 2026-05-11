@@ -1,8 +1,9 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
-import { EpisodicNode } from '../models';
-import { MAX_SUMMARY_CHARS, truncateAtSentence } from './text-utils';
+import { EpisodicNode } from '@/knowledge-graph/models';
+
+import { MAX_SUMMARY_CHARS, truncateAtSentence } from '../text-utils';
 
 // Schema
 

@@ -15,7 +15,7 @@ import {
   EntityNodeRepository,
   GdsCommunityRepository,
 } from '../neo4j/repositories';
-import { buildCommunitySummaryMessages } from './community-summary.prompts';
+import { buildCommunitySummaryMessages } from '../prompts';
 
 export const CommunitySummarySchema = z.object({
   name: NodeNameSchema,

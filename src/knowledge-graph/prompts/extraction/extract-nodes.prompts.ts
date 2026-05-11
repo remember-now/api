@@ -1,10 +1,9 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-import { EpisodeType } from '@/knowledge-graph/models';
+import { EntityTypeMap } from '@/knowledge-graph/episode/episode.types';
+import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 
-import { EntityTypeMap } from '../episode/episode.types';
-import { EpisodicNode } from '../models';
-import { episodeToContext } from './prompts.types';
+import { episodeToContext } from '../prompts.types';
 
 const EXTRACTION_RULES = `
 EXTRACT (real-world, nameable entities only):
