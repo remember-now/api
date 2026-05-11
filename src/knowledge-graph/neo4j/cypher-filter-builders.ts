@@ -1,15 +1,5 @@
 import { SearchFilters, TemporalComparison } from '../search/types';
-import { NodeLabelsSchema } from './types';
-
-export interface FilterClauseResult {
-  /** Zero or more AND-joined conditions (no leading WHERE/AND keyword). */
-  clause: string;
-  params: Record<string, unknown>;
-}
-
-const TEMPORAL_FIELDS = new Set(['valid_at', 'invalid_at', 'created_at', 'expired_at']);
-
-const WHITELISTED_OPS = new Set<string>(Object.values(TemporalComparison));
+import { FilterClauseResult } from './types';
 
 /**
  * Builds temporal WHERE conditions from OR-groups of AND-joined filters.
@@ -35,8 +25,6 @@ function buildTemporalConditions(
 
     for (let innerIdx = 0; innerIdx < group.length; innerIdx++) {
       const tf = group[innerIdx];
-      if (!TEMPORAL_FIELDS.has(tf.field)) continue;
-      if (!WHITELISTED_OPS.has(tf.op)) continue;
 
       if (tf.op === TemporalComparison.isNull) {
         andParts.push(`${alias}.${tf.field} IS NULL`);
@@ -99,7 +87,6 @@ export function buildNodeFilterClause(
   const params: Record<string, unknown> = {};
 
   if (filters.nodeLabels && filters.nodeLabels.length > 0) {
-    NodeLabelsSchema.parse(filters.nodeLabels);
     conditions.push(`ANY(label IN labels(${alias}) WHERE label IN $filterNodeLabels)`);
     params['filterNodeLabels'] = filters.nodeLabels;
   }

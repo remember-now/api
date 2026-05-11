@@ -12,12 +12,7 @@ import {
   MAX_KEYWORD_CANDIDATES,
   normalizeString,
 } from './resolution-utils';
-import { edgeDedupeJsonSchema } from './types';
-
-export interface EdgeResolutionResult {
-  resolvedEdges: EntityEdge[];
-  invalidatedEdges: EntityEdge[];
-}
+import { edgeDedupeJsonSchema, EdgeResolutionResult } from './types';
 
 @Injectable()
 export class EdgeResolutionService {

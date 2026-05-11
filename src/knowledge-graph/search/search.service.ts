@@ -29,21 +29,23 @@ import {
   CommunityReranker,
   CommunitySearchConfig,
   CommunitySearchMethod,
-  DEFAULT_MIN_SCORE,
-  DEFAULT_SEARCH_LIMIT,
   EdgeReranker,
   EdgeSearchConfig,
   EdgeSearchMethod,
+  emptySearchResults,
   EpisodeReranker,
   EpisodeSearchConfig,
   EpisodeSearchMethod,
   NodeReranker,
   NodeSearchConfig,
   NodeSearchMethod,
-  SearchConfig,
+  SearchConfigInput,
+  SearchFilters,
+  SearchOptions,
+  SearchOptionsInput,
+  SearchOptionsSchema,
+  SearchResults,
 } from './types';
-import { SearchFilters } from './types';
-import { emptySearchResults, SearchOptions, SearchResults } from './types';
 
 @Injectable()
 export class SearchService {
@@ -60,7 +62,7 @@ export class SearchService {
     nodeUuids: Uuid[];
     query: string;
     groupIds: GroupId[];
-    config: SearchConfig;
+    config: SearchConfigInput;
     userId: number;
     filters?: SearchFilters;
   }): Promise<SearchResults> {
@@ -75,13 +77,21 @@ export class SearchService {
     });
   }
 
-  async search(options: SearchOptions): Promise<SearchResults> {
-    if (!options.query.trim()) return emptySearchResults();
+  async search(options: SearchOptionsInput): Promise<SearchResults> {
+    const {
+      query,
+      groupIds,
+      config,
+      filters,
+      centerNodeUuid,
+      originNodeUuids,
+      userId,
+    }: SearchOptions = SearchOptionsSchema.parse(options);
 
-    const { query, groupIds, config, filters, centerNodeUuid, originNodeUuids } = options;
+    if (!query.trim()) return emptySearchResults();
 
-    const limit = config.limit ?? DEFAULT_SEARCH_LIMIT;
-    const minScore = config.rerankerMinScore ?? 0;
+    const limit = config.limit;
+    const minScore = config.rerankerMinScore;
 
     const configs = [
       config.edgeConfig,
@@ -113,7 +123,7 @@ export class SearchService {
 
     const [queryVector, model] = await Promise.all([
       needsVector ? this.embeddingService.embedText(query) : Promise.resolve(null),
-      needsModel ? this.llmService.getActiveModel(options.userId) : Promise.resolve(null),
+      needsModel ? this.llmService.getActiveModel(userId) : Promise.resolve(null),
     ]);
 
     const [edgeResult, nodeResult, episodeResult, communityResult] = await Promise.all([
@@ -230,7 +240,7 @@ export class SearchService {
               embedding: queryVector,
               groupIds,
               limit: fetch,
-              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+              minScore: config.simMinScore,
             }),
             filters,
           )
@@ -399,7 +409,7 @@ export class SearchService {
               embedding: queryVector,
               groupIds,
               limit: fetch,
-              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+              minScore: config.simMinScore,
             }),
             filters,
           )
@@ -582,7 +592,7 @@ export class SearchService {
               embedding: queryVector,
               groupIds,
               limit: fetch,
-              minScore: config.simMinScore ?? DEFAULT_MIN_SCORE,
+              minScore: config.simMinScore,
             }),
           )
           .then((nodes) => {

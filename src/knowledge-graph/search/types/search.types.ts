@@ -1,32 +1,45 @@
-import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../../models';
-import { GroupId, Uuid } from '../../neo4j/types';
-import { SearchConfig } from './search-config.types';
-import { SearchFilters } from './search-filters.types';
+import { z } from 'zod';
 
-// Interfaces
+import {
+  CommunityNodeSchema,
+  EntityEdgeSchema,
+  EntityNodeSchema,
+  EpisodicNodeSchema,
+} from '../../models';
+import { GroupIdSchema, UuidSchema } from '../../neo4j/types';
+import { SearchConfigSchema } from './search-config.types';
+import { SearchFiltersSchema } from './search-filters.types';
 
-export interface SearchResults {
-  edges: EntityEdge[];
-  edgeScores: Map<Uuid, number>;
-  nodes: EntityNode[];
-  nodeScores: Map<Uuid, number>;
-  episodes: EpisodicNode[];
-  episodeScores: Map<Uuid, number>;
-  communities: CommunityNode[];
-  communityScores: Map<Uuid, number>;
-}
+// Schemas
 
-export interface SearchOptions {
-  userId: number;
-  query: string;
-  groupIds: GroupId[];
-  config: SearchConfig;
-  filters?: SearchFilters;
+export const SearchResultsSchema = z.object({
+  edges: z.array(EntityEdgeSchema),
+  edgeScores: z.map(UuidSchema, z.number()),
+  nodes: z.array(EntityNodeSchema),
+  nodeScores: z.map(UuidSchema, z.number()),
+  episodes: z.array(EpisodicNodeSchema),
+  episodeScores: z.map(UuidSchema, z.number()),
+  communities: z.array(CommunityNodeSchema),
+  communityScores: z.map(UuidSchema, z.number()),
+});
+
+export const SearchOptionsSchema = z.object({
+  userId: z.number(),
+  query: z.string(),
+  groupIds: z.array(GroupIdSchema),
+  config: SearchConfigSchema,
+  filters: SearchFiltersSchema.optional(),
   /** UUID of the node to use as the graph-distance anchor for node_distance reranking. */
-  centerNodeUuid?: Uuid;
+  centerNodeUuid: UuidSchema.optional(),
   /** UUIDs of nodes to start BFS traversal from. */
-  originNodeUuids?: Uuid[];
-}
+  originNodeUuids: z.array(UuidSchema).optional(),
+});
+
+// Types
+
+export type SearchResults = z.infer<typeof SearchResultsSchema>;
+export type SearchOptions = z.infer<typeof SearchOptionsSchema>;
+export type SearchOptionsInput = z.input<typeof SearchOptionsSchema>;
 
 // Helpers
 

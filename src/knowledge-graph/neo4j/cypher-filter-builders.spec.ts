@@ -1,6 +1,11 @@
 import { TemporalComparison } from '../search/types';
 import { buildEdgeFilterClause, buildNodeFilterClause } from './cypher-filter-builders';
 import { luceneSanitize } from './neo4j-utils';
+import { NodeLabelSchema, RelationshipTypeSchema, UuidSchema } from './types';
+
+const label = (s: string) => NodeLabelSchema.parse(s);
+const edgeType = (s: string) => RelationshipTypeSchema.parse(s);
+const uuid = (s: string) => UuidSchema.parse(s);
 
 // ─── luceneSanitize ───────────────────────────────────────────────────────────
 
@@ -70,19 +75,9 @@ describe('buildNodeFilterClause', () => {
   });
 
   it('nodeLabels: produces label check and sets param', () => {
-    const result = buildNodeFilterClause({ nodeLabels: ['Person'] }, 'n');
+    const result = buildNodeFilterClause({ nodeLabels: [label('Person')] }, 'n');
     expect(result.clause).toContain('labels(n)');
     expect(result.params['filterNodeLabels']).toEqual(['Person']);
-  });
-
-  it('nodeLabels: throws on label with space (injection attempt)', () => {
-    expect(() => buildNodeFilterClause({ nodeLabels: ['Bad Label'] }, 'n')).toThrow();
-  });
-
-  it('nodeLabels: throws on label with Cypher injection characters', () => {
-    expect(() =>
-      buildNodeFilterClause({ nodeLabels: ['n) RETURN n //'] }, 'n'),
-    ).toThrow();
   });
 
   it('single-group single filter (gte): produces >= condition and param', () => {
@@ -149,7 +144,7 @@ describe('buildNodeFilterClause', () => {
   it('mixed labels + temporal: conditions are AND-joined at top level', () => {
     const result = buildNodeFilterClause(
       {
-        nodeLabels: ['Person'],
+        nodeLabels: [label('Person')],
         temporalFilters: [[{ field: 'valid_at', op: TemporalComparison.isNotNull }]],
       },
       'n',
@@ -162,20 +157,24 @@ describe('buildNodeFilterClause', () => {
 
 describe('buildEdgeFilterClause', () => {
   it('edgeTypes: clause contains name IN $filterEdgeTypes', () => {
-    const result = buildEdgeFilterClause({ edgeTypes: ['WORKS_AT'] }, 'e');
+    const result = buildEdgeFilterClause({ edgeTypes: [edgeType('WORKS_AT')] }, 'e');
     expect(result.clause).toContain('e.name IN $filterEdgeTypes');
     expect(result.params['filterEdgeTypes']).toEqual(['WORKS_AT']);
   });
 
   it('edgeUuids: clause contains uuid IN $filterEdgeUuids', () => {
-    const result = buildEdgeFilterClause({ edgeUuids: ['uuid-1'] }, 'e');
+    const u = uuid('00000000-0000-4000-8000-000000000001');
+    const result = buildEdgeFilterClause({ edgeUuids: [u] }, 'e');
     expect(result.clause).toContain('e.uuid IN $filterEdgeUuids');
-    expect(result.params['filterEdgeUuids']).toEqual(['uuid-1']);
+    expect(result.params['filterEdgeUuids']).toEqual([u]);
   });
 
   it('multiple filter types: conditions are AND-joined', () => {
     const result = buildEdgeFilterClause(
-      { edgeTypes: ['WORKS_AT'], edgeUuids: ['uuid-1'] },
+      {
+        edgeTypes: [edgeType('WORKS_AT')],
+        edgeUuids: [uuid('00000000-0000-4000-8000-000000000001')],
+      },
       'e',
     );
     expect(result.clause).toContain(' AND ');

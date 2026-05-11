@@ -13,13 +13,7 @@ import {
   normalizeString,
   shannonEntropy,
 } from './resolution-utils';
-import { nodeResolutionsJsonSchema } from './types';
-
-export interface NodeResolutionResult {
-  resolvedNodes: EntityNode[];
-  uuidMap: Map<Uuid, Uuid>;
-  duplicatePairs: Array<{ extractedUuid: Uuid; canonicalUuid: Uuid }>;
-}
+import { NodeResolutionResult, nodeResolutionsJsonSchema } from './types';
 
 @Injectable()
 export class NodeResolutionService {

@@ -1,27 +1,23 @@
-import { NodeLabelsSchema } from './types';
+import { NodeLabel } from './types';
 
-/** Validates, deduplicates, and sorts labels into a colon-joined Cypher label string
+/** Deduplicates and sorts labels into a colon-joined Cypher label string
  * (e.g. `"Entity:Person"`).
  */
-export function buildLabelString(labels: string[]): string {
-  NodeLabelsSchema.parse(labels);
+export function buildLabelString(labels: NodeLabel[]): string {
   return [...new Set(labels)].sort().join(':');
 }
 
 /**
  * Buckets nodes by their canonical label string so each bulk `UNWIND` can use a
- * single static label in its `MERGE` clause. Validates all label sets before returning.
+ * single static label in its `MERGE` clause.
  */
-export function groupNodesByLabel<T extends { labels: string[] }>(
+export function groupNodesByLabel<T extends { labels: NodeLabel[] }>(
   nodes: T[],
 ): Map<string, T[]> {
   const byLabel = new Map<string, T[]>();
   for (const n of nodes) {
     const key = [...new Set(n.labels)].sort().join(':');
     byLabel.set(key, [...(byLabel.get(key) ?? []), n]);
-  }
-  for (const key of byLabel.keys()) {
-    NodeLabelsSchema.parse(key.split(':'));
   }
   return byLabel;
 }

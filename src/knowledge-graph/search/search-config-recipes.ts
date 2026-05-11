@@ -9,7 +9,7 @@ import {
   EpisodeSearchMethod,
   NodeReranker,
   NodeSearchMethod,
-  SearchConfig,
+  SearchConfigInput,
 } from './types';
 
 // NOTE: None of these recipes include temporal filters, matching the Python
@@ -18,7 +18,7 @@ import {
 
 // ─── Combined (all entity types) ────────────────────────────────────────────
 
-export const COMBINED_HYBRID_SEARCH_RRF: SearchConfig = {
+export const COMBINED_HYBRID_SEARCH_RRF: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -39,7 +39,7 @@ export const COMBINED_HYBRID_SEARCH_RRF: SearchConfig = {
   },
 };
 
-export const COMBINED_HYBRID_SEARCH_MMR: SearchConfig = {
+export const COMBINED_HYBRID_SEARCH_MMR: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -60,7 +60,7 @@ export const COMBINED_HYBRID_SEARCH_MMR: SearchConfig = {
   },
 };
 
-export const COMBINED_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
+export const COMBINED_HYBRID_SEARCH_CROSS_ENCODER: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -91,7 +91,7 @@ export const COMBINED_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
 
 // ─── Edge-only ───────────────────────────────────────────────────────────────
 
-export const EDGE_HYBRID_SEARCH_RRF: SearchConfig = {
+export const EDGE_HYBRID_SEARCH_RRF: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -100,7 +100,7 @@ export const EDGE_HYBRID_SEARCH_RRF: SearchConfig = {
   },
 };
 
-export const EDGE_HYBRID_SEARCH_MMR: SearchConfig = {
+export const EDGE_HYBRID_SEARCH_MMR: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -109,7 +109,7 @@ export const EDGE_HYBRID_SEARCH_MMR: SearchConfig = {
   },
 };
 
-export const EDGE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
+export const EDGE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfigInput = {
   limit: 10,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -122,7 +122,7 @@ export const EDGE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
   },
 };
 
-export const EDGE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfig = {
+export const EDGE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -131,7 +131,7 @@ export const EDGE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfig = {
   },
 };
 
-export const EDGE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfig = {
+export const EDGE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   edgeConfig: {
@@ -142,7 +142,7 @@ export const EDGE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfig = {
 
 // ─── Node-only ───────────────────────────────────────────────────────────────
 
-export const NODE_HYBRID_SEARCH_RRF: SearchConfig = {
+export const NODE_HYBRID_SEARCH_RRF: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
@@ -151,7 +151,7 @@ export const NODE_HYBRID_SEARCH_RRF: SearchConfig = {
   },
 };
 
-export const NODE_HYBRID_SEARCH_MMR: SearchConfig = {
+export const NODE_HYBRID_SEARCH_MMR: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
@@ -160,7 +160,7 @@ export const NODE_HYBRID_SEARCH_MMR: SearchConfig = {
   },
 };
 
-export const NODE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
+export const NODE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfigInput = {
   limit: 10,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
@@ -173,7 +173,7 @@ export const NODE_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
   },
 };
 
-export const NODE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfig = {
+export const NODE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
@@ -182,7 +182,7 @@ export const NODE_HYBRID_SEARCH_NODE_DISTANCE: SearchConfig = {
   },
 };
 
-export const NODE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfig = {
+export const NODE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   nodeConfig: {
@@ -193,7 +193,7 @@ export const NODE_HYBRID_SEARCH_EPISODE_MENTIONS: SearchConfig = {
 
 // ─── Community-only ──────────────────────────────────────────────────────────
 
-export const COMMUNITY_HYBRID_SEARCH_RRF: SearchConfig = {
+export const COMMUNITY_HYBRID_SEARCH_RRF: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
@@ -202,7 +202,7 @@ export const COMMUNITY_HYBRID_SEARCH_RRF: SearchConfig = {
   },
 };
 
-export const COMMUNITY_HYBRID_SEARCH_MMR: SearchConfig = {
+export const COMMUNITY_HYBRID_SEARCH_MMR: SearchConfigInput = {
   limit: DEFAULT_SEARCH_LIMIT,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {
@@ -211,7 +211,7 @@ export const COMMUNITY_HYBRID_SEARCH_MMR: SearchConfig = {
   },
 };
 
-export const COMMUNITY_HYBRID_SEARCH_CROSS_ENCODER: SearchConfig = {
+export const COMMUNITY_HYBRID_SEARCH_CROSS_ENCODER: SearchConfigInput = {
   limit: 3,
   rerankerMinScore: DEFAULT_MIN_SCORE,
   communityConfig: {

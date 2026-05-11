@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 // Constants
 
 export const DEFAULT_SEARCH_LIMIT = 10;
@@ -55,54 +57,62 @@ export enum CommunityReranker {
   cross_encoder = 'cross_encoder',
 }
 
-// Interfaces
+// Schemas
 
-export interface EdgeSearchConfig {
-  searchMethods: EdgeSearchMethod[];
-  reranker: EdgeReranker;
-  limit?: number;
-  rerankerMinScore?: number;
-  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
-  simMinScore?: number;
-  mmrLambda?: number;
-  /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
-  maxDepth?: number;
-}
+export const EdgeSearchConfigSchema = z.object({
+  searchMethods: z.array(z.enum(EdgeSearchMethod)),
+  reranker: z.enum(EdgeReranker),
+  limit: z.number().int().positive().default(DEFAULT_SEARCH_LIMIT),
+  rerankerMinScore: z.number().optional(),
+  simMinScore: z.number().default(DEFAULT_MIN_SCORE),
+  mmrLambda: z.number().default(DEFAULT_MMR_LAMBDA),
+  maxDepth: z.number().int().positive().default(MAX_SEARCH_DEPTH),
+});
 
-export interface NodeSearchConfig {
-  searchMethods: NodeSearchMethod[];
-  reranker: NodeReranker;
-  limit?: number;
-  rerankerMinScore?: number;
-  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
-  simMinScore?: number;
-  mmrLambda?: number;
-  /** BFS traversal depth. Defaults to MAX_SEARCH_DEPTH (3). Must be a positive integer. */
-  maxDepth?: number;
-}
+export const NodeSearchConfigSchema = z.object({
+  searchMethods: z.array(z.enum(NodeSearchMethod)),
+  reranker: z.enum(NodeReranker),
+  limit: z.number().int().positive().default(DEFAULT_SEARCH_LIMIT),
+  rerankerMinScore: z.number().optional(),
+  simMinScore: z.number().default(DEFAULT_MIN_SCORE),
+  mmrLambda: z.number().default(DEFAULT_MMR_LAMBDA),
+  maxDepth: z.number().int().positive().default(MAX_SEARCH_DEPTH),
+});
 
-export interface EpisodeSearchConfig {
-  searchMethods: EpisodeSearchMethod[];
-  reranker: EpisodeReranker;
-  limit?: number;
-  rerankerMinScore?: number;
-}
+export const EpisodeSearchConfigSchema = z.object({
+  searchMethods: z.array(z.enum(EpisodeSearchMethod)),
+  reranker: z.enum(EpisodeReranker),
+  limit: z.number().int().positive().default(DEFAULT_SEARCH_LIMIT),
+  rerankerMinScore: z.number().optional(),
+});
 
-export interface CommunitySearchConfig {
-  searchMethods: CommunitySearchMethod[];
-  reranker: CommunityReranker;
-  limit?: number;
-  rerankerMinScore?: number;
-  /** Minimum cosine similarity score for vector index results. Defaults to DEFAULT_MIN_SCORE (0.6). */
-  simMinScore?: number;
-  mmrLambda?: number;
-}
+export const CommunitySearchConfigSchema = z.object({
+  searchMethods: z.array(z.enum(CommunitySearchMethod)),
+  reranker: z.enum(CommunityReranker),
+  limit: z.number().int().positive().default(DEFAULT_SEARCH_LIMIT),
+  rerankerMinScore: z.number().optional(),
+  simMinScore: z.number().default(DEFAULT_MIN_SCORE),
+  mmrLambda: z.number().default(DEFAULT_MMR_LAMBDA),
+});
 
-export interface SearchConfig {
-  edgeConfig?: EdgeSearchConfig;
-  nodeConfig?: NodeSearchConfig;
-  episodeConfig?: EpisodeSearchConfig;
-  communityConfig?: CommunitySearchConfig;
-  limit: number;
-  rerankerMinScore?: number;
-}
+export const SearchConfigSchema = z.object({
+  edgeConfig: EdgeSearchConfigSchema.optional(),
+  nodeConfig: NodeSearchConfigSchema.optional(),
+  episodeConfig: EpisodeSearchConfigSchema.optional(),
+  communityConfig: CommunitySearchConfigSchema.optional(),
+  limit: z.number().int().positive().default(DEFAULT_SEARCH_LIMIT),
+  rerankerMinScore: z.number().default(0),
+});
+
+// Types
+
+export type EdgeSearchConfig = z.infer<typeof EdgeSearchConfigSchema>;
+export type EdgeSearchConfigInput = z.input<typeof EdgeSearchConfigSchema>;
+export type NodeSearchConfig = z.infer<typeof NodeSearchConfigSchema>;
+export type NodeSearchConfigInput = z.input<typeof NodeSearchConfigSchema>;
+export type EpisodeSearchConfig = z.infer<typeof EpisodeSearchConfigSchema>;
+export type EpisodeSearchConfigInput = z.input<typeof EpisodeSearchConfigSchema>;
+export type CommunitySearchConfig = z.infer<typeof CommunitySearchConfigSchema>;
+export type CommunitySearchConfigInput = z.input<typeof CommunitySearchConfigSchema>;
+export type SearchConfig = z.infer<typeof SearchConfigSchema>;
+export type SearchConfigInput = z.input<typeof SearchConfigSchema>;
