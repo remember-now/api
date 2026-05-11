@@ -81,75 +81,6 @@ export class BulkEpisodeService {
     private readonly episodicEdgeRepository: EpisodicEdgeRepository,
   ) {}
 
-  // * REFACTORING *
-
-  async extractNodes(
-    model: BaseChatModel,
-    episode: EpisodicNode,
-    previousEpisodesForEpisode: EpisodicNode[],
-    entityTypes?: EntityTypeMap,
-    edgeTypes?: EdgeTypeMap,
-    edgeTypeMappings?: EdgeTypeMappings,
-    customInstructions?: string,
-    excludedEntityTypes?: string[],
-    useCombinedExtraction: boolean = false,
-  ): Promise<{
-    extractedNodes: EntityNode[];
-    preExtractedEdges?: EntityEdge[];
-  }> {
-    if (useCombinedExtraction) {
-      const { nodes, edges } = await this.combinedExtractionService.extractNodesAndEdges(
-        model,
-        [episode],
-        entityTypes,
-        edgeTypes,
-        edgeTypeMappings,
-        customInstructions,
-        excludedEntityTypes,
-      );
-      return { extractedNodes: nodes, preExtractedEdges: edges };
-    }
-
-    if (shouldChunk(episode.content)) {
-      const chunks = await chunkContent(episode.content, episode.source);
-      const perChunk = await Promise.all(
-        chunks.map((chunk) =>
-          this.nodeExtractionService.extractNodes(
-            model,
-            { ...episode, content: chunk },
-            previousEpisodesForEpisode,
-            entityTypes,
-            customInstructions,
-            excludedEntityTypes,
-          ),
-        ),
-      );
-      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
-      const nodesByName = new Map<string, EntityNode>();
-
-      for (const nodes of perChunk) {
-        for (const node of nodes) {
-          const key = node.name.toLowerCase();
-          if (!nodesByName.has(key)) nodesByName.set(key, node);
-        }
-      }
-      return { extractedNodes: [...nodesByName.values()] };
-    }
-
-    return {
-      extractedNodes: await this.nodeExtractionService.extractNodes(
-        model,
-        episode,
-        previousEpisodesForEpisode,
-        entityTypes,
-        customInstructions,
-        excludedEntityTypes,
-      ),
-    };
-  }
-
-  // * REFACTORING END *
-
   async addEpisodesBulk(options: AddBulkEpisodeOptions): Promise<AddBulkEpisodeResult> {
     const {
       userId,
@@ -375,145 +306,55 @@ export class BulkEpisodeService {
       );
     });
 
-    // 14.5. Extract edge attributes for resolved edges (custom edge types)
+    // 14.5. Build per-node and per-edge episode context for the helpers below
     const allCanonicalNodes = [
       ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n])).values(),
     ];
-    if (edgeTypes && effectiveEdgeTypeMappings) {
-      const uuidToNode = new Map<Uuid, EntityNode>(
-        allCanonicalNodes.map((n) => [n.uuid, n]),
-      );
-
-      type EdgeAttrTask = { edge: EntityEdge; epIndex: number };
-      const edgeAttrTasks: EdgeAttrTask[] = [];
-
-      edgeResolutions.forEach((res, epIndex) => {
-        for (const edge of res.resolvedEdges) {
-          const src = uuidToNode.get(edge.sourceNodeUuid);
-          const tgt = uuidToNode.get(edge.targetNodeUuid);
-          if (!src || !tgt) continue;
-          const applicable = getApplicableEdgeTypes(
-            src.labels,
-            tgt.labels,
-            edgeTypes,
-            effectiveEdgeTypeMappings,
-          );
-          const typeDef = applicable[edge.name];
-          if (!typeDef) continue;
-          const jsonSchema = z.toJSONSchema(typeDef.schema) as {
-            properties?: Record<string, unknown>;
-          };
-          if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
-          edgeAttrTasks.push({ edge, epIndex });
-        }
-      });
-
-      await withConcurrency(
-        LLM_CONCURRENCY_LIMIT,
-        edgeAttrTasks.map(({ edge, epIndex }) => async () => {
-          const src = uuidToNode.get(edge.sourceNodeUuid)!;
-          const tgt = uuidToNode.get(edge.targetNodeUuid)!;
-          const applicable = getApplicableEdgeTypes(
-            src.labels,
-            tgt.labels,
-            edgeTypes,
-            effectiveEdgeTypeMappings,
-          );
-          const typeDef = applicable[edge.name];
-          const jsonSchema = z.toJSONSchema(typeDef.schema);
-          const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
-            buildExtractEdgeAttributesMessages({
-              fact: edge.fact,
-              referenceTime: episodicNodes[epIndex].validAt,
-              existingAttributes: edge.attributes ?? {},
-            }),
-          )) as Record<string, unknown>;
-          edge.attributes = { ...edge.attributes, ...attrs };
-        }),
-      );
-    }
-
-    // 15. Generate node summaries for all new canonical nodes
     const newNodesOnly = allCanonicalNodes.filter((n) => !existingNodesMap.has(n.uuid));
 
-    if (newNodesOnly.length > 0) {
-      const nodesInput = newNodesOnly.map((n) => ({
-        uuid: n.uuid,
-        name: n.name,
-        summary: n.summary,
-        facts: allResolvedEdges
-          .filter((e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid)
-          .map((e) => e.fact),
-      }));
-
-      const summaryMap = new Map<Uuid, string>();
-      for (let i = 0; i < nodesInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
-        const batch = nodesInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
-        // TODO: Uses episodicNodes[0] as context for ALL summary batches.
-        // Nodes from later episodes get summarized with episode-0's context, which
-        // degrades quality for diverse batches. Fix: group canonical nodes by their
-        // originating episode and summarize each group with its own context.
-        const summaryMessages = buildNodeSummaryMessages({
-          episode: episodicNodes[0],
-          previousEpisodes: prevEpisodesPerEpisode[0],
-          nodes: batch,
-        });
-
-        const summaryResult = await model
-          .withStructuredOutput(nodeSummaryJsonSchema)
-          .invoke(summaryMessages);
-
-        for (const s of summaryResult.summaries) {
-          summaryMap.set(s.uuid, s.summary);
-        }
-      }
-
-      for (const node of newNodesOnly) {
-        const summary = summaryMap.get(node.uuid);
-        if (summary !== undefined) node.summary = summary;
-      }
-    }
-
-    // 16. Extract entity attributes for new canonical nodes (post-resolution, with edge context)
-    const nodeToEpisodeCtx = new Map<
-      string,
-      {
-        episode: (typeof episodicNodes)[0];
-        prevEpisodes: (typeof prevEpisodesPerEpisode)[0];
-      }
+    const nodeContext = new Map<
+      Uuid,
+      { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }
     >();
     canonicalNodesPerEpisode.forEach((nodes, i) => {
       for (const n of nodes) {
-        if (!nodeToEpisodeCtx.has(n.uuid)) {
-          nodeToEpisodeCtx.set(n.uuid, {
+        if (!nodeContext.has(n.uuid)) {
+          nodeContext.set(n.uuid, {
             episode: episodicNodes[i],
-            prevEpisodes: prevEpisodesPerEpisode[i],
+            previousEpisodes: prevEpisodesPerEpisode[i],
           });
         }
       }
     });
-    for (const node of newNodesOnly) {
-      const label = node.labels.find((l) => l !== 'Entity');
-      const entityType = label ? entityTypes?.[label] : undefined;
-      if (entityType) {
-        const ctx = nodeToEpisodeCtx.get(node.uuid);
-        if (!ctx) continue;
-        const nodeEdges = allResolvedEdges.filter(
-          (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
-        );
-        const attrMessages = buildExtractEntityAttributesMessages({
-          episodeContent: ctx.episode.content,
-          previousEpisodesContent: ctx.prevEpisodes.map((ep) => ep.content),
-          relatedFacts: nodeEdges.map((e) => e.fact),
-          referenceTime: ctx.episode.validAt,
-          existingAttributes: node.attributes ?? {},
-        });
-        const attrs = (await model
-          .withStructuredOutput(z.toJSONSchema(entityType.schema))
-          .invoke(attrMessages)) as Record<string, unknown>;
-        node.attributes = { ...node.attributes, ...attrs };
+
+    const edgeContext = new Map<Uuid, { referenceTime: Date }>();
+    edgeResolutions.forEach((res, epIndex) => {
+      for (const edge of res.resolvedEdges) {
+        edgeContext.set(edge.uuid, { referenceTime: episodicNodes[epIndex].validAt });
       }
-    }
+    });
+
+    // 14.6. Extract edge attributes post-resolution (custom edge types)
+    await this.extractEdgeAttributes(
+      model,
+      allResolvedEdges,
+      allCanonicalNodes,
+      edgeTypes,
+      effectiveEdgeTypeMappings,
+      edgeContext,
+    );
+
+    // 14.7. Extract entity attributes post-resolution (with resolved-edge context)
+    await this.extractEntityAttributes(
+      model,
+      newNodesOnly,
+      allResolvedEdges,
+      entityTypes,
+      nodeContext,
+    );
+
+    // 15. Generate node summaries for all new canonical nodes
+    await this.summarizeNodes(model, newNodesOnly, allResolvedEdges, nodeContext);
 
     // 17. Create episodic edges
     const allEpisodicEdges = episodicNodes.flatMap((ep, i) =>
@@ -552,6 +393,73 @@ export class BulkEpisodeService {
       edges: allResolvedEdges,
       invalidatedEdges: allInvalidatedEdges,
       episodicEdges: allEpisodicEdges,
+    };
+  }
+
+  // * REFACTORING *
+
+  async extractNodes(
+    model: BaseChatModel,
+    episode: EpisodicNode,
+    previousEpisodesForEpisode: EpisodicNode[],
+    entityTypes?: EntityTypeMap,
+    edgeTypes?: EdgeTypeMap,
+    edgeTypeMappings?: EdgeTypeMappings,
+    customInstructions?: string,
+    excludedEntityTypes?: string[],
+    useCombinedExtraction: boolean = false,
+  ): Promise<{
+    extractedNodes: EntityNode[];
+    preExtractedEdges?: EntityEdge[];
+  }> {
+    if (useCombinedExtraction) {
+      const { nodes, edges } = await this.combinedExtractionService.extractNodesAndEdges(
+        model,
+        [episode],
+        entityTypes,
+        edgeTypes,
+        edgeTypeMappings,
+        customInstructions,
+        excludedEntityTypes,
+      );
+      return { extractedNodes: nodes, preExtractedEdges: edges };
+    }
+
+    if (shouldChunk(episode.content)) {
+      const chunks = await chunkContent(episode.content, episode.source);
+      const perChunk = await Promise.all(
+        chunks.map((chunk) =>
+          this.nodeExtractionService.extractNodes(
+            model,
+            { ...episode, content: chunk },
+            previousEpisodesForEpisode,
+            entityTypes,
+            customInstructions,
+            excludedEntityTypes,
+          ),
+        ),
+      );
+      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
+      const nodesByName = new Map<string, EntityNode>();
+
+      for (const nodes of perChunk) {
+        for (const node of nodes) {
+          const key = node.name.toLowerCase();
+          if (!nodesByName.has(key)) nodesByName.set(key, node);
+        }
+      }
+      return { extractedNodes: [...nodesByName.values()] };
+    }
+
+    return {
+      extractedNodes: await this.nodeExtractionService.extractNodes(
+        model,
+        episode,
+        previousEpisodesForEpisode,
+        entityTypes,
+        customInstructions,
+        excludedEntityTypes,
+      ),
     };
   }
 
@@ -611,11 +519,163 @@ export class BulkEpisodeService {
           : Promise.resolve([] as EntityEdge[]),
       ]),
     );
-    const seen = new Set<string>();
+    const seen = new Set<Uuid>();
     return results.flat().filter((e) => {
       if (seen.has(e.uuid)) return false;
       seen.add(e.uuid);
       return true;
     });
   }
+
+  private async summarizeNodes(
+    model: BaseChatModel,
+    nodes: EntityNode[],
+    allEdges: EntityEdge[],
+    nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+  ): Promise<void> {
+    if (nodes.length === 0) return;
+
+    // Group nodes by their originating episode so each node is summarized with its own context.
+    const nodesByEpisode = new Map<
+      Uuid,
+      { episode: EpisodicNode; previousEpisodes: EpisodicNode[]; nodes: EntityNode[] }
+    >();
+
+    for (const node of nodes) {
+      const ctx = nodeContext.get(node.uuid);
+      if (!ctx) continue;
+      const entry = nodesByEpisode.get(ctx.episode.uuid);
+      if (entry) {
+        entry.nodes.push(node);
+      } else {
+        nodesByEpisode.set(ctx.episode.uuid, {
+          episode: ctx.episode,
+          previousEpisodes: ctx.previousEpisodes,
+          nodes: [node],
+        });
+      }
+    }
+
+    const summaryMap = new Map<Uuid, string>();
+    for (const {
+      episode,
+      previousEpisodes,
+      nodes: groupNodes,
+    } of nodesByEpisode.values()) {
+      const summaryInput = groupNodes.map((n) => ({
+        uuid: n.uuid,
+        name: n.name,
+        summary: n.summary,
+        facts: allEdges
+          .filter((e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid)
+          .map((e) => e.fact),
+      }));
+
+      for (let i = 0; i < summaryInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
+        const batch = summaryInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
+        const summaryMessages = buildNodeSummaryMessages({
+          episode,
+          previousEpisodes,
+          nodes: batch,
+        });
+        const summaryResult = await model
+          .withStructuredOutput(nodeSummaryJsonSchema)
+          .invoke(summaryMessages);
+        for (const s of summaryResult.summaries) {
+          summaryMap.set(s.uuid, s.summary);
+        }
+      }
+    }
+
+    for (const node of nodes) {
+      const summary = summaryMap.get(node.uuid);
+      if (summary !== undefined) node.summary = summary;
+    }
+  }
+
+  private async extractEntityAttributes(
+    model: BaseChatModel,
+    nodes: EntityNode[],
+    allEdges: EntityEdge[],
+    entityTypes: EntityTypeMap | undefined,
+    nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+  ): Promise<void> {
+    if (!entityTypes) return;
+    for (const node of nodes) {
+      const label = node.labels.find((l) => l !== 'Entity');
+      const entityType = label ? entityTypes[label] : undefined;
+      if (!entityType) continue;
+      const ctx = nodeContext.get(node.uuid);
+      if (!ctx) continue;
+      const nodeEdges = allEdges.filter(
+        (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+      );
+      const attrMessages = buildExtractEntityAttributesMessages({
+        episodeContent: ctx.episode.content,
+        previousEpisodesContent: ctx.previousEpisodes.map((ep) => ep.content),
+        relatedFacts: nodeEdges.map((e) => e.fact),
+        referenceTime: ctx.episode.validAt,
+        existingAttributes: node.attributes ?? {},
+      });
+      const attrs = (await model
+        .withStructuredOutput(z.toJSONSchema(entityType.schema))
+        .invoke(attrMessages)) as Record<string, unknown>;
+      node.attributes = { ...node.attributes, ...attrs };
+    }
+  }
+
+  private async extractEdgeAttributes(
+    model: BaseChatModel,
+    resolvedEdges: EntityEdge[],
+    canonicalNodes: EntityNode[],
+    edgeTypes: EdgeTypeMap | undefined,
+    edgeTypeMappings: EdgeTypeMappings | undefined,
+    edgeContext: Map<Uuid, { referenceTime: Date }>,
+  ): Promise<void> {
+    if (!edgeTypes || !edgeTypeMappings) return;
+    const uuidToNode = new Map<Uuid, EntityNode>(canonicalNodes.map((n) => [n.uuid, n]));
+
+    type EdgeAttrTask = {
+      edge: EntityEdge;
+      jsonSchema: { properties?: Record<string, unknown> };
+      referenceTime: Date;
+    };
+    const tasks: EdgeAttrTask[] = [];
+    for (const edge of resolvedEdges) {
+      const src = uuidToNode.get(edge.sourceNodeUuid);
+      const tgt = uuidToNode.get(edge.targetNodeUuid);
+      if (!src || !tgt) continue;
+      const applicable = getApplicableEdgeTypes(
+        src.labels,
+        tgt.labels,
+        edgeTypes,
+        edgeTypeMappings,
+      );
+      const typeDef = applicable[edge.name];
+      if (!typeDef) continue;
+      const jsonSchema = z.toJSONSchema(typeDef.schema) as {
+        properties?: Record<string, unknown>;
+      };
+      if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
+      const ctx = edgeContext.get(edge.uuid);
+      if (!ctx) continue;
+      tasks.push({ edge, jsonSchema, referenceTime: ctx.referenceTime });
+    }
+
+    await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      tasks.map(({ edge, jsonSchema, referenceTime }) => async () => {
+        const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
+          buildExtractEdgeAttributesMessages({
+            fact: edge.fact,
+            referenceTime,
+            existingAttributes: edge.attributes ?? {},
+          }),
+        )) as Record<string, unknown>;
+        edge.attributes = { ...edge.attributes, ...attrs };
+      }),
+    );
+  }
+
+  // * REFACTORING END *
 }
