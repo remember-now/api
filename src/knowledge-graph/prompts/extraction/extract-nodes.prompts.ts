@@ -3,7 +3,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { EntityTypeMap } from '@/knowledge-graph/episode/types';
 import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 
-import { episodeToContext } from '../types';
+import { formatPreviousEpisodes } from '../text-utils';
 
 const EXTRACTION_RULES = `
 EXTRACT (real-world, nameable entities only):
@@ -109,18 +109,6 @@ function buildSystemPrompt(source: EpisodeType): string {
     default:
       return TEXT_SYSTEM_PROMPT;
   }
-}
-
-function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
-  if (episodes.length === 0) {
-    return 'None';
-  }
-  return episodes
-    .map((e) => {
-      const ctx = episodeToContext(e);
-      return `- [${ctx.name}] (${ctx.validAt}): ${ctx.content}`;
-    })
-    .join('\n');
 }
 
 export function buildExtractNodesMessages(ctx: {

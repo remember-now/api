@@ -55,3 +55,10 @@ export function concatenateEpisodes(episodes: EpisodicNode[]): string {
     .map((ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`)
     .join('\n\n');
 }
+
+export function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
+  if (episodes.length === 0) return 'None';
+  return episodes
+    .map((e) => `- [${e.name}] (${e.validAt.toISOString()}): ${e.content}`)
+    .join('\n');
+}

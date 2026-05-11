@@ -3,7 +3,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
 import { EntityNode, EpisodicNode } from '@/knowledge-graph/models';
 
-import { episodeToContext } from '../types';
+import { formatPreviousEpisodes } from '../text-utils';
 
 const SYSTEM_PROMPT = `You are an expert at extracting relationships between entities from text.
 
@@ -35,18 +35,6 @@ Rules:
 - validAt: ISO 8601 datetime when the fact became true; null if no temporal information
 - invalidAt: ISO 8601 datetime when the fact stopped being true; null if ongoing or unknown
 - Respond with one entry per fact in the same order as the input`;
-
-function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
-  if (episodes.length === 0) {
-    return 'None';
-  }
-  return episodes
-    .map((e) => {
-      const ctx = episodeToContext(e);
-      return `- [${ctx.name}] (${ctx.validAt}): ${ctx.content}`;
-    })
-    .join('\n');
-}
 
 function formatEntities(nodes: EntityNode[]): string {
   if (nodes.length === 0) return '';

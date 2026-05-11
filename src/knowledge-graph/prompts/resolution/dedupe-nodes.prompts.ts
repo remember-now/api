@@ -2,7 +2,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 
 import { EpisodicNode } from '@/knowledge-graph/models';
 
-import { episodeToContext } from '../types';
+import { formatPreviousEpisodes } from '../text-utils';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph deduplication system.
 
@@ -14,16 +14,6 @@ Rules:
 - Every extracted entity must appear in entity_resolutions exactly once
 - For each entity, return its integer id, the best canonical name, and the name of the matching existing entity (duplicate_name) or an empty string if it is not a duplicate
 - Only use names from the provided existing candidate list for duplicate_name`;
-
-function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
-  if (episodes.length === 0) return 'None';
-  return episodes
-    .map((e) => {
-      const ctx = episodeToContext(e);
-      return `- [${ctx.name}] (${ctx.validAt}): ${ctx.content}`;
-    })
-    .join('\n');
-}
 
 function formatExtractedEntities(entities: Array<{ id: number; name: string }>): string {
   if (entities.length === 0) return 'None';

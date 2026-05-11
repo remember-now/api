@@ -2,7 +2,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 
 import { EpisodicNode } from '@/knowledge-graph/models';
 
-import { episodeToContext } from '../types';
+import { formatPreviousEpisodes } from '../text-utils';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph edge deduplication system.
 
@@ -17,16 +17,6 @@ Rules:
 - contradicted_facts: indices of facts that are made false by the new fact (can reference any fact in the list)
 - A fact can appear in BOTH arrays — this means it is superseded: the same information but now outdated
 - Return empty arrays when no duplicates or contradictions exist`;
-
-function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
-  if (episodes.length === 0) return 'None';
-  return episodes
-    .map((e) => {
-      const ctx = episodeToContext(e);
-      return `- [${ctx.name}] (${ctx.validAt}): ${ctx.content}`;
-    })
-    .join('\n');
-}
 
 function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>): string {
   if (edges.length === 0) return 'None';

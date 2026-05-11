@@ -2,7 +2,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 
 import { EpisodicNode } from '@/knowledge-graph/models';
 
-import { MAX_SUMMARY_CHARS } from '../text-utils';
+import { formatPreviousEpisodes, MAX_SUMMARY_CHARS } from '../text-utils';
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a factual summary (≤ ${MAX_SUMMARY_CHARS} characters) for each entity using the provided episode context.
 
@@ -13,15 +13,6 @@ Rules:
 - Preserve names, dates, and counts precisely
 - If an existing summary is provided, merge it with new facts; newer facts win on contradiction
 - Skip entities with no relevant context in the episode`;
-
-function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
-  if (episodes.length === 0) {
-    return 'None';
-  }
-  return episodes
-    .map((e) => `- [${e.name}] (${e.validAt.toISOString()}): ${e.content}`)
-    .join('\n');
-}
 
 export function buildNodeSummaryMessages(ctx: {
   episode: EpisodicNode;
