@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 
-import { BulkModule } from './bulk/bulk.module';
 import { CommunityModule } from './community/community.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { EpisodeModule } from './episode/episode.module';
@@ -18,7 +17,6 @@ import { SearchModule } from './search/search.module';
     CommunityModule,
     SearchModule,
     EpisodeModule,
-    BulkModule,
   ],
   exports: [
     EmbeddingModule,
@@ -28,7 +26,6 @@ import { SearchModule } from './search/search.module';
     CommunityModule,
     SearchModule,
     EpisodeModule,
-    BulkModule,
   ],
 })
 export class KnowledgeGraphModule {}

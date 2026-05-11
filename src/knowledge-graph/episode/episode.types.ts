@@ -59,28 +59,23 @@ export const EdgeTypeMappingsSchema = z.map(
   z.array(RelationshipTypeSchema),
 );
 
-export const BaseEpisodeOptionsSchema = z.object({
+export const AddEpisodeOptionsSchema = z.object({
   userId: z.number(),
+  episodes: z.array(EpisodeSchema).min(1),
   entityTypes: EntityTypeMapSchema.optional(),
   edgeTypes: EdgeTypeMapSchema.optional(),
   edgeTypeMappings: EdgeTypeMappingsSchema.optional(),
   excludedEntityTypes: z.array(NodeLabelSchema).optional(),
   customInstructions: z.string().optional(),
   updateCommunities: z.boolean().optional(),
+  useCombinedExtraction: z.boolean().default(false),
 });
 
-export const BaseEpisodeResultSchema = z.object({
+export const AddEpisodeResultSchema = z.object({
   nodes: z.array(EntityNodeSchema),
   edges: z.array(EntityEdgeSchema),
   invalidatedEdges: z.array(EntityEdgeSchema),
   episodicEdges: z.array(EpisodicEdgeSchema),
-});
-
-export const AddEpisodeOptionsSchema = BaseEpisodeOptionsSchema.extend({
-  episode: EpisodeSchema,
-});
-
-export const AddEpisodeResultSchema = BaseEpisodeResultSchema.extend({
   episode: EpisodicNodeSchema,
 });
 

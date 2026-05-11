@@ -4,8 +4,6 @@ import { z } from 'zod';
 
 import { LlmService } from '@/llm/llm.service';
 
-import { LLM_CONCURRENCY_LIMIT, withConcurrency } from '../bulk/bulk-utils';
-import { chunkContent, shouldChunk } from '../bulk/content-chunking';
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import {
@@ -51,6 +49,19 @@ import {
   sagaSummaryJsonSchema,
 } from '../prompts/summarize-sagas.prompts';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
+import {
+  COSINE_SIMILARITY_THRESHOLD,
+  cosineSimilarity,
+  normalizeString,
+} from '../resolution/resolution-utils';
+import {
+  buildDirectedUuidMap,
+  LLM_CONCURRENCY_LIMIT,
+  reassembleByOffsets,
+  resolveEdgePointers,
+  withConcurrency,
+} from './batch-utils';
+import { chunkContent, shouldChunk } from './content-chunking';
 import {
   CANDIDATE_LIMIT,
   MAX_NODES_PER_SUMMARY_BATCH,
@@ -196,15 +207,17 @@ export class EpisodeService {
     return updatedSaga.summary;
   }
 
-  async addEpisode(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult> {
+  async addEpisodes(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult[]> {
     const {
       userId,
-      episode,
+      episodes,
       entityTypes,
       edgeTypes,
       edgeTypeMappings,
       excludedEntityTypes,
       customInstructions,
+      updateCommunities,
+      useCombinedExtraction,
     }: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
 
     const effectiveEdgeTypeMappings = getEffectiveTypeMappings(
@@ -213,197 +226,350 @@ export class EpisodeService {
     );
     const model = await this.llmService.getActiveModel(userId);
 
-    // 2. Retrieve previous episodes
-    const previousEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
-      RetrieveEpisodesParamsSchema.parse({
-        referenceTime: episode.referenceTime,
-        lastN: PREVIOUS_EPISODES_WINDOW,
-        groupIds: [episode.groupId],
+    // 2. Retrieve previous episodes in parallel
+    const prevEpisodesPerEpisode = await Promise.all(
+      episodes.map((ep) =>
+        this.episodicNodeRepository.retrieveEpisodes(
+          RetrieveEpisodesParamsSchema.parse({
+            referenceTime: ep.referenceTime,
+            lastN: PREVIOUS_EPISODES_WINDOW,
+            groupIds: [ep.groupId],
+          }),
+        ),
+      ),
+    );
+
+    // 3. Create + save episodic nodes (apply uuid override if provided)
+    const episodicNodes = episodes.map((raw) => {
+      const node = createEpisodicNode({
+        name: raw.name,
+        content: raw.content,
+        source: raw.source,
+        sourceDescription: raw.sourceDescription,
+        groupId: raw.groupId,
+        validAt: raw.referenceTime,
+      });
+      return raw.uuid ? { ...node, uuid: raw.uuid } : node;
+    });
+    await this.episodicNodeRepository.saveBulk(episodicNodes);
+
+    // 4. Extract nodes (and edges, if using combined extraction) in parallel.
+    // Combined path: single LLM call per episode yields both nodes and edges.
+    // Separate path: node extraction only; edges are extracted later in step 11.
+    let preExtractedEdgesPerEpisode: EntityEdge[][] | null = null;
+
+    const extractedNodesPerEpisode = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map((ep, i) => async () => {
+        const { extractedNodes, preExtractedEdges } = await this.extractNodes(
+          model,
+          ep,
+          prevEpisodesPerEpisode[i],
+          entityTypes,
+          edgeTypes,
+          effectiveEdgeTypeMappings,
+          customInstructions,
+          excludedEntityTypes,
+          useCombinedExtraction,
+        );
+        if (useCombinedExtraction) {
+          (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill([]))[i] =
+            preExtractedEdges;
+        }
+        return extractedNodes;
       }),
     );
 
-    // 3. Create + save episode
-    const episodicNode = createEpisodicNode({
-      name: episode.name,
-      content: episode.content,
-      source: episode.source,
-      sourceDescription: episode.sourceDescription,
-      groupId: episode.groupId,
-      validAt: episode.referenceTime,
-    });
-    await this.episodicNodeRepository.save(episodicNode);
-
-    // 4. Extract nodes (with chunking for large content)
-    const { extractedNodes } = await this.extractNodes(
-      model,
-      episodicNode,
-      previousEpisodes,
-      entityTypes,
-      edgeTypes,
-      effectiveEdgeTypeMappings,
-      customInstructions,
-      excludedEntityTypes,
-      false,
+    // 5. Embed all extracted nodes (batch)
+    const allExtractedNodes = extractedNodesPerEpisode.flat();
+    const allEmbedded = await this.embeddingService.embedNodes(allExtractedNodes);
+    const embeddedPerEpisode = reassembleByOffsets(
+      allEmbedded,
+      extractedNodesPerEpisode.map((a) => a.length),
     );
 
-    // 5. Embed extracted nodes, then collect search-based candidates
-    const embeddedNodes = await this.embeddingService.embedNodes(extractedNodes);
-    const existingNodes = await this.collectNodeCandidates(
-      embeddedNodes,
-      episode.groupId,
+    // 6. Collect search-based node candidates per episode
+    const groupIds = [...new Set(episodes.map((e) => e.groupId))];
+    const candidatesPerEpisode = await Promise.all(
+      embeddedPerEpisode.map((nodes, i) =>
+        this.collectNodeCandidates(nodes, episodicNodes[i].groupId),
+      ),
+    );
+    const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.uuid, n]));
+
+    // 7. Pass 1 — resolve nodes vs live graph in parallel
+    const nodeResolutions = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      embeddedPerEpisode.map(
+        (nodes, i) => () =>
+          this.nodeResolutionService.resolveNodes(
+            model,
+            episodicNodes[i],
+            nodes,
+            candidatesPerEpisode[i],
+            prevEpisodesPerEpisode[i],
+            customInstructions,
+          ),
+      ),
     );
 
-    // 6. Resolve nodes
-    const { resolvedNodes, uuidMap } = await this.nodeResolutionService.resolveNodes(
-      model,
-      episodicNode,
-      embeddedNodes,
-      existingNodes,
-      previousEpisodes,
-      customInstructions,
+    // 8. Merge duplicate pairs from pass 1
+    const pass1Pairs: [Uuid, Uuid][] = nodeResolutions.flatMap((r) =>
+      r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedUuid, p.canonicalUuid]),
     );
 
-    const matchedExistingNodes = existingNodes.filter((n) =>
-      [...uuidMap.values()].includes(n.uuid),
-    );
-    const canonicalNodes = [...resolvedNodes, ...matchedExistingNodes];
+    // 9. Pass 2 — within-batch dedup: exact name match first, then cosine
+    const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
+    const pass2Pairs: [Uuid, Uuid][] = [];
+    for (let i = 0; i < allNewNodes.length; i++) {
+      for (let j = i + 1; j < allNewNodes.length; j++) {
+        const a = allNewNodes[i];
+        const b = allNewNodes[j];
 
-    // 7. Extract edges
-    const extractedEdges = await this.edgeExtractionService.extractEdges(
-      model,
-      episodicNode,
-      canonicalNodes,
-      previousEpisodes,
-      episode.referenceTime,
-      customInstructions,
-      edgeTypes,
-      effectiveEdgeTypeMappings,
-    );
+        const exactMatch = normalizeString(a.name) === normalizeString(b.name);
+        const cosineMatch =
+          !exactMatch &&
+          a.nameEmbedding !== null &&
+          b.nameEmbedding !== null &&
+          cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >=
+            COSINE_SIMILARITY_THRESHOLD;
 
-    // 8. Embed extracted edges, then collect search-based candidates
-    const embeddedEdges = await this.embeddingService.embedEdges(extractedEdges);
-    const existingEdges = await this.collectEdgeCandidates(
-      embeddedEdges,
-      episode.groupId,
-    );
+        if (exactMatch || cosineMatch) {
+          pass2Pairs.push([b.uuid, a.uuid]); // b is alias → a (first-seen) is canonical
+        }
+      }
+    }
 
-    // 9. Resolve edges
-    const { resolvedEdges, invalidatedEdges } =
-      await this.edgeResolutionService.resolveEdges(
-        model,
-        episodicNode,
-        embeddedEdges,
-        existingEdges,
-        uuidMap,
-        episode.referenceTime,
-        previousEpisodes,
-        customInstructions,
+    const finalUuidMap = buildDirectedUuidMap([...pass1Pairs, ...pass2Pairs]);
+
+    // 10. Determine canonical nodes per episode
+    const canonicalNodesPerEpisode = nodeResolutions.map((resolution) => {
+      const ownCanonical = resolution.resolvedNodes.filter(
+        (n) => (finalUuidMap.get(n.uuid) ?? n.uuid) === n.uuid,
       );
+      const matchedExisting = resolution.duplicatePairs
+        .map((p) => {
+          const canonical = finalUuidMap.get(p.canonicalUuid) ?? p.canonicalUuid;
+          return existingNodesMap.get(canonical);
+        })
+        .filter((n): n is NonNullable<typeof n> => n !== undefined);
 
-    episodicNode.entityEdges = [...resolvedEdges, ...invalidatedEdges].map((e) => e.uuid);
+      const seen = new Set<Uuid>();
+      return [...ownCanonical, ...matchedExisting].filter((n) => {
+        if (seen.has(n.uuid)) return false;
+        seen.add(n.uuid);
+        return true;
+      });
+    });
 
-    // 9.5. Per-node and per-edge episode context (single-episode: all map to the same context)
+    // 11. Extract edges in parallel, then resolve pointers.
+    // Combined path: edges were already extracted in step 4; remap node UUIDs via finalUuidMap.
+    // Separate path: extract edges using the canonical nodes resolved above.
+    const rawEdgesPerEpisode = preExtractedEdgesPerEpisode
+      ? preExtractedEdgesPerEpisode
+      : await withConcurrency(
+          LLM_CONCURRENCY_LIMIT,
+          episodicNodes.map(
+            (ep, i) => () =>
+              this.edgeExtractionService.extractEdges(
+                model,
+                ep,
+                canonicalNodesPerEpisode[i],
+                prevEpisodesPerEpisode[i],
+                ep.validAt,
+                customInstructions,
+                edgeTypes,
+                effectiveEdgeTypeMappings,
+              ),
+          ),
+        );
+
+    const pointedEdgesPerEpisode = rawEdgesPerEpisode.map((edges) =>
+      resolveEdgePointers(edges, finalUuidMap),
+    );
+
+    // 12. Embed all extracted edges (batch)
+    const allExtractedEdges = pointedEdgesPerEpisode.flat();
+    const allEmbeddedEdges = await this.embeddingService.embedEdges(allExtractedEdges);
+    const embeddedEdgesPerEpisode = reassembleByOffsets(
+      allEmbeddedEdges,
+      pointedEdgesPerEpisode.map((a) => a.length),
+    );
+
+    // 13. Collect search-based edge candidates per episode
+    const edgeCandidatesPerEpisode = await Promise.all(
+      embeddedEdgesPerEpisode.map((edges, i) =>
+        this.collectEdgeCandidates(edges, episodicNodes[i].groupId),
+      ),
+    );
+
+    // 14. Resolve edges in parallel
+    const edgeResolutions = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map(
+        (ep, i) => () =>
+          this.edgeResolutionService.resolveEdges(
+            model,
+            ep,
+            embeddedEdgesPerEpisode[i],
+            edgeCandidatesPerEpisode[i],
+            finalUuidMap,
+            ep.validAt,
+            prevEpisodesPerEpisode[i],
+            customInstructions,
+          ),
+      ),
+    );
+
+    const allResolvedEdges = edgeResolutions.flatMap((r) => r.resolvedEdges);
+    const allInvalidatedEdges = edgeResolutions.flatMap((r) => r.invalidatedEdges);
+
+    edgeResolutions.forEach((res, i) => {
+      episodicNodes[i].entityEdges = [...res.resolvedEdges, ...res.invalidatedEdges].map(
+        (e) => e.uuid,
+      );
+    });
+
+    // 15. Build per-node and per-edge episode context for the helpers below
+    const allCanonicalNodes = [
+      ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n])).values(),
+    ];
+    const newNodesOnly = allCanonicalNodes.filter((n) => !existingNodesMap.has(n.uuid));
+
     const nodeContext = new Map<
       Uuid,
       { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }
-    >(canonicalNodes.map((n) => [n.uuid, { episode: episodicNode, previousEpisodes }]));
+    >();
+    canonicalNodesPerEpisode.forEach((nodes, i) => {
+      for (const n of nodes) {
+        if (!nodeContext.has(n.uuid)) {
+          nodeContext.set(n.uuid, {
+            episode: episodicNodes[i],
+            previousEpisodes: prevEpisodesPerEpisode[i],
+          });
+        }
+      }
+    });
 
-    const edgeContext = new Map<Uuid, { referenceTime: Date }>(
-      resolvedEdges.map((e) => [e.uuid, { referenceTime: episodicNode.validAt }]),
-    );
+    const edgeContext = new Map<Uuid, { referenceTime: Date }>();
+    edgeResolutions.forEach((res, epIndex) => {
+      for (const edge of res.resolvedEdges) {
+        edgeContext.set(edge.uuid, { referenceTime: episodicNodes[epIndex].validAt });
+      }
+    });
 
-    // 9.6. Extract edge attributes post-resolution (custom edge types)
+    // 16. Extract edge attributes post-resolution (custom edge types)
     await this.extractEdgeAttributes(
       model,
-      resolvedEdges,
-      canonicalNodes,
+      allResolvedEdges,
+      allCanonicalNodes,
       edgeTypes,
       effectiveEdgeTypeMappings,
       edgeContext,
     );
 
-    // 9.7. Extract entity attributes post-resolution (with resolved-edge context)
+    // 17. Extract entity attributes post-resolution (with resolved-edge context)
     await this.extractEntityAttributes(
       model,
-      resolvedNodes,
-      resolvedEdges,
+      newNodesOnly,
+      allResolvedEdges,
       entityTypes,
       nodeContext,
     );
 
-    // 10. Generate node summaries for newly resolved nodes
-    await this.summarizeNodes(model, resolvedNodes, resolvedEdges, nodeContext);
+    // 18. Generate node summaries for all new canonical nodes
+    await this.summarizeNodes(model, newNodesOnly, allResolvedEdges, nodeContext);
 
-    // 11. Build episodic edges
-    const episodicEdges = canonicalNodes.map((n) =>
-      createEpisodicEdge({
-        sourceNodeUuid: episodicNode.uuid,
-        targetNodeUuid: n.uuid,
-        groupId: episode.groupId,
-      }),
+    // 19. Create episodic edges per episode
+    const episodicEdgesPerEpisode = episodicNodes.map((ep, i) =>
+      canonicalNodesPerEpisode[i].map((node) =>
+        createEpisodicEdge({
+          sourceNodeUuid: ep.uuid,
+          targetNodeUuid: node.uuid,
+          groupId: ep.groupId,
+        }),
+      ),
     );
+    const allEpisodicEdges = episodicEdgesPerEpisode.flat();
 
-    // 12. Persist all in parallel
+    // 20. Persist in parallel
     await Promise.all([
-      this.entityNodeRepository.saveBulk(resolvedNodes),
-      this.entityEdgeRepository.saveBulk(resolvedEdges),
-      this.entityEdgeRepository.saveBulk(invalidatedEdges),
-      this.episodicEdgeRepository.saveBulk(episodicEdges),
-      this.episodicNodeRepository.save(episodicNode),
+      this.entityNodeRepository.saveBulk(allCanonicalNodes),
+      this.entityEdgeRepository.saveBulk(allResolvedEdges),
+      this.entityEdgeRepository.saveBulk(allInvalidatedEdges),
+      this.episodicEdgeRepository.saveBulk(allEpisodicEdges),
+      this.episodicNodeRepository.saveBulk(episodicNodes),
     ]);
 
-    // 13. Saga association
-    if (episode.sagaUuid) {
+    // 21. Saga association per episode (sequential — keeps NEXT_EPISODE chain
+    // deterministic when multiple batch episodes share the same sagaUuid).
+    for (let i = 0; i < episodes.length; i++) {
+      const raw = episodes[i];
+      if (!raw.sagaUuid) continue;
+      const epNode = episodicNodes[i];
+
       await this.sagaNodeRepository.save(
         createSagaNode({
-          uuid: episode.sagaUuid,
-          name: NodeNameSchema.parse(episode.sagaUuid),
-          groupId: episode.groupId,
+          uuid: raw.sagaUuid,
+          name: NodeNameSchema.parse(raw.sagaUuid),
+          groupId: raw.groupId,
         }),
       );
       await this.hasEpisodeEdgeRepository.save(
         createHasEpisodeEdge({
-          sourceNodeUuid: episode.sagaUuid,
-          targetNodeUuid: episodicNode.uuid,
-          groupId: episode.groupId,
+          sourceNodeUuid: raw.sagaUuid,
+          targetNodeUuid: epNode.uuid,
+          groupId: raw.groupId,
         }),
       );
 
       const [prevEpisode] = await this.episodicNodeRepository.retrieveEpisodes(
         RetrieveEpisodesParamsSchema.parse({
-          referenceTime: episode.referenceTime,
+          referenceTime: raw.referenceTime,
           lastN: 1,
-          sagaUuid: episode.sagaUuid,
+          sagaUuid: raw.sagaUuid,
         }),
       );
-      if (prevEpisode && prevEpisode.uuid !== episodicNode.uuid) {
+      if (prevEpisode && prevEpisode.uuid !== epNode.uuid) {
         await this.nextEpisodeEdgeRepository.save(
           createNextEpisodeEdge({
             sourceNodeUuid: prevEpisode.uuid,
-            targetNodeUuid: episodicNode.uuid,
-            groupId: episode.groupId,
+            targetNodeUuid: epNode.uuid,
+            groupId: raw.groupId,
           }),
         );
       }
     }
 
-    // 14. Build communities (opt-in)
-    if (options.updateCommunities) {
-      await this.communityService.buildCommunities(userId, episode.groupId);
+    // 22. Optional community build per distinct groupId
+    // TODO: Concurrent addEpisodes calls for the same groupId can race here —
+    // two community builds may project conflicting graph snapshots and race on
+    // deleteByGroupId. Investigate a per-groupId mutex or advisory lock before
+    // enabling concurrent bulk ingestion.
+    if (updateCommunities) {
+      await Promise.all(
+        groupIds.map((gid) => this.communityService.buildCommunities(userId, gid)),
+      );
     }
 
-    return {
-      episode: episodicNode,
-      nodes: resolvedNodes,
-      edges: resolvedEdges,
-      invalidatedEdges,
-      episodicEdges,
-    };
+    // TODO: per-entry `nodes` includes both newly-resolved canonical nodes AND
+    // existing nodes matched via cross-batch dedup. The same canonical EntityNode
+    // may therefore appear in multiple entries' `nodes` arrays — callers must
+    // dedupe by uuid if they want a unique set across the batch
+    // (`result.flatMap(r => r.nodes)` will overcount). Consider returning a
+    // separate top-level deduped `nodes` field if a unique-view is needed.
+    return episodicNodes.map(
+      (episode, i): AddEpisodeResult => ({
+        episode,
+        nodes: canonicalNodesPerEpisode[i],
+        edges: edgeResolutions[i].resolvedEdges,
+        invalidatedEdges: edgeResolutions[i].invalidatedEdges,
+        episodicEdges: episodicEdgesPerEpisode[i],
+      }),
+    );
   }
 
-  // * REFACTORING *
-
-  async extractNodes(
+  private async extractNodes(
     model: BaseChatModel,
     episode: EpisodicNode,
     previousEpisodesForEpisode: EpisodicNode[],
@@ -681,6 +847,4 @@ export class EpisodeService {
       }),
     );
   }
-
-  // * REFACTORING END *
 }

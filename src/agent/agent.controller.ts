@@ -56,14 +56,16 @@ export class AgentController {
     summary: '[TEST] Ingest an episode into the knowledge graph',
   })
   async testIngest(@Body() body: TestIngestDto, @GetUser('id') userId: number) {
-    const result = await this.episodeService.addEpisode({
+    const [result] = await this.episodeService.addEpisodes({
       userId,
-      episode: {
-        name: body.name,
-        content: body.content,
-        groupId: body.groupId,
-        source: body.source,
-      },
+      episodes: [
+        {
+          name: body.name,
+          content: body.content,
+          groupId: body.groupId,
+          source: body.source,
+        },
+      ],
     });
 
     return {

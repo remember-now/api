@@ -5,7 +5,7 @@ import {
   resolveEdgePointers,
   UnionFind,
   withConcurrency,
-} from './bulk-utils';
+} from './batch-utils';
 
 const u = (s: string) => s as Uuid;
 
