@@ -1,123 +1,159 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# RememberNow API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS backend for RememberNow - an automatically managed, graph-enabled, time-aware knowledge bank.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Project setup
 
-## Description
+Install dependencies:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+```bash
+npm install
+```
 
-## Frontend Type Generation
+Fill out `.env` file (`GEMINI_API_KEY` is required):
+
+```bash
+cp .env.example .env
+```
+
+Make sure Docker is running:
+
+```bash
+docker info
+```
+
+## Stack modes
+
+| Command                                        | What runs                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `docker compose up -d`                         | Everything except Langfuse observability                            |
+| `docker compose --profile observability up -d` | Everything, including observability                                 |
+| `npm run infra:dev:up`                         | Infra + observability (no app container, since dev runs it on host) |
+| `npm run infra:test:up`                        | App deps only, no observability                                     |
+
+## Compile and run the project
+
+### Container
+
+Run app in container (easiest):
+
+```bash
+docker compose up -d
+```
+
+### Dev (host)
+
+Run app on host.
+
+Also brings up Langfuse + MinIO + ClickHouse:
+
+```bash
+npx prisma generate && npm run infra:dev:up && npm run prisma:dev:deploy && npm run start:dev
+```
+
+When done developing for the day (preserves data):
+
+```bash
+npm run infra:dev:stop
+```
+
+Resume development with existing data:
+
+```bash
+npm run infra:dev:start && npm run start:dev
+```
+
+After editing `prisma/schema.prisma` (regenerate client + create a new migration):
+
+```bash
+npx prisma generate && npm run prisma:dev:migrate
+```
+
+Full reset + infra restart (destroys all data):
+
+```bash
+npm run infra:dev:reset
+```
+
+Or remove all data manually (would require `infra:dev:up` after):
+
+```bash
+npm run infra:dev:rm
+```
+
+Once dev infra is up, the following web UIs are available:
+
+- Swagger UI: <http://localhost:3333/api> (requires the app to be running)
+- Prisma Studio: <http://localhost:5555> (requires `npm run prisma:studio`)
+- Neo4j browser: <http://localhost:7474>
+- Langfuse: <http://localhost:3334>
+- MinIO console: <http://localhost:9091>
+
+## Development
+
+### Pre-commit hooks
+
+Installed automatically by `npm install` via Husky. On each commit, `lint-staged` runs ESLint (zero warnings allowed) and Prettier across staged TS/JS files, and Prettier across staged JSON/Markdown/YAML.
+
+### Frontend Type Generation
 
 The `openapi.json` is auto-generated when you run `npm run start:dev`.
 Make sure to commit changes when you modify routes/DTOs.
 
-## Project setup
+### Run tests
+
+Unit tests:
 
 ```bash
-# Install dependencies
-$ npm install
-
-# Fill out .env file (GEMINI_API_KEY is required)
-$ cp .env.example .env
-
-# Make sure Docker is running
-$ docker info
+npm run test
 ```
 
-## Compile and run the project
+E2E tests (`.env.test` file must be present. Change ports to not conflict with dev stack):
 
 ```bash
-# Run app in container (easiest)
-$ npm run start:docker
-
-# Run app on host (development)
-$ npm run infra:dev:up && npm run prisma:dev:deploy && npm run start:dev
-
-# When done developing for the day (preserves data):
-$ npm run infra:dev:stop
-
-# Resume development with existing data:
-$ npm run infra:dev:start && npm run start:dev
-
-# Full reset (destroys all data):
-$ npm run infra:dev:reset
+npm run test:e2e
 ```
 
-## Run tests
+Test coverage:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests (.env.test file must be present)
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run test:cov
 ```
 
-## Test stability verification
+### Test stability verification
 
 The anti-flaky test runner executes unit tests once, then runs e2e tests repeatedly to detect intermittent failures and race conditions. Useful for validating test reliability after infrastructure changes.
 
-```bash
-# Run with default 15 iterations
-$ ./anti-flaky-test.sh
+Run with default 15 iterations:
 
-# Run with custom iteration count
-$ ./anti-flaky-test.sh 30
+```bash
+./anti-flaky-test.sh
+```
+
+Run with custom iteration count:
+
+```bash
+./anti-flaky-test.sh 30
 ```
 
 The runner will exit immediately on first failure and display the failing test output. Test infrastructure is set up once and torn down automatically on completion or interruption.
 
 ## Recommended VS Code Extensions
 
-- **Neo4j for VS Code** — Cypher syntax highlighting, linting, autocompletion, and query execution. Install via VS Code Quick Open (`Ctrl+P`):
+- **Neo4j for VS Code** - Cypher syntax highlighting and linting. Install via VS Code Quick Open (`Ctrl+P`):
   ```
   ext install neo4j-extensions.neo4j-for-vscode
   ```
   All Cypher queries in this codebase are tagged with `/* cypher */` (template literals) or `/*cypher*/` (single-line strings) to enable embedded syntax highlighting directly in TypeScript files.
 
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
 ## Acknowledgements
 
-The knowledge graph pipeline in this project is a TypeScript port of [Graphiti](https://github.com/getzep/graphiti) by Zep AI, adapted for this codebase for the following reasons:
+The knowledge graph pipeline in this project is a modified TypeScript port of [Graphiti](https://github.com/getzep/graphiti) by Zep AI, adapted for this codebase for the following reasons:
 
+- I need to implement a Graph Versioning system to prevent data loss due to agent misbehavior, which is impossible without direct code access.
 - Graphiti couples tightly to specific providers. This port integrates with [LangChain](https://js.langchain.com/) so any supported model can be swapped in without changing pipeline code.
-- Graphiti maintains provider abstractions for its graph layer. Since Neo4j is a first-class dependency here, those abstractions are unnecessary and have been replaced with direct Cypher and Neo4j GDS calls (e.g. Leiden community detection via `gds.leiden.stream`).
+- Graphiti maintains provider abstractions for its graph layer. Since Neo4j is a first-class dependency here, those abstractions are unnecessary and removing them adds room for enhancements.
 - RememberNow is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
-- I am working on a Graph Versioning system to prevent data loss due to agent misbehavior.
 
 ## License
 
