@@ -2,7 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeepMockProxy, mockDeep, mockReset } from 'jest-mock-extended';
 
-import { Prisma } from '@generated/prisma/client';
+import { LlmProvider, Prisma } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
 import { Uuid } from '@/common/schemas';
@@ -98,6 +98,7 @@ describe('UserService', () => {
           email: 'test@example.com',
           passwordHash: 'hashedPassword',
           role: RoleSchema.enum.USER,
+          activeLlmProvider: LlmProvider.PLATFORM,
         },
       });
       expect(result).toEqual(expectedUserWithoutPassword);
@@ -152,6 +153,7 @@ describe('UserService', () => {
           email: createUserDto.email,
           passwordHash: hashedPassword,
           role: createUserDto.role,
+          activeLlmProvider: LlmProvider.PLATFORM,
         },
       });
       expect(result).toEqual(expectedUserWithoutPassword);

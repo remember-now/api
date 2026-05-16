@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
-import { Prisma } from '@generated/prisma/client';
+import { LlmProvider, Prisma } from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
 import { Uuid } from '@/common/schemas';
@@ -55,6 +55,7 @@ export class UserService {
           email: email,
           passwordHash: passwordHash,
           role: role,
+          activeLlmProvider: LlmProvider.PLATFORM,
         },
       });
 
