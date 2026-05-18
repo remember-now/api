@@ -1,8 +1,9 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { EmbeddingService } from '../embedding';
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
@@ -47,6 +48,13 @@ import {
   SearchResults,
 } from './types';
 
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
+
+const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
+
 @Injectable()
 export class SearchService {
   constructor(
@@ -56,6 +64,7 @@ export class SearchService {
     private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly episodicNodeRepository: EpisodicNodeRepository,
     private readonly communityNodeRepository: CommunityNodeRepository,
+    @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
 
   async searchFromNodes(options: {
@@ -78,17 +87,49 @@ export class SearchService {
   }
 
   async search(options: SearchOptionsInput): Promise<SearchResults> {
-    const {
-      query,
-      groupIds,
-      config,
-      filters,
-      centerNodeUuid,
-      originNodeUuids,
-      userId,
-    }: SearchOptions = SearchOptionsSchema.parse(options);
+    const { metrics: _m, ...rest } = await this.searchImpl(options);
+    return rest;
+  }
 
-    if (!query.trim()) return emptySearchResults();
+  @Span('search', { onResult: metricsOnResult })
+  private async searchImpl(
+    options: SearchOptionsInput,
+  ): Promise<SearchResults & { metrics: SpanMetrics }> {
+    const parsed: SearchOptions = SearchOptionsSchema.parse(options);
+    const ctx: LlmContext = {
+      userId: parsed.userId,
+      sessionId: parsed.userId,
+      tags: [
+        'knowledge-graph',
+        'retrieval',
+        ...parsed.groupIds.map((id) => `group:${id}`),
+      ],
+      metadata: {
+        query: parsed.query.slice(0, 200),
+      },
+    };
+
+    const { query, groupIds, config, filters, centerNodeUuid, originNodeUuids, userId } =
+      parsed;
+
+    const baseMetrics: SpanMetrics = {
+      'user.id': ctx.userId,
+      'session.id': ctx.sessionId ?? ctx.userId,
+      'query.length': query.length,
+    };
+
+    if (!query.trim()) {
+      return {
+        ...emptySearchResults(),
+        metrics: {
+          ...baseMetrics,
+          'results.edges': 0,
+          'results.nodes': 0,
+          'results.episodes': 0,
+          'results.communities': 0,
+        },
+      };
+    }
 
     const limit = config.limit;
     const minScore = config.rerankerMinScore;
@@ -139,6 +180,7 @@ export class SearchService {
             model,
             centerNodeUuid,
             originNodeUuids,
+            ctx,
           )
         : Promise.resolve([[], []] as [EntityEdge[], number[]]),
       config.nodeConfig
@@ -153,6 +195,7 @@ export class SearchService {
             model,
             centerNodeUuid,
             originNodeUuids,
+            ctx,
           )
         : Promise.resolve([[], []] as [EntityNode[], number[]]),
       config.episodeConfig
@@ -163,6 +206,7 @@ export class SearchService {
             limit,
             minScore,
             model,
+            ctx,
           )
         : Promise.resolve([[], []] as [EpisodicNode[], number[]]),
       config.communityConfig
@@ -174,6 +218,7 @@ export class SearchService {
             limit,
             minScore,
             model,
+            ctx,
           )
         : Promise.resolve([[], []] as [CommunityNode[], number[]]),
     ]);
@@ -192,6 +237,13 @@ export class SearchService {
       episodeScores: new Map(episodes.map((ep, i) => [ep.uuid, episodeScoreArr[i]])),
       communities,
       communityScores: new Map(communities.map((c, i) => [c.uuid, communityScoreArr[i]])),
+      metrics: {
+        ...baseMetrics,
+        'results.edges': edges.length,
+        'results.nodes': nodes.length,
+        'results.episodes': episodes.length,
+        'results.communities': communities.length,
+      },
     };
   }
 
@@ -208,7 +260,38 @@ export class SearchService {
     model: BaseChatModel | null,
     centerNodeUuid?: Uuid,
     originNodeUuids?: Uuid[],
+    ctx?: LlmContext,
   ): Promise<[EntityEdge[], number[]]> {
+    const { edges, scores } = await this.edgeSearchImpl(
+      query,
+      queryVector,
+      groupIds,
+      config,
+      filters,
+      limit,
+      minScore,
+      model,
+      centerNodeUuid,
+      originNodeUuids,
+      ctx,
+    );
+    return [edges, scores];
+  }
+
+  @Span('search.edge', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  private async edgeSearchImpl(
+    query: string,
+    queryVector: number[] | null,
+    groupIds: GroupId[],
+    config: EdgeSearchConfig,
+    filters: SearchFilters | undefined,
+    limit: number,
+    minScore: number,
+    model: BaseChatModel | null,
+    centerNodeUuid?: Uuid,
+    originNodeUuids?: Uuid[],
+    ctx?: LlmContext,
+  ): Promise<{ edges: EntityEdge[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const edgeMap = new Map<Uuid, EntityEdge>();
 
@@ -303,6 +386,7 @@ export class SearchService {
         query,
         candidates.map((e) => ({ uuid: e.uuid, text: e.fact })),
         rerankerMin,
+        { llmTracer: this.llmTracer, ctx },
       );
     } else if (reranker === EdgeReranker.node_distance) {
       if (!centerNodeUuid) {
@@ -358,7 +442,18 @@ export class SearchService {
       .filter((e): e is EntityEdge => e !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultEdges.length);
 
-    return [resultEdges, resultScores];
+    return {
+      edges: resultEdges,
+      scores: resultScores,
+      metrics: {
+        'query.length': query.length,
+        limit: limit,
+        minScore: minScore,
+        'config.searchMethods': config.searchMethods.join(','),
+        'config.reranker': config.reranker,
+        'result.count': resultEdges.length,
+      },
+    };
   }
 
   // ─── Node search ───────────────────────────────────────────────────────────
@@ -374,7 +469,38 @@ export class SearchService {
     model: BaseChatModel | null,
     centerNodeUuid?: Uuid,
     originNodeUuids?: Uuid[],
+    ctx?: LlmContext,
   ): Promise<[EntityNode[], number[]]> {
+    const { nodes, scores } = await this.nodeSearchImpl(
+      query,
+      queryVector,
+      groupIds,
+      config,
+      filters,
+      limit,
+      minScore,
+      model,
+      centerNodeUuid,
+      originNodeUuids,
+      ctx,
+    );
+    return [nodes, scores];
+  }
+
+  @Span('search.node', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  private async nodeSearchImpl(
+    query: string,
+    queryVector: number[] | null,
+    groupIds: GroupId[],
+    config: NodeSearchConfig,
+    filters: SearchFilters | undefined,
+    limit: number,
+    minScore: number,
+    model: BaseChatModel | null,
+    centerNodeUuid?: Uuid,
+    originNodeUuids?: Uuid[],
+    ctx?: LlmContext,
+  ): Promise<{ nodes: EntityNode[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const nodeMap = new Map<Uuid, EntityNode>();
 
@@ -472,6 +598,7 @@ export class SearchService {
         query,
         candidates.map((n) => ({ uuid: n.uuid, text: n.name })),
         rerankerMin,
+        { llmTracer: this.llmTracer, ctx },
       );
     } else if (reranker === NodeReranker.node_distance) {
       if (!centerNodeUuid) {
@@ -502,7 +629,18 @@ export class SearchService {
       .filter((n): n is EntityNode => n !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultNodes.length);
 
-    return [resultNodes, resultScores];
+    return {
+      nodes: resultNodes,
+      scores: resultScores,
+      metrics: {
+        'query.length': query.length,
+        limit: limit,
+        minScore: minScore,
+        'config.searchMethods': config.searchMethods.join(','),
+        'config.reranker': config.reranker,
+        'result.count': resultNodes.length,
+      },
+    };
   }
 
   // ─── Episode search ─────────────────────────────────────────────────────────
@@ -514,7 +652,30 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
+    ctx?: LlmContext,
   ): Promise<[EpisodicNode[], number[]]> {
+    const { episodes, scores } = await this.episodeSearchImpl(
+      query,
+      groupIds,
+      config,
+      limit,
+      minScore,
+      model,
+      ctx,
+    );
+    return [episodes, scores];
+  }
+
+  @Span('search.episode', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  private async episodeSearchImpl(
+    query: string,
+    groupIds: GroupId[],
+    config: EpisodeSearchConfig,
+    limit: number,
+    minScore: number,
+    model: BaseChatModel | null,
+    ctx?: LlmContext,
+  ): Promise<{ episodes: EpisodicNode[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
@@ -536,6 +697,7 @@ export class SearchService {
         query,
         bm25Episodes.slice(0, limit).map((ep) => ({ uuid: ep.uuid, text: ep.content })),
         rerankerMin,
+        { llmTracer: this.llmTracer, ctx },
       );
     } else {
       [rankedUuids, rankedScores] = rrf([bm25Uuids], rerankerMin);
@@ -547,7 +709,16 @@ export class SearchService {
       .filter((ep): ep is EpisodicNode => ep !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultEpisodes.length);
 
-    return [resultEpisodes, resultScores];
+    return {
+      episodes: resultEpisodes,
+      scores: resultScores,
+      metrics: {
+        'query.length': query.length,
+        limit: limit,
+        minScore: minScore,
+        'result.count': resultEpisodes.length,
+      },
+    };
   }
 
   // ─── Community search ───────────────────────────────────────────────────────
@@ -560,7 +731,32 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
+    ctx?: LlmContext,
   ): Promise<[CommunityNode[], number[]]> {
+    const { communities, scores } = await this.communitySearchImpl(
+      query,
+      queryVector,
+      groupIds,
+      config,
+      limit,
+      minScore,
+      model,
+      ctx,
+    );
+    return [communities, scores];
+  }
+
+  @Span('search.community', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  private async communitySearchImpl(
+    query: string,
+    queryVector: number[] | null,
+    groupIds: GroupId[],
+    config: CommunitySearchConfig,
+    limit: number,
+    minScore: number,
+    model: BaseChatModel | null,
+    ctx?: LlmContext,
+  ): Promise<{ communities: CommunityNode[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const communityMap = new Map<Uuid, CommunityNode>();
     const rerankerMin = config.rerankerMinScore ?? minScore;
@@ -630,6 +826,7 @@ export class SearchService {
         query,
         candidates.map((c) => ({ uuid: c.uuid, text: c.name })),
         rerankerMin,
+        { llmTracer: this.llmTracer, ctx },
       );
     } else {
       [rankedUuids, rankedScores] = rrf(
@@ -644,6 +841,17 @@ export class SearchService {
       .filter((c): c is CommunityNode => c !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultCommunities.length);
 
-    return [resultCommunities, resultScores];
+    return {
+      communities: resultCommunities,
+      scores: resultScores,
+      metrics: {
+        'query.length': query.length,
+        limit: limit,
+        minScore: minScore,
+        'config.searchMethods': config.searchMethods.join(','),
+        'config.reranker': config.reranker,
+        'result.count': resultCommunities.length,
+      },
+    };
   }
 }

@@ -16,6 +16,7 @@ import {
   NodeReranker,
   NodeSearchMethod,
 } from '@/knowledge-graph/search/types';
+import { Traceable } from '@/observability';
 
 import { AgentService } from './agent.service';
 
@@ -38,6 +39,7 @@ class TestSearchDto extends createZodDto(TestSearchSchema) {}
 @ApiTags('Agent')
 @Controller('agent')
 @UseGuards(LoggedInGuard)
+@Traceable({ asLangfuseTrace: true })
 export class AgentController {
   constructor(
     private readonly agentService: AgentService,

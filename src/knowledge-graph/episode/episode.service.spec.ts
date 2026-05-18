@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
+import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import {
   KG_REFERENCE_TIME,
   KG_TEST_GROUP_ID,
@@ -60,7 +61,7 @@ describe('EpisodeService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EpisodeService],
+      providers: [EpisodeService, { provide: LLM_TRACER, useValue: new NoOpLlmTracer() }],
     })
       .useMocker(createMock)
       .compile();
@@ -125,7 +126,7 @@ describe('EpisodeService', () => {
 
   // ─── Pipeline orchestration: per-step behavior for a single-episode batch ───
 
-  describe('addEpisodes — pipeline orchestration', () => {
+  describe('addEpisodes - pipeline orchestration', () => {
     it('saves episodic nodes via saveBulk before extraction', async () => {
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -158,6 +159,7 @@ describe('EpisodeService', () => {
         undefined,
         undefined,
         undefined,
+        expect.anything(),
       );
     });
 
@@ -198,6 +200,7 @@ describe('EpisodeService', () => {
         [existing],
         [],
         undefined,
+        expect.anything(),
       );
     });
 
@@ -235,6 +238,7 @@ describe('EpisodeService', () => {
         undefined,
         undefined,
         undefined,
+        expect.anything(),
       );
     });
 
@@ -297,6 +301,7 @@ describe('EpisodeService', () => {
         KG_REFERENCE_TIME,
         [],
         undefined,
+        expect.anything(),
       );
     });
 
@@ -348,7 +353,7 @@ describe('EpisodeService', () => {
 
   // ─── Pass-1: resolve nodes against the live graph ──────────────────────────
 
-  describe('addEpisodes — pass-1 dedup (vs live graph)', () => {
+  describe('addEpisodes - pass-1 dedup (vs live graph)', () => {
     it('alias node is excluded from result entries when resolveNodes returns a duplicate pair', async () => {
       const canonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
@@ -453,7 +458,7 @@ describe('EpisodeService', () => {
 
   // ─── Pass-2: within-batch exact-name + cosine similarity dedup ─────────────
 
-  describe('addEpisodes — pass-2 dedup (within-batch)', () => {
+  describe('addEpisodes - pass-2 dedup (within-batch)', () => {
     it('two nodes with identical embeddings → exactly one survives across the batch', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
@@ -649,7 +654,7 @@ describe('EpisodeService', () => {
 
   // ─── Combined pass-1 + pass-2 ─────────────────────────────────────────────
 
-  describe('addEpisodes — combined pass-1 and pass-2', () => {
+  describe('addEpisodes - combined pass-1 and pass-2', () => {
     it('only the canonical survives when one node is a pass-1 alias and another is a pass-2 alias', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
@@ -704,7 +709,7 @@ describe('EpisodeService', () => {
 
   // ─── Saga handling per episode (sagaUuid) ─────────────────────────────────
 
-  describe('addEpisodes — saga handling', () => {
+  describe('addEpisodes - saga handling', () => {
     it('creates SagaNode and HasEpisodeEdge when sagaUuid is provided', async () => {
       const ep = makeEpisode('ep1');
       ep.sagaUuid = KG_TEST_SAGA_UUID;
@@ -800,7 +805,7 @@ describe('EpisodeService', () => {
 
   // ─── Combined extraction (useCombinedExtraction: true) ────────────────────
 
-  describe('addEpisodes — combined extraction (useCombinedExtraction)', () => {
+  describe('addEpisodes - combined extraction (useCombinedExtraction)', () => {
     it('uses CombinedExtractionService instead of NodeExtractionService', async () => {
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -845,7 +850,7 @@ describe('EpisodeService', () => {
 
   // ─── Community building ───────────────────────────────────────────────────
 
-  describe('addEpisodes — community building', () => {
+  describe('addEpisodes - community building', () => {
     it('does not call buildCommunities by default', async () => {
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -898,7 +903,7 @@ describe('EpisodeService', () => {
 
   // ─── Node summaries ───────────────────────────────────────────────────────
 
-  describe('addEpisodes — node summaries', () => {
+  describe('addEpisodes - node summaries', () => {
     it('invokes structured output and applies returned summaries to canonical nodes', async () => {
       const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
       mockNodeExtraction.extractNodes.mockResolvedValue([node]);

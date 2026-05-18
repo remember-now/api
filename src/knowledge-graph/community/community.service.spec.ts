@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
+import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import { KG_TEST_GROUP_ID, KG_TEST_USER_ID } from '@/test/factories';
 
 import { EmbeddingService } from '../embedding';
@@ -32,7 +33,10 @@ describe('CommunityService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CommunityService],
+      providers: [
+        CommunityService,
+        { provide: LLM_TRACER, useValue: new NoOpLlmTracer() },
+      ],
     })
       .useMocker(createMock)
       .compile();

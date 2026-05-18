@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
+import type { LlmContext, LlmTracer } from '@/observability';
 
 import { EntityNodeRepository } from '../neo4j/repositories';
 import { DEFAULT_MMR_LAMBDA } from './types';
@@ -190,20 +191,29 @@ export async function crossEncoderReranker(
   query: string,
   items: Array<{ uuid: Uuid; text: string }>,
   minScore = 0,
+  opts?: { llmTracer?: LlmTracer; ctx?: LlmContext },
 ): Promise<[Uuid[], number[]]> {
   if (items.length === 0) return [[], []];
 
   const scoredModel = model.withStructuredOutput(z.toJSONSchema(CrossEncoderScoreSchema));
+  const callbacks = opts?.llmTracer?.getCallbacks(opts.ctx) ?? [];
 
   const rawScores = await Promise.all(
     items.map((item) =>
-      scoredModel.invoke([
-        // TOOD: Is this the best way to do this? how is withStructuredOutput populating the prompt?
-        new SystemMessage(
-          'Rate the relevance of the text to the query from 0 to 100. Respond with only a JSON object containing "score".',
-        ),
-        new HumanMessage(`Query: ${query}\n\nText: ${item.text}`),
-      ]),
+      scoredModel.invoke(
+        [
+          // TOOD: Is this the best way to do this? how is withStructuredOutput populating the prompt?
+          new SystemMessage(
+            'Rate the relevance of the text to the query from 0 to 100. Respond with only a JSON object containing "score".',
+          ),
+          new HumanMessage(`Query: ${query}\n\nText: ${item.text}`),
+        ],
+        {
+          callbacks,
+          runName: 'cross-encoder-score',
+          tags: ['knowledge-graph', 'rerank.cross-encoder'],
+        },
+      ),
     ),
   );
 

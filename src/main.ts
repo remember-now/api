@@ -1,15 +1,31 @@
 import { writeFileSync } from 'fs';
 
-import { Logger } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { config as loadDotenv } from 'dotenv';
 
-import { AppModule } from './app.module';
-import { AppConfigService, Environment } from './config/app';
+import { startOtel } from './observability/otel';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Load .env ourselves before startOtel - NestJS's ConfigModule would
+  // normally do this, but it doesn't run until bootstrap.
+  loadDotenv();
+
+  // Initialize the OpenTelemetry SDK + Langfuse span processor BEFORE any
+  // NestJS / LangChain code is imported so auto-instrumentation hooks attach.
+  startOtel();
+
+  const { Logger } = await import('@nestjs/common');
+  const { NestFactory } = await import('@nestjs/core');
+  const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
+  const { cleanupOpenApiDoc } = await import('nestjs-zod');
+  const { AppModule } = await import('./app.module');
+  const { AppConfigService, Environment } = await import('./config/app');
+  const { PinoLoggerService } = await import('./observability');
+
+  // bufferLogs: true defers early bootstrap log lines until useLogger fires
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(PinoLoggerService));
+  app.enableShutdownHooks();
+
   const logger = app.get(Logger);
   const appConfig = app.get(AppConfigService);
 

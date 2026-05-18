@@ -1,0 +1,133 @@
+/**
+ * Ported from `nestjs-otel` on 2026-05-16
+ * (https://github.com/pragmaticivan/nestjs-otel - Apache 2.0). The
+ * `asLangfuseTrace` option is a local extension, and the generic types were
+ * tightened (`unknown[]` instead of `any[]`, precise descriptor / constructor
+ * types) to satisfy `@typescript-eslint`'s no-unsafe-* rules without
+ * suppressions. Everything else is verbatim apart from adapting imports.
+ */
+import { type Span as ApiSpan, SpanStatusCode, trace } from '@opentelemetry/api';
+import 'reflect-metadata';
+
+import type { ExtendedSpanOptions } from '../types';
+
+const TRACER_NAME = 'remember-now';
+
+function copyMetadata(from: object, to: object): void {
+  for (const key of Reflect.getMetadataKeys(from)) {
+    Reflect.defineMetadata(key, Reflect.getMetadata(key, from), to);
+  }
+}
+
+type AnyMethod = (this: unknown, ...args: unknown[]) => unknown;
+
+const recordException = (span: ApiSpan, error: unknown): void => {
+  const err = error instanceof Error ? error : new Error(String(error));
+  span.recordException(err);
+  span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+};
+
+const handleOnResult = (
+  span: ApiSpan,
+  onResult: ExtendedSpanOptions['onResult'],
+  result: unknown,
+): void => {
+  if (!onResult) return;
+  try {
+    const attrs = onResult(result);
+    if (attrs?.attributes) {
+      span.setAttributes(attrs.attributes);
+    }
+  } catch (error) {
+    recordException(span, error);
+  }
+};
+
+type SpanDecoratorOptions<TArgs extends unknown[]> =
+  | ExtendedSpanOptions
+  | ((...args: TArgs) => ExtendedSpanOptions);
+
+type SpanMethodDecorator<TArgs extends unknown[], TReturn> = (
+  target: object,
+  propertyKey: PropertyKey,
+  descriptor: TypedPropertyDescriptor<(...args: TArgs) => TReturn>,
+) => void;
+
+export function Span<TArgs extends unknown[], TReturn>(
+  options?: SpanDecoratorOptions<TArgs>,
+): SpanMethodDecorator<TArgs, TReturn>;
+export function Span<TArgs extends unknown[], TReturn>(
+  name?: string,
+  options?: SpanDecoratorOptions<TArgs>,
+): SpanMethodDecorator<TArgs, TReturn>;
+export function Span<TArgs extends unknown[], TReturn>(
+  nameOrOptions?: string | SpanDecoratorOptions<TArgs>,
+  maybeOptions?: SpanDecoratorOptions<TArgs>,
+): SpanMethodDecorator<TArgs, TReturn> {
+  return (target, propertyKey, descriptor) => {
+    const explicitName = typeof nameOrOptions === 'string';
+    const name = explicitName
+      ? nameOrOptions
+      : `${target.constructor.name}.${String(propertyKey)}`;
+    const options: SpanDecoratorOptions<TArgs> =
+      (explicitName ? maybeOptions : nameOrOptions) ?? {};
+
+    const originalFunction = descriptor.value;
+    if (typeof originalFunction !== 'function') {
+      throw new Error(
+        `The @Span decorator can be only used on functions, but ${propertyKey.toString()} is not a function.`,
+      );
+    }
+
+    const wrappedFunction: AnyMethod = function (this, ...args) {
+      const tracer = trace.getTracer(TRACER_NAME);
+
+      const spanOptions =
+        typeof options === 'function' ? options(...(args as TArgs)) : options;
+
+      const { onResult, asLangfuseTrace, ...otelOptions } = spanOptions;
+
+      return tracer.startActiveSpan(name, otelOptions, (span): unknown => {
+        if (asLangfuseTrace) {
+          span.setAttribute('langfuse.trace.name', name);
+        }
+        try {
+          const result = (originalFunction as AnyMethod).apply(this, args);
+
+          if (result instanceof Promise) {
+            return result
+              .then((res: unknown) => {
+                handleOnResult(span, onResult, res);
+                return res;
+              })
+              .catch((error: unknown) => {
+                recordException(span, error);
+                throw error;
+              })
+              .finally(() => {
+                span.end();
+              });
+          }
+
+          handleOnResult(span, onResult, result);
+          span.end();
+          return result;
+        } catch (error) {
+          recordException(span, error);
+          span.end();
+          throw error;
+        }
+      });
+    };
+
+    // Proxy preserves the original function's `name`/`length` so frameworks
+    // that introspect them (NestJS routing, OpenAPI generators) keep working.
+    const proxy = new Proxy(originalFunction, {
+      apply: (_target, thisArg, argArray: unknown[]) =>
+        wrappedFunction.apply(thisArg, argArray),
+    });
+    descriptor.value = proxy as (...args: TArgs) => TReturn;
+
+    copyMetadata(originalFunction, descriptor.value);
+  };
+}

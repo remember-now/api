@@ -31,12 +31,14 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.fulltextFacts',
       /* cypher */ `CREATE FULLTEXT INDEX edge_facts IF NOT EXISTS
        FOR ()-[r:RELATES_TO]-()
        ON EACH [r.name, r.fact, r.group_id]`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.vectorEmbedding',
       /* cypher */ `CREATE VECTOR INDEX edge_facts_embedding IF NOT EXISTS
        FOR ()-[r:RELATES_TO]-() ON r.fact_embedding
        WITH [r.group_id]
@@ -44,30 +46,37 @@ export class EntityEdgeRepository implements OnModuleInit {
       { dims: toNeo4jInt(this.embeddingService.dimensions) },
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.groupId',
       /* cypher */ `CREATE INDEX entity_edge_group_id IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.group_id)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.uuid',
       /* cypher */ `CREATE INDEX relation_uuid IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.uuid)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.name',
       /* cypher */ `CREATE INDEX name_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.name)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.createdAt',
       /* cypher */ `CREATE INDEX created_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.created_at)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.expiredAt',
       /* cypher */ `CREATE INDEX expired_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.expired_at)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.validAt',
       /* cypher */ `CREATE INDEX valid_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.valid_at)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityEdge.createIndex.invalidAt',
       /* cypher */ `CREATE INDEX invalid_at_edge_index IF NOT EXISTS FOR ()-[e:RELATES_TO]-() ON (e.invalid_at)`,
       {},
     );
@@ -88,6 +97,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
     if (edge.factEmbedding) {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
+        'EntityEdge.save.withEmbedding',
         /* cypher */ `MATCH (source:Entity {uuid: $sourceNodeUuid})
          MATCH (target:Entity {uuid: $targetNodeUuid})
          MERGE (source)-[e:RELATES_TO {uuid: $uuid}]->(target)
@@ -105,6 +115,7 @@ export class EntityEdgeRepository implements OnModuleInit {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
+        'EntityEdge.save.withoutEmbedding',
         /* cypher */ `MATCH (source:Entity {uuid: $sourceNodeUuid})
          MATCH (target:Entity {uuid: $targetNodeUuid})
          MERGE (source)-[e:RELATES_TO {uuid: $uuid}]->(target)
@@ -145,6 +156,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
     if (withoutEmbedding.length > 0) {
       await this.neo4j.executeWrite(
+        'EntityEdge.saveBulk.withoutEmbedding',
         /* cypher */ `UNWIND $edges AS edge
          MATCH (source:Entity {uuid: edge.sourceNodeUuid})
          MATCH (target:Entity {uuid: edge.targetNodeUuid})
@@ -156,6 +168,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
     if (withEmbedding.length > 0) {
       await this.neo4j.executeWrite(
+        'EntityEdge.saveBulk.withEmbedding',
         /* cypher */ `UNWIND $edges AS edge
          MATCH (source:Entity {uuid: edge.sourceNodeUuid})
          MATCH (target:Entity {uuid: edge.targetNodeUuid})
@@ -175,6 +188,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityEdge.delete',
       '/*cypher*/ MATCH ()-[e:RELATES_TO {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
@@ -182,6 +196,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityEdge.deleteByUuids',
       '/*cypher*/ MATCH ()-[e:RELATES_TO]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
@@ -189,6 +204,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getByUuid(uuid: Uuid): Promise<EntityEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.getByUuid',
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO {uuid: $uuid}]->(target:Entity)
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
@@ -204,6 +220,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getByUuids(uuids: Uuid[]): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.getByUuids',
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.uuid IN $uuids
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -219,6 +236,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getUuidsForEpisodeDeletion(episodeUuid: Uuid): Promise<Uuid[]> {
     const results = await this.neo4j.executeRead<{ uuid: Uuid }>(
+      'EntityEdge.getUuidsForEpisodeDeletion',
       // episodes[0] is the creating episode — mirrors Python graphiti.py remove_episode:
       // only edges whose first episode matches are deleted; edges that merely accumulated
       // this episode as a contributor (episodes[1..]) are intentionally kept.
@@ -236,6 +254,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const queryParams: Record<string, unknown> = { groupIds };
     if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.getByGroupIds',
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -252,6 +271,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getBetweenNodes(sourceUuid: Uuid, targetUuid: Uuid): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.getBetweenNodes',
       /* cypher */ `MATCH (source:Entity {uuid: $sourceUuid})-[e:RELATES_TO]->(target:Entity {uuid: $targetUuid})
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
               e.created_at AS created_at, e.fact AS fact,
@@ -266,6 +286,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async getByNodeUuid(nodeUuid: Uuid): Promise<EntityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.getByNodeUuid',
       /* cypher */ `MATCH (source:Entity)-[e:RELATES_TO]->(target:Entity)
        WHERE source.uuid = $nodeUuid OR target.uuid = $nodeUuid
        RETURN e.uuid AS uuid, e.name AS name, e.group_id AS group_id,
@@ -282,6 +303,7 @@ export class EntityEdgeRepository implements OnModuleInit {
   async searchByFact(params: SearchByTextParams): Promise<EntityEdge[]> {
     const { query, groupIds, limit } = params;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.searchByFact',
       /* cypher */ `CALL db.index.fulltext.queryRelationships('edge_facts', $luceneQuery)
        YIELD relationship AS e, score
        MATCH (source:Entity)-[e]->(target:Entity)
@@ -316,6 +338,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const perGroup = await Promise.all(
       groupIds.map((groupId) =>
         this.neo4j.executeRead<Record<string, unknown>>(
+          'EntityEdge.searchBySimilarity',
           /* cypher */ `MATCH ()-[e:RELATES_TO]->()
            SEARCH e IN (
              VECTOR INDEX edge_facts_embedding
@@ -364,6 +387,7 @@ export class EntityEdgeRepository implements OnModuleInit {
     const whereExtra = clause ? ` AND ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityEdge.searchByBfs',
       /* cypher */ `MATCH (origin:Entity|Episodic)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
        MATCH (origin)-[:RELATES_TO|MENTIONS*1..${depth}]-(connected:Entity)
@@ -392,6 +416,7 @@ export class EntityEdgeRepository implements OnModuleInit {
 
   async hasRelatesEdgesForGroup(groupId: GroupId): Promise<boolean> {
     const results = await this.neo4j.executeRead<{ hasEdges: boolean }>(
+      'EntityEdge.hasRelatesEdgesForGroup',
       /* cypher */ `MATCH (n:Entity {group_id: $groupId})-[:RELATES_TO]-() RETURN count(n) > 0 AS hasEdges`,
       { groupId },
     );

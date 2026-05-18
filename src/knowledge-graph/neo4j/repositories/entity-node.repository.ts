@@ -36,11 +36,13 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.fulltextNames',
       /* cypher */ `CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
        FOR (n:Entity) ON EACH [n.name, n.summary, n.group_id]`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.vectorEmbedding',
       /* cypher */ `CREATE VECTOR INDEX entity_names_embedding IF NOT EXISTS
        FOR (n:Entity) ON n.name_embedding
        WITH [n.group_id]
@@ -48,18 +50,22 @@ export class EntityNodeRepository implements OnModuleInit {
       { dims: toNeo4jInt(this.embeddingService.dimensions) },
     );
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.groupId',
       /* cypher */ `CREATE INDEX entity_group_id IF NOT EXISTS FOR (n:Entity) ON (n.group_id)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.uuid',
       /* cypher */ `CREATE INDEX entity_uuid IF NOT EXISTS FOR (n:Entity) ON (n.uuid)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.name',
       /* cypher */ `CREATE INDEX name_entity_index IF NOT EXISTS FOR (n:Entity) ON (n.name)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'EntityNode.createIndex.createdAt',
       /* cypher */ `CREATE INDEX created_at_entity_index IF NOT EXISTS FOR (n:Entity) ON (n.created_at)`,
       {},
     );
@@ -78,6 +84,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
     if (node.nameEmbedding) {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
+        'EntityNode.save.withEmbedding',
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          WITH n CALL db.create.setNodeVectorProperty(n, 'name_embedding', $nameEmbedding)
@@ -87,6 +94,7 @@ export class EntityNodeRepository implements OnModuleInit {
       return results[0].uuid;
     } else {
       const results = await this.neo4j.executeWrite<{ uuid: string }>(
+        'EntityNode.save.withoutEmbedding',
         /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
          SET n += $props
          RETURN n.uuid AS uuid`,
@@ -105,6 +113,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
       if (withoutEmbedding.length > 0) {
         await this.neo4j.executeWrite(
+          'EntityNode.saveBulk.withoutEmbedding',
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})
            SET n += node.props`,
@@ -125,6 +134,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
       if (withEmbedding.length > 0) {
         await this.neo4j.executeWrite(
+          'EntityNode.saveBulk.withEmbedding',
           /* cypher */ `UNWIND $nodes AS node
            MERGE (n:${labelStr} {uuid: node.uuid})
            SET n += node.props
@@ -150,6 +160,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityNode.delete',
       '/*cypher*/ MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n',
       {
         uuid,
@@ -159,6 +170,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityNode.deleteByUuids',
       '/*cypher*/ MATCH (n:Entity) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
@@ -166,6 +178,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async deleteIfSoleMentioned(nodeUuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityNode.deleteIfSoleMentioned',
       /* cypher */ `MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: $nodeUuid})
        WITH n, count(ep) AS cnt
        WHERE cnt = 1
@@ -176,6 +189,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
+      'EntityNode.deleteByGroupId',
       '/*cypher*/ MATCH (n:Entity {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
@@ -183,6 +197,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async getByUuid(uuid: Uuid): Promise<EntityNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityNode.getByUuid',
       /* cypher */ `MATCH (n:Entity {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -196,6 +211,7 @@ export class EntityNodeRepository implements OnModuleInit {
 
   async getByUuids(uuids: Uuid[]): Promise<EntityNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityNode.getByUuids',
       /* cypher */ `MATCH (n:Entity) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -214,6 +230,7 @@ export class EntityNodeRepository implements OnModuleInit {
     if (limit !== undefined) queryParams['limit'] = limit;
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityNode.getByGroupIds',
       /* cypher */ `MATCH (n:Entity) WHERE n.group_id IN $groupIds
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, n.summary AS summary,
@@ -236,6 +253,7 @@ export class EntityNodeRepository implements OnModuleInit {
     const whereClause = clause ? `WHERE ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityNode.searchByName',
       /* cypher */ `CALL db.index.fulltext.queryNodes('entity_names', $luceneQuery)
        YIELD node AS n, score
        ${whereClause}
@@ -269,6 +287,7 @@ export class EntityNodeRepository implements OnModuleInit {
     const perGroup = await Promise.all(
       groupIds.map((groupId) =>
         this.neo4j.executeRead<Record<string, unknown>>(
+          'EntityNode.searchBySimilarity',
           /* cypher */ `MATCH (n:Entity)
            SEARCH n IN (
              VECTOR INDEX entity_names_embedding
@@ -314,6 +333,7 @@ export class EntityNodeRepository implements OnModuleInit {
     const whereExtra = clause ? ` AND ${clause}` : '';
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'EntityNode.searchByBfs',
       /* cypher */ `MATCH (origin:Entity|Episodic)
        WHERE origin.uuid IN $originNodeUuids AND origin.group_id IN $groupIds
        MATCH (origin)-[:RELATES_TO|MENTIONS*1..${depth}]-(reachable:Entity)
@@ -338,6 +358,7 @@ export class EntityNodeRepository implements OnModuleInit {
     centerNodeUuid: Uuid,
   ): Promise<{ uuid: Uuid; score: number }[]> {
     return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
+      'EntityNode.getNodeDistanceScores',
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (center:Entity {uuid: $centerUuid})-[:RELATES_TO]-(n:Entity {uuid: nodeUuid})
        RETURN 1 AS score, nodeUuid AS uuid`,
@@ -349,6 +370,7 @@ export class EntityNodeRepository implements OnModuleInit {
     nodeUuids: Uuid[],
   ): Promise<{ uuid: Uuid; score: number }[]> {
     return this.neo4j.executeRead<{ uuid: Uuid; score: number }>(
+      'EntityNode.getEpisodeMentionCounts',
       /* cypher */ `UNWIND $nodeUuids AS nodeUuid
        MATCH (ep:Episodic)-[:MENTIONS]->(n:Entity {uuid: nodeUuid})
        RETURN count(*) AS score, n.uuid AS uuid`,

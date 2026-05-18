@@ -29,6 +29,7 @@ describe('CommunityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('MERGE (n:Community'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -43,6 +44,7 @@ describe('CommunityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -53,6 +55,7 @@ describe('CommunityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -65,6 +68,7 @@ describe('CommunityNodeRepository', () => {
       const uuid = kgUuid();
       await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid }),
       );
@@ -105,6 +109,7 @@ describe('CommunityNodeRepository', () => {
         GetByGroupIdsParamsSchema.parse({ groupIds: ['group-1'] }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
@@ -137,10 +142,12 @@ describe('CommunityNodeRepository', () => {
       );
       expect(neo4j.executeRead).toHaveBeenCalledTimes(2);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE n.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g1' }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE n.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g2' }),
       );
@@ -184,6 +191,7 @@ describe('CommunityNodeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('group_id IN $groupIds'),
         expect.anything(),
       );

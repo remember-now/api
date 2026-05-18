@@ -1,9 +1,10 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
@@ -75,6 +76,13 @@ import {
   PREVIOUS_EPISODES_WINDOW,
 } from './types';
 
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
+
+const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
+
 @Injectable()
 export class EpisodeService {
   constructor(
@@ -93,6 +101,7 @@ export class EpisodeService {
     private readonly sagaNodeRepository: SagaNodeRepository,
     private readonly hasEpisodeEdgeRepository: HasEpisodeEdgeRepository,
     private readonly nextEpisodeEdgeRepository: NextEpisodeEdgeRepository,
+    @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
 
   async getEpisodes(options: {
@@ -121,8 +130,15 @@ export class EpisodeService {
   }
 
   async deleteEpisode(uuid: Uuid): Promise<void> {
+    await this.deleteEpisodeImpl(uuid);
+  }
+
+  @Span('deleteEpisode', { onResult: metricsOnResult })
+  private async deleteEpisodeImpl(uuid: Uuid): Promise<{ metrics: SpanMetrics }> {
     const episode = await this.episodicNodeRepository.getByUuid(uuid);
-    if (!episode) return;
+    if (!episode) {
+      return { metrics: { 'episode.uuid': uuid, skipped: true } };
+    }
 
     // Load entity nodes mentioned by this episode
     const mentionedNodeUuids =
@@ -146,12 +162,28 @@ export class EpisodeService {
 
     // Delete episode node
     await this.episodicNodeRepository.delete(uuid);
+
+    return {
+      metrics: {
+        'episode.uuid': uuid,
+        'nodes.mentioned': mentionedNodeUuids.length,
+        'edges.deleted': edgeUuids.length,
+      },
+    };
   }
 
   // TODO: For very large batches a bulk Cypher variant would be preferred over
   // sequential per-episode deletion.
   async deleteEpisodesByUuid(uuids: Uuid[]): Promise<void> {
+    await this.deleteEpisodesByUuidImpl(uuids);
+  }
+
+  @Span('deleteEpisodesByUuid', { onResult: metricsOnResult })
+  private async deleteEpisodesByUuidImpl(
+    uuids: Uuid[],
+  ): Promise<{ metrics: SpanMetrics }> {
     await Promise.all(uuids.map((uuid) => this.deleteEpisode(uuid)));
+    return { metrics: { 'episodes.count': uuids.length } };
   }
 
   async summarizeSaga(options: {
@@ -159,7 +191,30 @@ export class EpisodeService {
     sagaUuid: Uuid;
     groupId: GroupId;
   }): Promise<string> {
+    const { summary } = await this.summarizeSagaImpl(options);
+    return summary;
+  }
+
+  @Span('summarizeSaga', { onResult: metricsOnResult })
+  private async summarizeSagaImpl(options: {
+    userId: Uuid;
+    sagaUuid: Uuid;
+    groupId: GroupId;
+  }): Promise<{ summary: string; metrics: SpanMetrics }> {
     const { userId, sagaUuid, groupId } = options;
+    const ctx: LlmContext = {
+      userId,
+      sessionId: userId,
+      tags: ['knowledge-graph', 'saga'],
+      metadata: { sagaUuid, groupId },
+    };
+
+    const baseMetrics: SpanMetrics = {
+      'user.id': ctx.userId,
+      'session.id': ctx.sessionId ?? ctx.userId,
+      'saga.uuid': sagaUuid,
+      'group.id': groupId,
+    };
 
     const model = await this.llmService.getActiveModel(userId);
 
@@ -181,7 +236,10 @@ export class EpisodeService {
     const unsummarized = newEpisodes.filter((ep) => ep.validAt > referenceTime);
 
     if (unsummarized.length === 0) {
-      return saga.summary;
+      return {
+        summary: saga.summary,
+        metrics: { ...baseMetrics, 'episodes.unsummarized': 0 },
+      };
     }
 
     const messages = buildSummarizeSagaMessages({
@@ -191,7 +249,11 @@ export class EpisodeService {
 
     const result = await model
       .withStructuredOutput(sagaSummaryJsonSchema)
-      .invoke(messages);
+      .invoke(messages, {
+        callbacks: this.llmTracer.getCallbacks(ctx),
+        runName: 'summarize-saga',
+        tags: ['knowledge-graph', 'saga.summary'],
+      });
 
     const updatedSaga = {
       ...saga,
@@ -200,10 +262,40 @@ export class EpisodeService {
     };
     await this.sagaNodeRepository.save(updatedSaga);
 
-    return updatedSaga.summary;
+    return {
+      summary: updatedSaga.summary,
+      metrics: { ...baseMetrics, 'episodes.unsummarized': unsummarized.length },
+    };
   }
 
   async addEpisodes(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult[]> {
+    const parsed: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
+    const uniqueGroupIds = [...new Set(parsed.episodes.map((e) => e.groupId))];
+
+    const ctx: LlmContext = {
+      userId: parsed.userId,
+      sessionId: parsed.userId,
+      tags: [
+        'knowledge-graph',
+        'ingestion',
+        ...uniqueGroupIds.map((id) => `group:${id}`),
+      ],
+      metadata: {
+        episodeCount: String(parsed.episodes.length),
+        useCombinedExtraction: String(parsed.useCombinedExtraction),
+      },
+    };
+
+    const { results } = await this.addEpisodesImpl(parsed, ctx);
+    return results;
+  }
+
+  @Span('addEpisodes', { onResult: metricsOnResult })
+  private async addEpisodesImpl(
+    parsed: AddEpisodeOptions,
+    ctx: LlmContext,
+  ): Promise<{ results: AddEpisodeResult[]; metrics: SpanMetrics }> {
+    const startMs = performance.now();
     const {
       userId,
       episodes,
@@ -214,7 +306,7 @@ export class EpisodeService {
       customInstructions,
       updateCommunities,
       useCombinedExtraction,
-    }: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
+    } = parsed;
 
     const effectiveEdgeTypeMappings = getEffectiveTypeMappings(
       edgeTypeMappings,
@@ -267,6 +359,7 @@ export class EpisodeService {
           customInstructions,
           excludedEntityTypes,
           useCombinedExtraction,
+          { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
         );
         if (useCombinedExtraction) {
           (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill([]))[i] =
@@ -293,7 +386,7 @@ export class EpisodeService {
     );
     const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.uuid, n]));
 
-    // 7. Pass 1 — resolve nodes vs live graph in parallel
+    // 7. Pass 1 - resolve nodes vs live graph in parallel
     const nodeResolutions = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       embeddedPerEpisode.map(
@@ -305,6 +398,10 @@ export class EpisodeService {
             candidatesPerEpisode[i],
             prevEpisodesPerEpisode[i],
             customInstructions,
+            {
+              ...ctx,
+              metadata: { ...ctx.metadata, episodeUuid: episodicNodes[i].uuid },
+            },
           ),
       ),
     );
@@ -314,7 +411,7 @@ export class EpisodeService {
       r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedUuid, p.canonicalUuid]),
     );
 
-    // 9. Pass 2 — within-batch dedup: exact name match first, then cosine
+    // 9. Pass 2 - within-batch dedup: exact name match first, then cosine
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
     const pass2Pairs: [Uuid, Uuid][] = [];
     for (let i = 0; i < allNewNodes.length; i++) {
@@ -376,6 +473,7 @@ export class EpisodeService {
                 customInstructions,
                 edgeTypes,
                 effectiveEdgeTypeMappings,
+                { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
               ),
           ),
         );
@@ -413,6 +511,7 @@ export class EpisodeService {
             ep.validAt,
             prevEpisodesPerEpisode[i],
             customInstructions,
+            { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
           ),
       ),
     );
@@ -462,6 +561,7 @@ export class EpisodeService {
       edgeTypes,
       effectiveEdgeTypeMappings,
       edgeContext,
+      ctx,
     );
 
     // 17. Extract entity attributes post-resolution (with resolved-edge context)
@@ -471,10 +571,11 @@ export class EpisodeService {
       allResolvedEdges,
       entityTypes,
       nodeContext,
+      ctx,
     );
 
     // 18. Generate node summaries for all new canonical nodes
-    await this.summarizeNodes(model, newNodesOnly, allResolvedEdges, nodeContext);
+    await this.summarizeNodes(model, newNodesOnly, allResolvedEdges, nodeContext, ctx);
 
     // 19. Create episodic edges per episode
     const episodicEdgesPerEpisode = episodicNodes.map((ep, i) =>
@@ -497,7 +598,7 @@ export class EpisodeService {
       this.episodicNodeRepository.saveBulk(episodicNodes),
     ]);
 
-    // 21. Saga association per episode (sequential — keeps NEXT_EPISODE chain
+    // 21. Saga association per episode (sequential - keeps NEXT_EPISODE chain
     // deterministic when multiple batch episodes share the same sagaUuid).
     for (let i = 0; i < episodes.length; i++) {
       const raw = episodes[i];
@@ -538,7 +639,7 @@ export class EpisodeService {
     }
 
     // 22. Optional community build per distinct groupId
-    // TODO: Concurrent addEpisodes calls for the same groupId can race here —
+    // TODO: Concurrent addEpisodes calls for the same groupId can race here -
     // two community builds may project conflicting graph snapshots and race on
     // deleteByGroupId. Investigate a per-groupId mutex or advisory lock before
     // enabling concurrent bulk ingestion.
@@ -550,11 +651,11 @@ export class EpisodeService {
 
     // TODO: per-entry `nodes` includes both newly-resolved canonical nodes AND
     // existing nodes matched via cross-batch dedup. The same canonical EntityNode
-    // may therefore appear in multiple entries' `nodes` arrays — callers must
+    // may therefore appear in multiple entries' `nodes` arrays - callers must
     // dedupe by uuid if they want a unique set across the batch
     // (`result.flatMap(r => r.nodes)` will overcount). Consider returning a
     // separate top-level deduped `nodes` field if a unique-view is needed.
-    return episodicNodes.map(
+    const results = episodicNodes.map(
       (episode, i): AddEpisodeResult => ({
         episode,
         nodes: canonicalNodesPerEpisode[i],
@@ -563,6 +664,30 @@ export class EpisodeService {
         episodicEdges: episodicEdgesPerEpisode[i],
       }),
     );
+
+    return {
+      results,
+      metrics: {
+        'user.id': ctx.userId,
+        'session.id': ctx.sessionId ?? ctx.userId,
+        'episode.count': episodes.length,
+        'episode.uuids': episodicNodes.map((e) => e.uuid).join(','),
+        'group.ids': groupIds.join(','),
+        'node.count.extracted': allExtractedNodes.length,
+        'node.count.canonical': allCanonicalNodes.length,
+        'node.count.new': newNodesOnly.length,
+        'edge.count.extracted': allExtractedEdges.length,
+        'edge.count.resolved': allResolvedEdges.length,
+        'edge.count.invalidated': allInvalidatedEdges.length,
+        'previousEpisodes.totalCount': prevEpisodesPerEpisode.reduce(
+          (s, a) => s + a.length,
+          0,
+        ),
+        useCombinedExtraction: useCombinedExtraction,
+        updateCommunities: updateCommunities,
+        duration_ms: Math.round(performance.now() - startMs),
+      },
+    };
   }
 
   private async extractNodes(
@@ -575,10 +700,52 @@ export class EpisodeService {
     customInstructions?: string,
     excludedEntityTypes?: string[],
     useCombinedExtraction: boolean = false,
+    ctx?: LlmContext,
   ): Promise<{
     extractedNodes: EntityNode[];
     preExtractedEdges?: EntityEdge[];
   }> {
+    const { metrics: _m, ...rest } = await this.extractNodesImpl(
+      model,
+      episode,
+      previousEpisodesForEpisode,
+      entityTypes,
+      edgeTypes,
+      edgeTypeMappings,
+      customInstructions,
+      excludedEntityTypes,
+      useCombinedExtraction,
+      ctx,
+    );
+    return rest;
+  }
+
+  @Span('extractNodes', { onResult: metricsOnResult })
+  private async extractNodesImpl(
+    model: BaseChatModel,
+    episode: EpisodicNode,
+    previousEpisodesForEpisode: EpisodicNode[],
+    entityTypes?: EntityTypeMap,
+    edgeTypes?: EdgeTypeMap,
+    edgeTypeMappings?: EdgeTypeMappings,
+    customInstructions?: string,
+    excludedEntityTypes?: string[],
+    useCombinedExtraction: boolean = false,
+    ctx?: LlmContext,
+  ): Promise<{
+    extractedNodes: EntityNode[];
+    preExtractedEdges?: EntityEdge[];
+    metrics: SpanMetrics;
+  }> {
+    const baseMetrics: SpanMetrics = {
+      'episode.uuid': episode.uuid,
+      useCombinedExtraction: useCombinedExtraction,
+    };
+
+    let extractedNodes: EntityNode[];
+    let preExtractedEdges: EntityEdge[] | undefined;
+    let chunksCount: number | undefined;
+
     if (useCombinedExtraction) {
       const { nodes, edges } = await this.combinedExtractionService.extractNodesAndEdges(
         model,
@@ -588,11 +755,11 @@ export class EpisodeService {
         edgeTypeMappings,
         customInstructions,
         excludedEntityTypes,
+        ctx,
       );
-      return { extractedNodes: nodes, preExtractedEdges: edges };
-    }
-
-    if (shouldChunk(episode.content)) {
+      extractedNodes = nodes;
+      preExtractedEdges = edges;
+    } else if (shouldChunk(episode.content)) {
       const chunks = await chunkContent(episode.content, episode.source);
       const perChunk = await Promise.all(
         chunks.map((chunk) =>
@@ -603,30 +770,41 @@ export class EpisodeService {
             entityTypes,
             customInstructions,
             excludedEntityTypes,
+            ctx,
           ),
         ),
       );
       // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
       const nodesByName = new Map<string, EntityNode>();
-
       for (const nodes of perChunk) {
         for (const node of nodes) {
           const key = node.name.toLowerCase();
           if (!nodesByName.has(key)) nodesByName.set(key, node);
         }
       }
-      return { extractedNodes: [...nodesByName.values()] };
-    }
-
-    return {
-      extractedNodes: await this.nodeExtractionService.extractNodes(
+      extractedNodes = [...nodesByName.values()];
+      chunksCount = chunks.length;
+    } else {
+      extractedNodes = await this.nodeExtractionService.extractNodes(
         model,
         episode,
         previousEpisodesForEpisode,
         entityTypes,
         customInstructions,
         excludedEntityTypes,
-      ),
+        ctx,
+      );
+    }
+
+    return {
+      extractedNodes,
+      preExtractedEdges,
+      metrics: {
+        ...baseMetrics,
+        'extracted.count': extractedNodes.length,
+        'preExtracted.edges.count': preExtractedEdges?.length,
+        'chunks.count': chunksCount,
+      },
     };
   }
 
@@ -634,6 +812,18 @@ export class EpisodeService {
     nodes: EntityNode[],
     groupId: GroupId,
   ): Promise<EntityNode[]> {
+    const { candidates } = await this.collectNodeCandidatesImpl(nodes, groupId);
+    return candidates;
+  }
+
+  @Span('collectNodeCandidates', {
+    attributes: RETRIEVER_ATTRS,
+    onResult: metricsOnResult,
+  })
+  private async collectNodeCandidatesImpl(
+    nodes: EntityNode[],
+    groupId: GroupId,
+  ): Promise<{ candidates: EntityNode[]; metrics: SpanMetrics }> {
     const results = await Promise.all(
       nodes.flatMap((n) => [
         this.entityNodeRepository.searchByName(
@@ -655,17 +845,37 @@ export class EpisodeService {
       ]),
     );
     const seen = new Set<Uuid>();
-    return results.flat().filter((n) => {
+    const candidates = results.flat().filter((n) => {
       if (seen.has(n.uuid)) return false;
       seen.add(n.uuid);
       return true;
     });
+    return {
+      candidates,
+      metrics: {
+        'input.count': nodes.length,
+        'group.id': groupId,
+        'candidates.count': candidates.length,
+      },
+    };
   }
 
   private async collectEdgeCandidates(
     edges: EntityEdge[],
     groupId: GroupId,
   ): Promise<EntityEdge[]> {
+    const { candidates } = await this.collectEdgeCandidatesImpl(edges, groupId);
+    return candidates;
+  }
+
+  @Span('collectEdgeCandidates', {
+    attributes: RETRIEVER_ATTRS,
+    onResult: metricsOnResult,
+  })
+  private async collectEdgeCandidatesImpl(
+    edges: EntityEdge[],
+    groupId: GroupId,
+  ): Promise<{ candidates: EntityEdge[]; metrics: SpanMetrics }> {
     const results = await Promise.all(
       edges.flatMap((e) => [
         this.entityEdgeRepository.searchByFact(
@@ -687,11 +897,19 @@ export class EpisodeService {
       ]),
     );
     const seen = new Set<Uuid>();
-    return results.flat().filter((e) => {
+    const candidates = results.flat().filter((e) => {
       if (seen.has(e.uuid)) return false;
       seen.add(e.uuid);
       return true;
     });
+    return {
+      candidates,
+      metrics: {
+        'input.count': edges.length,
+        'group.id': groupId,
+        'candidates.count': candidates.length,
+      },
+    };
   }
 
   private async summarizeNodes(
@@ -699,8 +917,22 @@ export class EpisodeService {
     nodes: EntityNode[],
     allEdges: EntityEdge[],
     nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+    ctx?: LlmContext,
   ): Promise<void> {
-    if (nodes.length === 0) return;
+    await this.summarizeNodesImpl(model, nodes, allEdges, nodeContext, ctx);
+  }
+
+  @Span('summarizeNodes', { onResult: metricsOnResult })
+  private async summarizeNodesImpl(
+    model: BaseChatModel,
+    nodes: EntityNode[],
+    allEdges: EntityEdge[],
+    nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    if (nodes.length === 0) {
+      return { metrics: { 'nodes.count': 0, 'summarized.count': 0 } };
+    }
 
     // Group nodes by their originating episode so each node is summarized with its own context.
     const nodesByEpisode = new Map<
@@ -709,15 +941,15 @@ export class EpisodeService {
     >();
 
     for (const node of nodes) {
-      const ctx = nodeContext.get(node.uuid);
-      if (!ctx) continue;
-      const entry = nodesByEpisode.get(ctx.episode.uuid);
+      const nodeCtx = nodeContext.get(node.uuid);
+      if (!nodeCtx) continue;
+      const entry = nodesByEpisode.get(nodeCtx.episode.uuid);
       if (entry) {
         entry.nodes.push(node);
       } else {
-        nodesByEpisode.set(ctx.episode.uuid, {
-          episode: ctx.episode,
-          previousEpisodes: ctx.previousEpisodes,
+        nodesByEpisode.set(nodeCtx.episode.uuid, {
+          episode: nodeCtx.episode,
+          previousEpisodes: nodeCtx.previousEpisodes,
           nodes: [node],
         });
       }
@@ -747,7 +979,11 @@ export class EpisodeService {
         });
         const summaryResult = await model
           .withStructuredOutput(nodeSummaryJsonSchema)
-          .invoke(summaryMessages);
+          .invoke(summaryMessages, {
+            callbacks: this.llmTracer.getCallbacks(ctx),
+            runName: 'summarize-nodes',
+            tags: ['knowledge-graph', 'node.summary'],
+          });
         for (const s of summaryResult.summaries) {
           summaryMap.set(s.uuid, s.summary);
         }
@@ -758,6 +994,13 @@ export class EpisodeService {
       const summary = summaryMap.get(node.uuid);
       if (summary !== undefined) node.summary = summary;
     }
+
+    return {
+      metrics: {
+        'nodes.count': nodes.length,
+        'summarized.count': summaryMap.size,
+      },
+    };
   }
 
   private async extractEntityAttributes(
@@ -766,29 +1009,61 @@ export class EpisodeService {
     allEdges: EntityEdge[],
     entityTypes: EntityTypeMap | undefined,
     nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+    ctx?: LlmContext,
   ): Promise<void> {
-    if (!entityTypes) return;
+    await this.extractEntityAttributesImpl(
+      model,
+      nodes,
+      allEdges,
+      entityTypes,
+      nodeContext,
+      ctx,
+    );
+  }
+
+  @Span('extractEntityAttributes', { onResult: metricsOnResult })
+  private async extractEntityAttributesImpl(
+    model: BaseChatModel,
+    nodes: EntityNode[],
+    allEdges: EntityEdge[],
+    entityTypes: EntityTypeMap | undefined,
+    nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const baseMetrics: SpanMetrics = {
+      'nodes.count': nodes.length,
+      'entityTypes.count': entityTypes ? Object.keys(entityTypes).length : 0,
+    };
+
+    if (!entityTypes) return { metrics: { ...baseMetrics, 'extracted.count': 0 } };
+    let extracted = 0;
     for (const node of nodes) {
       const label = node.labels.find((l) => l !== 'Entity');
       const entityType = label ? entityTypes[label] : undefined;
       if (!entityType) continue;
-      const ctx = nodeContext.get(node.uuid);
-      if (!ctx) continue;
+      const nodeCtx = nodeContext.get(node.uuid);
+      if (!nodeCtx) continue;
       const nodeEdges = allEdges.filter(
         (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
       );
       const attrMessages = buildExtractEntityAttributesMessages({
-        episodeContent: ctx.episode.content,
-        previousEpisodesContent: ctx.previousEpisodes.map((ep) => ep.content),
+        episodeContent: nodeCtx.episode.content,
+        previousEpisodesContent: nodeCtx.previousEpisodes.map((ep) => ep.content),
         relatedFacts: nodeEdges.map((e) => e.fact),
-        referenceTime: ctx.episode.validAt,
+        referenceTime: nodeCtx.episode.validAt,
         existingAttributes: node.attributes ?? {},
       });
       const attrs = (await model
         .withStructuredOutput(z.toJSONSchema(entityType.schema))
-        .invoke(attrMessages)) as Record<string, unknown>;
+        .invoke(attrMessages, {
+          callbacks: this.llmTracer.getCallbacks(ctx),
+          runName: 'extract-entity-attributes',
+          tags: ['knowledge-graph', 'attributes.entity'],
+        })) as Record<string, unknown>;
       node.attributes = { ...node.attributes, ...attrs };
+      extracted++;
     }
+    return { metrics: { ...baseMetrics, 'extracted.count': extracted } };
   }
 
   private async extractEdgeAttributes(
@@ -798,8 +1073,37 @@ export class EpisodeService {
     edgeTypes: EdgeTypeMap | undefined,
     edgeTypeMappings: EdgeTypeMappings | undefined,
     edgeContext: Map<Uuid, { referenceTime: Date }>,
+    ctx?: LlmContext,
   ): Promise<void> {
-    if (!edgeTypes || !edgeTypeMappings) return;
+    await this.extractEdgeAttributesImpl(
+      model,
+      resolvedEdges,
+      canonicalNodes,
+      edgeTypes,
+      edgeTypeMappings,
+      edgeContext,
+      ctx,
+    );
+  }
+
+  @Span('extractEdgeAttributes', { onResult: metricsOnResult })
+  private async extractEdgeAttributesImpl(
+    model: BaseChatModel,
+    resolvedEdges: EntityEdge[],
+    canonicalNodes: EntityNode[],
+    edgeTypes: EdgeTypeMap | undefined,
+    edgeTypeMappings: EdgeTypeMappings | undefined,
+    edgeContext: Map<Uuid, { referenceTime: Date }>,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const baseMetrics: SpanMetrics = {
+      'edges.count': resolvedEdges.length,
+      'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
+    };
+
+    if (!edgeTypes || !edgeTypeMappings) {
+      return { metrics: { ...baseMetrics, 'extracted.count': 0 } };
+    }
     const uuidToNode = new Map<Uuid, EntityNode>(canonicalNodes.map((n) => [n.uuid, n]));
 
     type EdgeAttrTask = {
@@ -824,9 +1128,9 @@ export class EpisodeService {
         properties?: Record<string, unknown>;
       };
       if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
-      const ctx = edgeContext.get(edge.uuid);
-      if (!ctx) continue;
-      tasks.push({ edge, jsonSchema, referenceTime: ctx.referenceTime });
+      const edgeCtx = edgeContext.get(edge.uuid);
+      if (!edgeCtx) continue;
+      tasks.push({ edge, jsonSchema, referenceTime: edgeCtx.referenceTime });
     }
 
     await withConcurrency(
@@ -838,9 +1142,15 @@ export class EpisodeService {
             referenceTime,
             existingAttributes: edge.attributes ?? {},
           }),
+          {
+            callbacks: this.llmTracer.getCallbacks(ctx),
+            runName: 'extract-edge-attributes',
+            tags: ['knowledge-graph', 'attributes.edge'],
+          },
         )) as Record<string, unknown>;
         edge.attributes = { ...edge.attributes, ...attrs };
       }),
     );
+    return { metrics: { ...baseMetrics, 'extracted.count': tasks.length } };
   }
 }

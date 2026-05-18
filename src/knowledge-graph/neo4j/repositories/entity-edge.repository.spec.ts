@@ -38,6 +38,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({ uuid: edge.uuid }),
       );
@@ -55,6 +56,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('setRelationshipVectorProperty'),
         expect.anything(),
       );
@@ -70,6 +72,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('setRelationshipVectorProperty'),
         expect.anything(),
       );
@@ -82,6 +85,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({ uuid }),
       );
@@ -132,6 +136,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeRead.mockResolvedValue([]);
       await repo.getBetweenNodes(sourceNodeUuid, targetNodeUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('RELATES_TO'),
         expect.objectContaining({
           sourceUuid: sourceNodeUuid,
@@ -146,6 +151,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeRead.mockResolvedValue([]);
       await repo.getByNodeUuid(sourceNodeUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('source.uuid = $nodeUuid OR target.uuid = $nodeUuid'),
         expect.objectContaining({ nodeUuid: sourceNodeUuid }),
       );
@@ -159,6 +165,7 @@ describe('EntityEdgeRepository', () => {
         GetByGroupIdsParamsSchema.parse({ groupIds: ['group-1'] }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
@@ -191,10 +198,12 @@ describe('EntityEdgeRepository', () => {
       );
       expect(neo4j.executeRead).toHaveBeenCalledTimes(2);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE e.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g1' }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE e.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g2' }),
       );
@@ -243,6 +252,7 @@ describe('EntityEdgeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('group_id IN $groupIds'),
         expect.anything(),
       );
@@ -254,6 +264,7 @@ describe('EntityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.onModuleInit();
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('edge_facts'),
         {},
       );
@@ -271,6 +282,7 @@ describe('EntityEdgeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('db.index.fulltext.queryRelationships'),
         expect.objectContaining({
           luceneQuery: expect.stringContaining('Alice works') as unknown as string,
@@ -332,6 +344,7 @@ describe('EntityEdgeRepository', () => {
       const result = await repo.hasRelatesEdgesForGroup(KG_TEST_GROUP_ID);
       expect(result).toBe(true);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('RELATES_TO'),
         {
           groupId: KG_TEST_GROUP_ID,

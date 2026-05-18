@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 import { z } from 'zod';
 
+import { NoOpLlmTracer } from '@/observability';
 import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
 
 import { NodeExtractionService } from './node-extraction.service';
@@ -18,7 +19,7 @@ describe('NodeExtractionService', () => {
   let mockRunnable: { invoke: jest.Mock };
 
   beforeEach(() => {
-    service = new NodeExtractionService();
+    service = new NodeExtractionService(new NoOpLlmTracer());
     mockModel = mockDeep<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);

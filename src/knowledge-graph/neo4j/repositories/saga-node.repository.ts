@@ -21,14 +21,17 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
+      'SagaNode.createIndex.uuid',
       /* cypher */ `CREATE INDEX saga_uuid IF NOT EXISTS FOR (n:Saga) ON (n.uuid)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'SagaNode.createIndex.groupId',
       /* cypher */ `CREATE INDEX saga_group_id IF NOT EXISTS FOR (n:Saga) ON (n.group_id)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'SagaNode.createIndex.name',
       /* cypher */ `CREATE INDEX saga_name IF NOT EXISTS FOR (n:Saga) ON (n.name)`,
       {},
     );
@@ -37,6 +40,7 @@ export class SagaNodeRepository implements OnModuleInit {
   async save(node: SagaNode): Promise<string> {
     const labelStr = buildLabelString(node.labels);
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
+      'SagaNode.save',
       /* cypher */ `MERGE (n:${labelStr} {uuid: $uuid})
        SET n += $props
        RETURN n.uuid AS uuid`,
@@ -62,6 +66,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
     for (const [labelStr, group] of groupNodesByLabel(nodes)) {
       await this.neo4j.executeWrite(
+        'SagaNode.saveBulk',
         /* cypher */ `UNWIND $nodes AS node
          MERGE (n:${labelStr} {uuid: node.uuid})
          SET n += node.props`,
@@ -84,6 +89,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'SagaNode.delete',
       '/*cypher*/ MATCH (n:Saga {uuid: $uuid}) DETACH DELETE n',
       {
         uuid,
@@ -93,6 +99,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
+      'SagaNode.deleteByUuids',
       '/*cypher*/ MATCH (n:Saga) WHERE n.uuid IN $uuids DETACH DELETE n',
       { uuids },
     );
@@ -100,6 +107,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async deleteByGroupId(groupId: GroupId): Promise<void> {
     await this.neo4j.executeWrite(
+      'SagaNode.deleteByGroupId',
       '/*cypher*/ MATCH (n:Saga {group_id: $groupId}) DETACH DELETE n',
       { groupId },
     );
@@ -107,6 +115,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async getByUuid(uuid: Uuid): Promise<SagaNode | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'SagaNode.getByUuid',
       /* cypher */ `MATCH (n:Saga {uuid: $uuid})
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, labels(n) AS labels,
@@ -119,6 +128,7 @@ export class SagaNodeRepository implements OnModuleInit {
 
   async getByUuids(uuids: Uuid[]): Promise<SagaNode[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'SagaNode.getByUuids',
       /* cypher */ `MATCH (n:Saga) WHERE n.uuid IN $uuids
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, labels(n) AS labels,
@@ -138,6 +148,7 @@ export class SagaNodeRepository implements OnModuleInit {
     };
     if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'SagaNode.getByGroupIds',
       /* cypher */ `MATCH (n:Saga) WHERE n.group_id IN $groupIds ${cursorClause}
        RETURN n.uuid AS uuid, n.name AS name, n.group_id AS group_id,
               n.created_at AS created_at, labels(n) AS labels,

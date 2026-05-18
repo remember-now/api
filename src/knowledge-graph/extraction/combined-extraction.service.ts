@@ -1,6 +1,8 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
+
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { EdgeTypeMap, EdgeTypeMappings, EntityTypeMap } from '../episode/types';
 import {
@@ -17,6 +19,11 @@ import {
   combinedExtractionJsonSchema,
 } from '../prompts';
 
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
+
 const TimestampsBatchSchema = z.object({
   facts: z.array(
     z.object({
@@ -26,8 +33,16 @@ const TimestampsBatchSchema = z.object({
   ),
 });
 
+type CombinedExtractionResult = {
+  nodes: EntityNode[];
+  edges: EntityEdge[];
+  nodeEpisodeIndexMap: Map<string, number[]>;
+};
+
 @Injectable()
 export class CombinedExtractionService {
+  constructor(@Inject(LLM_TRACER) private readonly llmTracer: LlmTracer) {}
+
   async extractNodesAndEdges(
     model: BaseChatModel,
     episodes: EpisodicNode[],
@@ -36,13 +51,49 @@ export class CombinedExtractionService {
     edgeTypeMappings?: EdgeTypeMappings,
     customInstructions?: string,
     excludedEntityTypes?: string[],
-  ): Promise<{
-    nodes: EntityNode[];
-    edges: EntityEdge[];
-    nodeEpisodeIndexMap: Map<string, number[]>;
-  }> {
+    ctx?: LlmContext,
+  ): Promise<CombinedExtractionResult> {
+    const { metrics: _m, ...rest } = await this.extractNodesAndEdgesImpl(
+      model,
+      episodes,
+      entityTypes,
+      edgeTypes,
+      edgeTypeMappings,
+      customInstructions,
+      excludedEntityTypes,
+      ctx,
+    );
+    return rest;
+  }
+
+  @Span('combinedExtraction', { onResult: metricsOnResult })
+  private async extractNodesAndEdgesImpl(
+    model: BaseChatModel,
+    episodes: EpisodicNode[],
+    entityTypes?: EntityTypeMap,
+    edgeTypes?: EdgeTypeMap,
+    edgeTypeMappings?: EdgeTypeMappings,
+    customInstructions?: string,
+    excludedEntityTypes?: string[],
+    ctx?: LlmContext,
+  ): Promise<CombinedExtractionResult & { metrics: SpanMetrics }> {
+    const baseMetrics: SpanMetrics = {
+      'episodes.count': episodes.length,
+      'entityTypes.count': entityTypes ? Object.keys(entityTypes).length : 0,
+      'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
+    };
+
     if (episodes.length === 0) {
-      return { nodes: [], edges: [], nodeEpisodeIndexMap: new Map() };
+      return {
+        nodes: [],
+        edges: [],
+        nodeEpisodeIndexMap: new Map(),
+        metrics: {
+          ...baseMetrics,
+          'nodes.extracted.count': 0,
+          'edges.extracted.count': 0,
+        },
+      };
     }
 
     const referenceTime = episodes.reduce(
@@ -62,7 +113,11 @@ export class CombinedExtractionService {
 
     const result = await model
       .withStructuredOutput(combinedExtractionJsonSchema)
-      .invoke(messages);
+      .invoke(messages, {
+        callbacks: this.llmTracer.getCallbacks(ctx),
+        runName: 'extract-nodes-and-edges',
+        tags: ['knowledge-graph', 'extraction.combined'],
+      });
 
     // 2. Collect referenced entity names from facts (case-insensitive)
     const referencedNames = new Set<string>();
@@ -71,7 +126,7 @@ export class CombinedExtractionService {
       referencedNames.add(fact.targetEntityName.toLowerCase());
     }
 
-    // 3. Build EntityNode[] — only entities that appear in at least one fact
+    // 3. Build EntityNode[] - only entities that appear in at least one fact
     const nameToNode = new Map<string, EntityNode>();
     for (const entity of result.entities) {
       const nameLower = entity.name.toLowerCase();
@@ -113,7 +168,11 @@ export class CombinedExtractionService {
       });
       const tsResult = await model
         .withStructuredOutput(z.toJSONSchema(TimestampsBatchSchema))
-        .invoke(tsMessages);
+        .invoke(tsMessages, {
+          callbacks: this.llmTracer.getCallbacks(ctx),
+          runName: 'extract-timestamps-batch',
+          tags: ['knowledge-graph', 'extraction.timestamps'],
+        });
       for (let i = 0; i < factsNeedingTimestamps.length; i++) {
         const original = factsNeedingTimestamps[i];
         const ts = tsResult.facts[i];
@@ -174,10 +233,17 @@ export class CombinedExtractionService {
       );
     }
 
+    const nodes = [...nameToNode.values()];
+
     return {
-      nodes: [...nameToNode.values()],
+      nodes,
       edges,
       nodeEpisodeIndexMap,
+      metrics: {
+        ...baseMetrics,
+        'nodes.extracted.count': nodes.length,
+        'edges.extracted.count': edges.length,
+      },
     };
   }
 }

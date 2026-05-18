@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { Environment } from './configuration';
+import { Environment, LogLevel } from './configuration';
 
 @Injectable()
 export class AppConfigService {
@@ -25,5 +25,9 @@ export class AppConfigService {
 
   get sessionExpiryHours(): number {
     return this.configService.get<number>('app.sessionExpiryHours')!;
+  }
+
+  get logLevel(): LogLevel {
+    return this.configService.get<LogLevel>('app.logLevel')!;
   }
 }

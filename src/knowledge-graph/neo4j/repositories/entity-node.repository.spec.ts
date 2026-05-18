@@ -30,6 +30,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('MERGE (n:Entity'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -44,6 +45,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('MERGE (n:Entity:Person'),
         expect.anything(),
       );
@@ -57,6 +59,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -70,6 +73,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -86,6 +90,7 @@ describe('EntityNodeRepository', () => {
       await repo.saveBulk(nodes);
       expect(neo4j.executeWrite).toHaveBeenCalledTimes(1);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('UNWIND'),
         expect.anything(),
       );
@@ -121,6 +126,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.saveBulk(nodes);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('setNodeVectorProperty'),
         expect.anything(),
       );
@@ -138,6 +144,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid }),
       );
@@ -150,6 +157,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.deleteByUuids(uuids);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuids }),
       );
@@ -161,6 +169,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.deleteByGroupId(KG_TEST_GROUP_ID);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ groupId: KG_TEST_GROUP_ID }),
       );
@@ -200,6 +209,7 @@ describe('EntityNodeRepository', () => {
       neo4j.executeRead.mockResolvedValue([]);
       await repo.getByUuid(uuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('uuid: $uuid'),
         expect.objectContaining({ uuid }),
       );
@@ -259,10 +269,12 @@ describe('EntityNodeRepository', () => {
       );
       expect(neo4j.executeRead).toHaveBeenCalledTimes(2);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE n.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g1' }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('WHERE n.group_id = $groupId'),
         expect.objectContaining({ groupId: 'g2' }),
       );
@@ -307,6 +319,7 @@ describe('EntityNodeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('group_id IN $groupIds'),
         expect.anything(),
       );
@@ -320,6 +333,7 @@ describe('EntityNodeRepository', () => {
         GetByGroupIdsParamsSchema.parse({ groupIds: ['group-1', 'group-2'] }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1', 'group-2'] }),
       );
@@ -331,6 +345,7 @@ describe('EntityNodeRepository', () => {
         GetByGroupIdsParamsSchema.parse({ groupIds: ['group-1'], limit: 10 }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('LIMIT $limit'),
         expect.objectContaining({ limit: neoDriver.int(10) }),
       );
@@ -344,6 +359,7 @@ describe('EntityNodeRepository', () => {
       const centerUuid = kgUuid();
       await repo.getNodeDistanceScores(nodeUuids, centerUuid);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('RELATES_TO'),
         {
           nodeUuids,
@@ -359,6 +375,7 @@ describe('EntityNodeRepository', () => {
       const nodeUuids = [kgUuid(), kgUuid()];
       await repo.getEpisodeMentionCounts(nodeUuids);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('MENTIONS'),
         {
           nodeUuids,

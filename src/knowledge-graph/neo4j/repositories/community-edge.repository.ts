@@ -12,10 +12,12 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
+      'CommunityEdge.createIndex.groupId',
       /* cypher */ `CREATE INDEX community_edge_group_id IF NOT EXISTS FOR ()-[r:HAS_MEMBER]-() ON (r.group_id)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'CommunityEdge.createIndex.uuid',
       /* cypher */ `CREATE INDEX has_member_uuid IF NOT EXISTS FOR ()-[e:HAS_MEMBER]-() ON (e.uuid)`,
       {},
     );
@@ -23,6 +25,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async save(edge: CommunityEdge): Promise<string> {
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
+      'CommunityEdge.save',
       /* cypher */ `MATCH (community:Community {uuid: $sourceNodeUuid})
        MATCH (entity:Entity {uuid: $targetNodeUuid})
        MERGE (community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity)
@@ -43,6 +46,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
     if (edges.length === 0) return;
 
     await this.neo4j.executeWrite(
+      'CommunityEdge.saveBulk',
       /* cypher */ `UNWIND $edges AS edge
        MATCH (community:Community {uuid: edge.sourceNodeUuid})
        MATCH (entity:Entity {uuid: edge.targetNodeUuid})
@@ -62,6 +66,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'CommunityEdge.delete',
       '/*cypher*/ MATCH ()-[e:HAS_MEMBER {uuid: $uuid}]->() DELETE e',
       {
         uuid,
@@ -71,6 +76,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
+      'CommunityEdge.deleteByUuids',
       '/*cypher*/ MATCH ()-[e:HAS_MEMBER]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
@@ -78,6 +84,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async getByUuid(uuid: Uuid): Promise<CommunityEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'CommunityEdge.getByUuid',
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER {uuid: $uuid}]->(entity:Entity)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               community.uuid AS source_node_uuid, entity.uuid AS target_node_uuid`,
@@ -89,6 +96,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
 
   async getByUuids(uuids: Uuid[]): Promise<CommunityEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'CommunityEdge.getByUuids',
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.uuid IN $uuids
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
@@ -106,6 +114,7 @@ export class CommunityEdgeRepository implements OnModuleInit {
     if (limit !== undefined) queryParams['limit'] = limit;
 
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'CommunityEdge.getByGroupIds',
       /* cypher */ `MATCH (community:Community)-[e:HAS_MEMBER]->(entity:Entity)
        WHERE e.group_id IN $groupIds
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,

@@ -37,7 +37,7 @@ describe('LLM Lifecycle Integration (e2e)', () => {
         .get(`${s.baseUrl}/llms`)
         .withCookies(`$S{${sessionKey}}`)
         .expectStatus(200)
-        .expectJsonLike({ activeProvider: null });
+        .expectJsonLike({ activeProvider: LlmProvider.PLATFORM });
 
       await flow
         .step('Save ANTHROPIC config')
@@ -144,12 +144,12 @@ describe('LLM Lifecycle Integration (e2e)', () => {
         .expectStatus(200);
 
       await flow
-        .step('No active provider initially')
+        .step('PLATFORM active initially')
         .spec()
         .get(`${s.baseUrl}/llms`)
         .withCookies(`$S{${sessionKey}}`)
         .expectStatus(200)
-        .expectJsonLike({ activeProvider: null });
+        .expectJsonLike({ activeProvider: LlmProvider.PLATFORM });
 
       await flow
         .step('Attempt set GOOGLE_GEMINI without config — 400')

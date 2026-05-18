@@ -12,10 +12,12 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.neo4j.executeWrite(
+      'NextEpisodeEdge.createIndex.uuid',
       /* cypher */ `CREATE INDEX next_episode_uuid IF NOT EXISTS FOR ()-[e:NEXT_EPISODE]-() ON (e.uuid)`,
       {},
     );
     await this.neo4j.executeWrite(
+      'NextEpisodeEdge.createIndex.groupId',
       /* cypher */ `CREATE INDEX next_episode_group_id IF NOT EXISTS FOR ()-[e:NEXT_EPISODE]-() ON (e.group_id)`,
       {},
     );
@@ -23,6 +25,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async save(edge: NextEpisodeEdge): Promise<string> {
     const results = await this.neo4j.executeWrite<{ uuid: string }>(
+      'NextEpisodeEdge.save',
       /* cypher */ `MATCH (source:Episodic {uuid: $sourceNodeUuid})
        MATCH (target:Episodic {uuid: $targetNodeUuid})
        MERGE (source)-[e:NEXT_EPISODE {uuid: $uuid}]->(target)
@@ -42,6 +45,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
   async saveBulk(edges: NextEpisodeEdge[]): Promise<void> {
     if (edges.length === 0) return;
     await this.neo4j.executeWrite(
+      'NextEpisodeEdge.saveBulk',
       /* cypher */ `UNWIND $edges AS edge
        MATCH (source:Episodic {uuid: edge.sourceNodeUuid})
        MATCH (target:Episodic {uuid: edge.targetNodeUuid})
@@ -61,6 +65,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async delete(uuid: Uuid): Promise<void> {
     await this.neo4j.executeWrite(
+      'NextEpisodeEdge.delete',
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE {uuid: $uuid}]->() DELETE e',
       { uuid },
     );
@@ -68,6 +73,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     await this.neo4j.executeWrite(
+      'NextEpisodeEdge.deleteByUuids',
       '/*cypher*/ MATCH ()-[e:NEXT_EPISODE]->() WHERE e.uuid IN $uuids DELETE e',
       { uuids },
     );
@@ -75,6 +81,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async getByUuid(uuid: Uuid): Promise<NextEpisodeEdge | null> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'NextEpisodeEdge.getByUuid',
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE {uuid: $uuid}]->(target:Episodic)
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
               source.uuid AS source_node_uuid, target.uuid AS target_node_uuid`,
@@ -86,6 +93,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
 
   async getByUuids(uuids: Uuid[]): Promise<NextEpisodeEdge[]> {
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'NextEpisodeEdge.getByUuids',
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.uuid IN $uuids
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,
@@ -105,6 +113,7 @@ export class NextEpisodeEdgeRepository implements OnModuleInit {
     };
     if (limit !== undefined) queryParams['limit'] = limit;
     const results = await this.neo4j.executeRead<Record<string, unknown>>(
+      'NextEpisodeEdge.getByGroupIds',
       /* cypher */ `MATCH (source:Episodic)-[e:NEXT_EPISODE]->(target:Episodic)
        WHERE e.group_id IN $groupIds ${cursorClause}
        RETURN e.uuid AS uuid, e.group_id AS group_id, e.created_at AS created_at,

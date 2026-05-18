@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
 import { Uuid } from '@/common/schemas';
+import { NoOpLlmTracer } from '@/observability';
 import {
   KG_DIFF_EMBEDDING,
   KG_HIGH_SIM_EMBEDDING,
@@ -35,7 +36,7 @@ describe('NodeResolutionService', () => {
   let mockRunnable: { invoke: jest.Mock };
 
   beforeEach(() => {
-    service = new NodeResolutionService();
+    service = new NodeResolutionService(new NoOpLlmTracer());
     mockModel = mockDeep<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
@@ -264,7 +265,7 @@ describe('NodeResolutionService', () => {
   });
 
   it('should bypass cosine for low-entropy names and go to LLM', async () => {
-    // "bob" entropy ≈ 0.918 (b:2, o:1) — below the 1.5 threshold → skips cosine
+    // "bob" entropy ≈ 0.918 (b:2, o:1) - below the 1.5 threshold → skips cosine
     const extracted = [makeNode('bob', KG_HIGH_SIM_EMBEDDING)];
     const existing = [
       {
@@ -289,7 +290,7 @@ describe('NodeResolutionService', () => {
   });
 
   it('should use cosine for names with entropy above threshold (e.g. "alice")', async () => {
-    // "alice" entropy ≈ 2.32 (a,l,i,c,e — all distinct) — above the 1.5 threshold → cosine path.
+    // "alice" entropy ≈ 2.32 (a,l,i,c,e - all distinct) - above the 1.5 threshold → cosine path.
     // Existing node "alicia" does not exact-match "alice" after normalizeString, so the
     // cosine scan runs. With KG_DIFF_EMBEDDING the cosine score is below threshold, so
     // no candidate is found and alice is added as a new node without any LLM call.

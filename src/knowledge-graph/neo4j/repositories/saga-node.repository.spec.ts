@@ -30,6 +30,7 @@ describe('SagaNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: node.uuid }]);
       const result = await repo.save(node);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('MERGE (n:Saga'),
         expect.objectContaining({ uuid: node.uuid }),
       );
@@ -43,6 +44,7 @@ describe('SagaNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ uuid }),
       );
@@ -54,6 +56,7 @@ describe('SagaNodeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.deleteByGroupId(KG_TEST_GROUP_ID);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('DETACH DELETE'),
         expect.objectContaining({ groupId: KG_TEST_GROUP_ID }),
       );
@@ -92,6 +95,7 @@ describe('SagaNodeRepository', () => {
         GetByGroupIdsWithCursorParamsSchema.parse({ groupIds: ['group-1'] }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('group_id IN $groupIds'),
         expect.objectContaining({ groupIds: ['group-1'] }),
       );
@@ -107,6 +111,7 @@ describe('SagaNodeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('n.uuid < $uuidCursor'),
         expect.objectContaining({ uuidCursor: KG_TEST_UUID_CURSOR }),
       );
@@ -122,6 +127,7 @@ describe('SagaNodeRepository', () => {
         }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('ORDER BY n.uuid DESC'),
         expect.anything(),
       );
@@ -133,6 +139,7 @@ describe('SagaNodeRepository', () => {
         GetByGroupIdsWithCursorParamsSchema.parse({ groupIds: ['group-1'] }),
       );
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.not.stringContaining('$uuidCursor'),
         expect.anything(),
       );

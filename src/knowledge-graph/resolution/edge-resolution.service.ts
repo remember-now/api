@@ -1,7 +1,8 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { EntityEdge, EpisodicNode } from '../models';
 import { SearchByTextParamsSchema } from '../neo4j';
@@ -16,9 +17,17 @@ import {
 } from './resolution-utils';
 import { edgeDedupeJsonSchema, EdgeResolutionResult } from './types';
 
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
+
 @Injectable()
 export class EdgeResolutionService {
-  constructor(private readonly edgeRepo: EntityEdgeRepository) {}
+  constructor(
+    private readonly edgeRepo: EntityEdgeRepository,
+    @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
+  ) {}
 
   async resolveEdges(
     model: BaseChatModel,
@@ -29,7 +38,34 @@ export class EdgeResolutionService {
     referenceTime: Date,
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
+    ctx?: LlmContext,
   ): Promise<EdgeResolutionResult> {
+    const { metrics: _m, ...rest } = await this.resolveEdgesImpl(
+      model,
+      episode,
+      extractedEdges,
+      existingEdges,
+      uuidMap,
+      referenceTime,
+      previousEpisodes,
+      customInstructions,
+      ctx,
+    );
+    return rest;
+  }
+
+  @Span('edgeResolution', { onResult: metricsOnResult })
+  private async resolveEdgesImpl(
+    model: BaseChatModel,
+    episode: EpisodicNode,
+    extractedEdges: EntityEdge[],
+    existingEdges: EntityEdge[],
+    uuidMap: Map<Uuid, Uuid>,
+    referenceTime: Date,
+    previousEpisodes: EpisodicNode[] = [],
+    customInstructions?: string,
+    ctx?: LlmContext,
+  ): Promise<EdgeResolutionResult & { metrics: SpanMetrics }> {
     // Step 1: Remap source/target uuids via uuidMap
     const remapped = extractedEdges.map((e) => ({
       ...e,
@@ -37,7 +73,7 @@ export class EdgeResolutionService {
       targetNodeUuid: uuidMap.get(e.targetNodeUuid) ?? e.targetNodeUuid,
     }));
 
-    // Step 2: Intra-batch dedup — same endpoints + same normalized fact → keep first, merge episodes
+    // Step 2: Intra-batch dedup - same endpoints + same normalized fact → keep first, merge episodes
     const deduped: EntityEdge[] = [];
     for (const edge of remapped) {
       const normalizedFact = normalizeString(edge.fact);
@@ -147,7 +183,11 @@ export class EdgeResolutionService {
 
       const dedupe = await model
         .withStructuredOutput(edgeDedupeJsonSchema)
-        .invoke(messages);
+        .invoke(messages, {
+          callbacks: this.llmTracer.getCallbacks(ctx),
+          runName: 'resolve-edges',
+          tags: ['knowledge-graph', 'resolution.edge'],
+        });
 
       // A fact is duplicate only if it matches an endpoint-range index
       const isDuplicate = dedupe.duplicate_facts.some(
@@ -159,7 +199,7 @@ export class EdgeResolutionService {
           edge.expiredAt = new Date();
         }
 
-        // Self-expiration — if any contradiction candidate postdates this edge,
+        // Self-expiration - if any contradiction candidate postdates this edge,
         // the edge is superseded by information already in the graph.
         if (!edge.expiredAt) {
           const contradictionCandidates = dedupe.contradicted_facts
@@ -233,9 +273,18 @@ export class EdgeResolutionService {
       }
     }
 
+    const invalidatedEdges = Array.from(invalidatedEdgesMap.values());
+
     return {
       resolvedEdges,
-      invalidatedEdges: Array.from(invalidatedEdgesMap.values()),
+      invalidatedEdges,
+      metrics: {
+        'episode.uuid': episode.uuid,
+        'extracted.count': extractedEdges.length,
+        'existing.count': existingEdges.length,
+        'resolved.count': resolvedEdges.length,
+        'invalidated.count': invalidatedEdges.length,
+      },
     };
   }
 }

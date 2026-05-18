@@ -30,6 +30,7 @@ describe('CommunityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([{ uuid: edge.uuid }]);
       const result = await repo.save(edge);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('HAS_MEMBER'),
         expect.objectContaining({ uuid: edge.uuid }),
       );
@@ -43,6 +44,7 @@ describe('CommunityEdgeRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.delete(uuid);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('HAS_MEMBER'),
         expect.objectContaining({ uuid }),
       );

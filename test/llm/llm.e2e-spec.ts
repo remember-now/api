@@ -46,11 +46,11 @@ describe('LLM (e2e)', () => {
         .expectJsonLength('providers', expectedCount);
     });
 
-    it('should return activeProvider: null initially', async () => {
+    it('should return activeProvider: PLATFORM initially', async () => {
       await h
         .authenticatedRequest(sessionKey)
         .get(`${s.baseUrl}/llms`)
-        .expect('validProvidersList', { activeProvider: null });
+        .expect('validProvidersList', { activeProvider: LlmProvider.PLATFORM });
     });
 
     it('should return 403 without session', async () => {

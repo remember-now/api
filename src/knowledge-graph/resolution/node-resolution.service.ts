@@ -1,7 +1,8 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { EntityNode, EpisodicNode } from '../models';
 import { buildDedupeNodesMessages } from '../prompts';
@@ -16,8 +17,15 @@ import {
 } from './resolution-utils';
 import { NodeResolutionResult, nodeResolutionsJsonSchema } from './types';
 
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
+
 @Injectable()
 export class NodeResolutionService {
+  constructor(@Inject(LLM_TRACER) private readonly llmTracer: LlmTracer) {}
+
   async resolveNodes(
     model: BaseChatModel,
     episode: EpisodicNode,
@@ -25,7 +33,30 @@ export class NodeResolutionService {
     existingNodes: EntityNode[],
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
+    ctx?: LlmContext,
   ): Promise<NodeResolutionResult> {
+    const { metrics: _m, ...rest } = await this.resolveNodesImpl(
+      model,
+      episode,
+      extractedNodes,
+      existingNodes,
+      previousEpisodes,
+      customInstructions,
+      ctx,
+    );
+    return rest;
+  }
+
+  @Span('nodeResolution', { onResult: metricsOnResult })
+  private async resolveNodesImpl(
+    model: BaseChatModel,
+    episode: EpisodicNode,
+    extractedNodes: EntityNode[],
+    existingNodes: EntityNode[],
+    previousEpisodes: EpisodicNode[] = [],
+    customInstructions?: string,
+    ctx?: LlmContext,
+  ): Promise<NodeResolutionResult & { metrics: SpanMetrics }> {
     const uuidMap = new Map<Uuid, Uuid>();
     const duplicatePairs: Array<{
       extractedUuid: Uuid;
@@ -118,7 +149,11 @@ export class NodeResolutionService {
 
       const raw = await model
         .withStructuredOutput(nodeResolutionsJsonSchema)
-        .invoke(messages);
+        .invoke(messages, {
+          callbacks: this.llmTracer.getCallbacks(ctx),
+          runName: 'resolve-nodes',
+          tags: ['knowledge-graph', 'resolution.node'],
+        });
 
       const resolutions = raw.entity_resolutions;
 
@@ -139,7 +174,7 @@ export class NodeResolutionService {
         }
 
         // Apply canonical name if LLM returned a better one.
-        // nameEmbedding is cleared because it was computed for the old name —
+        // nameEmbedding is cleared because it was computed for the old name -
         // persisting a stale embedding would corrupt vector search results.
         if (resolution.name) {
           const node = extractedNodes.find((n) => n.uuid === extractedUuid);
@@ -153,6 +188,17 @@ export class NodeResolutionService {
 
     const resolvedNodes = extractedNodes.filter((n) => !uuidMap.has(n.uuid));
 
-    return { resolvedNodes, uuidMap, duplicatePairs };
+    return {
+      resolvedNodes,
+      uuidMap,
+      duplicatePairs,
+      metrics: {
+        'episode.uuid': episode.uuid,
+        'extracted.count': extractedNodes.length,
+        'existing.count': existingNodes.length,
+        'resolved.count': resolvedNodes.length,
+        'duplicates.count': duplicatePairs.length,
+      },
+    };
   }
 }

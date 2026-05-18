@@ -3,6 +3,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { Uuid } from '@/common/schemas';
+import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import {
   KG_HIGH_SIM_EMBEDDING,
   KG_NEAR_SAME_EMBEDDING,
@@ -47,7 +48,10 @@ describe('EdgeResolutionService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EdgeResolutionService],
+      providers: [
+        EdgeResolutionService,
+        { provide: LLM_TRACER, useValue: new NoOpLlmTracer() },
+      ],
     })
       .useMocker(createMock)
       .compile();
@@ -175,7 +179,7 @@ describe('EdgeResolutionService', () => {
 
   it('should not invalidate contradicted edges when both lack validAt (no temporal overlap computable)', async () => {
     // Python resolve_edge_contradictions skips invalidation when validAt is null on
-    // either side — temporal guards require both dates to be present.
+    // either side - temporal guards require both dates to be present.
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice is now CEO at Acme',
@@ -349,7 +353,7 @@ describe('EdgeResolutionService', () => {
     });
     endpointEdge.uuid = u('endpoint-uuid');
 
-    // keyword search returns the endpoint edge — should be excluded from similarEdges
+    // keyword search returns the endpoint edge - should be excluded from similarEdges
     mockEdgeRepo.searchByFact.mockResolvedValue([endpointEdge]);
     mockRunnable.invoke.mockResolvedValue({
       duplicate_facts: [],

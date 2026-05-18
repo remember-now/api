@@ -1,10 +1,11 @@
 import { randomUUID } from 'crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
+import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
 
 import { EmbeddingService } from '../embedding';
 import { createCommunityEdge, createCommunityNode } from '../models';
@@ -17,6 +18,11 @@ import {
 } from '../neo4j/repositories';
 import { GraphNameSchema, GroupId, NodeNameSchema } from '../neo4j/types';
 import { buildCommunitySummaryMessages } from '../prompts';
+
+type SpanMetrics = Record<string, string | number | boolean | undefined>;
+const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
 
 export const CommunitySummarySchema = z.object({
   name: NodeNameSchema,
@@ -35,15 +41,36 @@ export class CommunityService {
     private readonly communityNodeRepository: CommunityNodeRepository,
     private readonly communityEdgeRepository: CommunityEdgeRepository,
     private readonly gdsCommunityRepository: GdsCommunityRepository,
+    @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
 
   async buildCommunities(userId: Uuid, groupId: GroupId): Promise<void> {
+    await this.buildCommunitiesImpl(userId, groupId);
+  }
+
+  @Span('buildCommunities', { onResult: metricsOnResult })
+  private async buildCommunitiesImpl(
+    userId: Uuid,
+    groupId: GroupId,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const ctx: LlmContext = {
+      userId,
+      sessionId: userId,
+      tags: ['knowledge-graph', 'community'],
+      metadata: { groupId },
+    };
+
+    const baseMetrics: SpanMetrics = {
+      'user.id': userId,
+      'group.id': groupId,
+    };
+
     // 1. Guard: check if any Entity nodes with RELATES_TO edges exist
     const hasEdges = await this.entityEdgeRepository.hasRelatesEdgesForGroup(groupId);
 
     if (!hasEdges) {
       await this.communityNodeRepository.deleteByGroupId(groupId);
-      return;
+      return { metrics: { ...baseMetrics, 'communities.count': 0 } };
     }
 
     // 2. Get active model
@@ -92,7 +119,11 @@ export class CommunityService {
 
       const communitySummary = await model
         .withStructuredOutput(communitySummaryJsonSchema)
-        .invoke(messages);
+        .invoke(messages, {
+          callbacks: this.llmTracer.getCallbacks(ctx),
+          runName: 'community-summary',
+          tags: ['knowledge-graph', 'community.summary'],
+        });
 
       const communityRaw = createCommunityNode({
         name: communitySummary.name,
@@ -116,5 +147,13 @@ export class CommunityService {
     // 9. Persist nodes first, then edges (edges require community nodes to exist)
     await this.communityNodeRepository.saveBulk(communityNodes);
     await this.communityEdgeRepository.saveBulk(communityEdges);
+
+    return {
+      metrics: {
+        ...baseMetrics,
+        'communities.count': communityNodes.length,
+        'communities.edges.count': communityEdges.length,
+      },
+    };
   }
 }

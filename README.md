@@ -138,6 +138,25 @@ Run with custom iteration count:
 
 The runner will exit immediately on first failure and display the failing test output. Test infrastructure is set up once and torn down automatically on completion or interruption.
 
+### Langfuse observability (optional)
+
+Langfuse captures full LLM traces - including prompts and outputs - and is only intended for use in development. It is **off by default** and never enabled on the hosted product.
+
+To turn it on for local dev:
+
+1. Bring up the observability profile (`npm run infra:dev:up` already does this).
+2. Open <http://localhost:3334> and create an account + project (any name).
+3. In the project, go to **Settings -> API Keys** and create a new key pair.
+4. Add the resulting keys to your `.env`:
+   ```
+   LANGFUSE_ENABLED=true
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   ```
+5. Restart `npm run start:dev`. Traces should start appearing under the project's **Traces** tab.
+
+When running the app inside the docker network instead of on the host, also set `LANGFUSE_BASE_URL=http://langfuse-web:3000` (the in-network hostname). The default in `.env.example` points at the host-mapped port `http://localhost:3334`.
+
 ## Recommended VS Code Extensions
 
 - **Neo4j for VS Code** - Cypher syntax highlighting and linting. Install via VS Code Quick Open (`Ctrl+P`):
@@ -154,6 +173,8 @@ The knowledge graph pipeline in this project is a modified TypeScript port of [G
 - Graphiti couples tightly to specific providers. This port integrates with [LangChain](https://js.langchain.com/) so any supported model can be swapped in without changing pipeline code.
 - Graphiti maintains provider abstractions for its graph layer. Since Neo4j is a first-class dependency here, those abstractions are unnecessary and removing them adds room for enhancements.
 - RememberNow is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
+
+The `@Span` and `@Traceable` decorators in `src/observability/decorators/` (and their tests) are ported from [nestjs-otel](https://github.com/pragmaticivan/nestjs-otel) (Apache-2.0), with a local `asLangfuseTrace` option added.
 
 ## License
 

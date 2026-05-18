@@ -26,6 +26,7 @@ describe('GdsCommunityRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.projectGraph(myGraph, group1);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('gds.graph.project'),
         { graphName: myGraph, groupId: group1 },
       );
@@ -41,6 +42,7 @@ describe('GdsCommunityRepository', () => {
       neo4j.executeRead.mockResolvedValue(rows);
       const result = await repo.runLeiden(myGraph);
       expect(neo4j.executeRead).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('gds.leiden.stream'),
         {
           graphName: myGraph,
@@ -55,6 +57,7 @@ describe('GdsCommunityRepository', () => {
       neo4j.executeWrite.mockResolvedValue([]);
       await repo.dropGraph(myGraph);
       expect(neo4j.executeWrite).toHaveBeenCalledWith(
+        expect.any(String),
         expect.stringContaining('gds.graph.drop'),
         {
           graphName: myGraph,

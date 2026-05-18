@@ -38,7 +38,9 @@
       "mcp__context7__query-docs",
       "Bash(npx jest:*)",
       "Bash(npm test:*)",
-      "mcp__github__list_issues"
+      "mcp__github__list_issues",
+      "Skill(langfuse)",
+      "Skill(context7-mcp)"
     ],
     "deny": ["Read(./.env)", "Read(~/.aws/**)"]
   },

@@ -169,9 +169,9 @@
             "required": true,
             "in": "path",
             "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": 0,
-              "type": "integer"
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
             }
           }
         ],
@@ -200,9 +200,9 @@
             "required": true,
             "in": "path",
             "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": 0,
-              "type": "integer"
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
             }
           }
         ],
@@ -241,9 +241,9 @@
             "required": true,
             "in": "path",
             "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": 0,
-              "type": "integer"
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
             }
           }
         ],
@@ -833,19 +833,9 @@
             "$ref": "#/components/schemas/Role_Output"
           },
           "id": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
-          },
-          "agentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "activeLlmProvider": {
             "anyOf": [
@@ -868,7 +858,6 @@
           "email",
           "role",
           "id",
-          "agentId",
           "activeLlmProvider",
           "createdAt",
           "updatedAt"
@@ -970,19 +959,9 @@
                   "$ref": "#/components/schemas/Role_Output"
                 },
                 "id": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "agentId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "activeLlmProvider": {
                   "anyOf": [
@@ -1005,7 +984,6 @@
                 "email",
                 "role",
                 "id",
-                "agentId",
                 "activeLlmProvider",
                 "createdAt",
                 "updatedAt"
@@ -1075,22 +1053,12 @@
             "$ref": "#/components/schemas/Role_Output"
           },
           "id": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "passwordHash": {
             "type": "string"
-          },
-          "agentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "activeLlmProvider": {
             "anyOf": [
@@ -1114,7 +1082,6 @@
           "role",
           "id",
           "passwordHash",
-          "agentId",
           "activeLlmProvider",
           "createdAt",
           "updatedAt"
@@ -1183,19 +1150,9 @@
                 "$ref": "#/components/schemas/Role_Output"
               },
               "id": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "agentId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
               },
               "activeLlmProvider": {
                 "anyOf": [
@@ -1218,7 +1175,6 @@
               "email",
               "role",
               "id",
-              "agentId",
               "activeLlmProvider",
               "createdAt",
               "updatedAt"
