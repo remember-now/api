@@ -1,18 +1,20 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { EntityTypeMap } from '../episode/types';
 import { createEntityNode, EntityNode, EpisodicNode } from '../models';
-import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
 import { buildExtractNodesMessages } from '../prompts';
+import { NodeLabel, NodeLabels, NodeLabelSchema } from '../types';
 import { extractedEntitiesJsonSchema } from './types';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
 
 function resolveLabels(
   entityTypeId: number | undefined,
@@ -83,7 +85,7 @@ export class NodeExtractionService {
       .map((e) =>
         createEntityNode({
           name: e.name,
-          groupId: episode.groupId,
+          graphId: episode.graphId,
           labels: resolveLabels(e.entityTypeId, entityTypes),
         }),
       )

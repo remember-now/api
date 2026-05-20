@@ -10,11 +10,10 @@ import {
 } from '../../models';
 import {
   EpisodeTypeSchema,
-  GroupIdSchema,
   NodeLabelSchema,
   NodeNameSchema,
   RelationshipTypeSchema,
-} from '../../neo4j';
+} from '../../types';
 
 // Constants
 
@@ -26,7 +25,7 @@ export const CANDIDATE_LIMIT = 10;
 
 export const EpisodeSchema = z
   .object({
-    groupId: GroupIdSchema,
+    graphId: UuidSchema,
     name: NodeNameSchema,
     content: z.string().min(1),
     source: EpisodeTypeSchema,

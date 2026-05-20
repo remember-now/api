@@ -2,27 +2,27 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 
 import { NoOpLlmTracer } from '@/observability';
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { EdgeExtractionService } from './edge-extraction.service';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp. Bob is the CEO of Acme Corp.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 const aliceNode = KgNodeFactory.createEntityNode({
   name: 'Alice',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 const bobNode = KgNodeFactory.createEntityNode({
   name: 'Bob',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 const acmeNode = KgNodeFactory.createEntityNode({
   name: 'Acme Corp',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 const nodes = [aliceNode, bobNode, acmeNode];
 
@@ -63,7 +63,7 @@ describe('EdgeExtractionService', () => {
     expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
     expect(edges[0].name).toBe('WORKS_AT');
     expect(edges[0].fact).toBe('Alice works at Acme Corp.');
-    expect(edges[0].groupId).toBe(KG_TEST_GROUP_ID);
+    expect(edges[0].graphId).toBe(KG_TEST_GRAPH_ID);
   });
 
   it('should pass validAt/invalidAt from LLM response to edge', async () => {

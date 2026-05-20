@@ -48,7 +48,7 @@ Run app on host.
 Also brings up Langfuse + MinIO + ClickHouse:
 
 ```bash
-npx prisma generate && npm run infra:dev:up && npm run prisma:dev:deploy && npm run start:dev
+npm run prisma:generate && npm run infra:dev:up && npm run prisma:dev:deploy && npm run start:dev
 ```
 
 When done developing for the day (preserves data):
@@ -66,7 +66,7 @@ npm run infra:dev:start && npm run start:dev
 After editing `prisma/schema.prisma` (regenerate client + create a new migration):
 
 ```bash
-npx prisma generate && npm run prisma:dev:migrate
+npm run prisma:generate && npm run prisma:dev:migrate
 ```
 
 Full reset + infra restart (destroys all data):
@@ -75,7 +75,7 @@ Full reset + infra restart (destroys all data):
 npm run infra:dev:reset
 ```
 
-Or remove all data manually (would require `infra:dev:up` after):
+Or remove all data and containers manually.
 
 ```bash
 npm run infra:dev:rm
@@ -85,7 +85,6 @@ Once dev infra is up, the following web UIs are available:
 
 - Swagger UI: <http://localhost:3333/api> (requires the app to be running)
 - Prisma Studio: <http://localhost:5555> (requires `npm run prisma:studio`)
-- Neo4j browser: <http://localhost:7474>
 - Langfuse: <http://localhost:3334>
 - MinIO console: <http://localhost:9091>
 
@@ -157,22 +156,16 @@ To turn it on for local dev:
 
 When running the app inside the docker network instead of on the host, also set `LANGFUSE_BASE_URL=http://langfuse-web:3000` (the in-network hostname). The default in `.env.example` points at the host-mapped port `http://localhost:3334`.
 
-## Recommended VS Code Extensions
-
-- **Neo4j for VS Code** - Cypher syntax highlighting and linting. Install via VS Code Quick Open (`Ctrl+P`):
-  ```
-  ext install neo4j-extensions.neo4j-for-vscode
-  ```
-  All Cypher queries in this codebase are tagged with `/* cypher */` (template literals) or `/*cypher*/` (single-line strings) to enable embedded syntax highlighting directly in TypeScript files.
-
 ## Acknowledgements
 
 The knowledge graph pipeline in this project is a modified TypeScript port of [Graphiti](https://github.com/getzep/graphiti) by Zep AI, adapted for this codebase for the following reasons:
 
 - I need to implement a Graph Versioning system to prevent data loss due to agent misbehavior, which is impossible without direct code access.
 - Graphiti couples tightly to specific providers. This port integrates with [LangChain](https://js.langchain.com/) so any supported model can be swapped in without changing pipeline code.
-- Graphiti maintains provider abstractions for its graph layer. Since Neo4j is a first-class dependency here, those abstractions are unnecessary and removing them adds room for enhancements.
+- Graphiti maintains provider abstractions for its graph layer. Managed to make Graphiti work with just Postgres ([pgvector](https://github.com/pgvector/pgvector) + [pgvectorscale](https://github.com/timescale/pgvectorscale) for ANN search), so those abstractions are unnecessary and removing them adds room for enhancements.
 - RememberNow is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
+
+Approximate nearest-neighbor vector search is powered by [pgvectorscale](https://github.com/timescale/pgvectorscale) (PostgreSQL License) from Tiger Data, layered on top of [pgvector](https://github.com/pgvector/pgvector). The knowledge-graph migration enables the `vectorscale` extension and builds StreamingDiskANN indexes (with SBQ compression and label-based filtering) over the knowledge graph's vector embeddings - see `prisma/migrations/20260517000000_knowledge_graph/migration.sql`.
 
 The `@Span` and `@Traceable` decorators in `src/observability/decorators/` (and their tests) are ported from [nestjs-otel](https://github.com/pragmaticivan/nestjs-otel) (Apache-2.0), with a local `asLangfuseTrace` option added.
 

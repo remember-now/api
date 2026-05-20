@@ -1,7 +1,6 @@
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import type { SpanOptions } from '@opentelemetry/api';
 
-export const TRACER = Symbol('TRACER');
 export const LLM_TRACER = Symbol('LLM_TRACER');
 
 /**
@@ -13,12 +12,6 @@ export interface LlmContext {
   sessionId?: string;
   tags?: string[];
   metadata?: Record<string, string>;
-}
-
-export interface SpanHandle {
-  setAttribute(key: string, value: unknown): void;
-  setAttributes(attrs: Record<string, unknown>): void;
-  recordException(err: unknown): void;
 }
 
 /**
@@ -35,39 +28,19 @@ export interface ExtendedSpanOptions extends SpanOptions {
 }
 
 /**
- * Structural tracer backed by raw OpenTelemetry. Emits in dev and
- * prod. Use for pipeline steps, retrievers, Neo4j queries - anything where
- * timing/structure is wanted, but where LLM prompt content must never leak.
- *
- * Spans flow to whatever processors are registered at bootstrap. When the
- * `LangfuseSpanProcessor` is active (dev), Langfuse ingests these too; in prod
- * they go to the configured OTel collector.
+ * Shape of the `metrics` object that wrapped service methods return alongside
+ * their real payload so the `@Span` decorator can lift the metrics onto span
+ * attributes via `metricsOnResult`.
  */
-export interface Tracer {
-  withSpan<T>(
-    name: string,
-    fn: (span: SpanHandle) => Promise<T>,
-    attrs?: Record<string, unknown>,
-  ): Promise<T>;
+export type SpanMetrics = Record<string, string | number | boolean | undefined>;
 
-  /**
-   * Like `withSpan`, but marks this span as the trace root for Langfuse by
-   * setting `langfuse.trace.name`. Use at user-facing entry points
-   * (e.g. `addEpisodes`, `search`) so the trace lands with a meaningful name
-   * even when the OTel parent span is filtered out of Langfuse.
-   */
-  withTrace<T>(
-    name: string,
-    fn: (span: SpanHandle) => Promise<T>,
-    attrs?: Record<string, unknown>,
-  ): Promise<T>;
-
-  withRetriever<T>(
-    name: string,
-    fn: (span: SpanHandle) => Promise<T>,
-    attrs?: Record<string, unknown>,
-  ): Promise<T>;
-}
+/**
+ * `onResult` callback for `@Span` that lifts a `{ metrics }` field from the
+ * decorated method's return value onto the span as attributes.
+ */
+export const metricsOnResult = (r: unknown) => ({
+  attributes: (r as { metrics: SpanMetrics }).metrics,
+});
 
 /**
  * Content-bearing observability for LLM calls. Returns LangChain callbacks

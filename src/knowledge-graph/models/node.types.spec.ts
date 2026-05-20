@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { UuidSchema } from '@/common/schemas';
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from '@/test/factories';
+import { kgUuid as _kgUuid, KG_REFERENCE_TIME, KG_TEST_GRAPH_ID } from '@/test/factories';
 
-import { EpisodeType, GroupIdSchema, NodeNameSchema } from '../neo4j/types';
+import { EpisodeType, NodeNameSchema } from '../types';
 import {
   CommunityNodeSchema,
   createCommunityNode,
@@ -45,7 +45,7 @@ describe('node.types', () => {
       const node = {
         uuid: randomUUID(),
         name: 'Test',
-        groupId: 'group-1',
+        graphId: KG_TEST_GRAPH_ID,
         labels: [],
         createdAt: new Date(),
       };
@@ -56,7 +56,7 @@ describe('node.types', () => {
       const node = {
         uuid: randomUUID(),
         name: '',
-        groupId: 'group-1',
+        graphId: 'group-1',
         createdAt: new Date(),
       };
       expect(() => NodeBaseSchema.parse(node)).toThrow();
@@ -66,17 +66,17 @@ describe('node.types', () => {
       const node = {
         uuid: 'not-a-uuid',
         name: 'Test',
-        groupId: 'group-1',
+        graphId: 'group-1',
         createdAt: new Date(),
       };
       expect(() => NodeBaseSchema.parse(node)).toThrow();
     });
 
-    it('should reject empty groupId', () => {
+    it('should reject empty graphId', () => {
       const node = {
         uuid: randomUUID(),
         name: 'Test',
-        groupId: '',
+        graphId: '',
         createdAt: new Date(),
       };
       expect(() => NodeBaseSchema.parse(node)).toThrow();
@@ -97,7 +97,7 @@ describe('EntityNode', () => {
     it('should create with correct defaults', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(node.name).toBe('Test');
       expect(node.nameEmbedding).toBeNull();
@@ -106,13 +106,13 @@ describe('EntityNode', () => {
       expect(node.attributes).toEqual({});
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe(KG_TEST_GROUP_ID);
+      expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
     it('should allow overriding defaults', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         summary: 'Custom summary',
       });
       expect(node.summary).toBe('Custom summary');
@@ -121,7 +121,7 @@ describe('EntityNode', () => {
     it('should allow setting nameEmbedding', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [0.1, 0.2, 0.3],
       });
       expect(node.nameEmbedding).toEqual([0.1, 0.2, 0.3]);
@@ -130,27 +130,27 @@ describe('EntityNode', () => {
     it('should allow setting attributes', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         attributes: { key: 'value' },
       });
       expect(node.attributes).toEqual({ key: 'value' });
     });
 
-    it('should allow setting groupId', () => {
-      const groupId = GroupIdSchema.parse('group-123');
-      const node = createEntityNode({ name: n('Test'), groupId });
+    it('should allow setting graphId', () => {
+      const graphId = UuidSchema.parse('00000000-0000-4000-8000-000000000123');
+      const node = createEntityNode({ name: n('Test'), graphId });
 
-      expect(node.groupId).toBe('group-123');
+      expect(node.graphId).toBe('00000000-0000-4000-8000-000000000123');
     });
 
     it('should generate unique uuids', () => {
       const node1 = createEntityNode({
         name: n('Test1'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       const node2 = createEntityNode({
         name: n('Test2'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(node1.uuid).not.toBe(node2.uuid);
     });
@@ -160,7 +160,7 @@ describe('EntityNode', () => {
     it('should accept valid entity node', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(() => EntityNodeSchema.parse(node)).not.toThrow();
     });
@@ -169,7 +169,7 @@ describe('EntityNode', () => {
       expect(() =>
         EntityNodeSchema.parse({
           uuid: randomUUID(),
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
           labels: ['Entity'],
           nameEmbedding: null,
@@ -179,18 +179,18 @@ describe('EntityNode', () => {
       ).toThrow();
     });
 
-    it('should reject empty groupId', () => {
+    it('should reject empty graphId', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
-      expect(() => EntityNodeSchema.parse({ ...node, groupId: '' })).toThrow();
+      expect(() => EntityNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });
 
     it('should reject empty name', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(() => EntityNodeSchema.parse({ ...node, name: '' })).toThrow();
     });
@@ -198,7 +198,7 @@ describe('EntityNode', () => {
     it('should accept null nameEmbedding', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
       expect(() => EntityNodeSchema.parse(node)).not.toThrow();
@@ -207,7 +207,7 @@ describe('EntityNode', () => {
     it('should accept array nameEmbedding', () => {
       const node = createEntityNode({
         name: n('Test'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [0.1, 0.2],
       });
       expect(() => EntityNodeSchema.parse(node)).not.toThrow();
@@ -222,7 +222,7 @@ describe('EpisodicNode', () => {
     it('should create with correct defaults', () => {
       const node = createEpisodicNode({
         name: n('Episode 1'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         content: 'Some content',
         validAt,
       });
@@ -234,43 +234,18 @@ describe('EpisodicNode', () => {
       expect(node.labels).toEqual(['Episodic']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe(KG_TEST_GROUP_ID);
+      expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
     it('should allow overriding source', () => {
       const node = createEpisodicNode({
         name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
         source: EpisodeType.message,
       });
       expect(node.source).toBe(EpisodeType.message);
-    });
-
-    it('should default entityEdges to empty array', () => {
-      const node = createEpisodicNode({
-        name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
-        content: 'content',
-        validAt,
-      });
-      expect(node.entityEdges).toEqual([]);
-    });
-
-    it('should allow overriding entityEdges', () => {
-      const uuids = [
-        UuidSchema.parse('11111111-1111-4111-8111-111111111111'),
-        UuidSchema.parse('22222222-2222-4222-8222-222222222222'),
-      ];
-      const node = createEpisodicNode({
-        name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
-        content: 'content',
-        validAt,
-        entityEdges: uuids,
-      });
-      expect(node.entityEdges).toEqual(uuids);
     });
   });
 
@@ -278,7 +253,7 @@ describe('EpisodicNode', () => {
     it('should accept valid episodic node', () => {
       const node = createEpisodicNode({
         name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
       });
@@ -288,7 +263,7 @@ describe('EpisodicNode', () => {
     it('should reject invalid source enum value', () => {
       const node = createEpisodicNode({
         name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
       });
@@ -299,7 +274,7 @@ describe('EpisodicNode', () => {
       for (const source of Object.values(EpisodeType)) {
         const node = createEpisodicNode({
           name: n('Episode'),
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
           content: 'content',
           validAt,
           source,
@@ -308,48 +283,14 @@ describe('EpisodicNode', () => {
       }
     });
 
-    it('should accept empty entityEdges array', () => {
+    it('should reject empty graphId', () => {
       const node = createEpisodicNode({
         name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
       });
-      expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
-    });
-
-    it('should accept entityEdges with valid uuid values', () => {
-      const node = createEpisodicNode({
-        name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
-        content: 'content',
-        validAt,
-        entityEdges: [
-          UuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab'),
-          UuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc'),
-        ],
-      });
-      expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
-    });
-
-    it('should reject entityEdges with non-string elements', () => {
-      const node = createEpisodicNode({
-        name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
-        content: 'content',
-        validAt,
-      });
-      expect(() => EpisodicNodeSchema.parse({ ...node, entityEdges: [123] })).toThrow();
-    });
-
-    it('should reject empty groupId', () => {
-      const node = createEpisodicNode({
-        name: n('Episode'),
-        groupId: KG_TEST_GROUP_ID,
-        content: 'content',
-        validAt,
-      });
-      expect(() => EpisodicNodeSchema.parse({ ...node, groupId: '' })).toThrow();
+      expect(() => EpisodicNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });
   });
 });
@@ -359,7 +300,7 @@ describe('CommunityNode', () => {
     it('should create with correct defaults', () => {
       const node = createCommunityNode({
         name: n('Community 1'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(node.name).toBe('Community 1');
       expect(node.nameEmbedding).toBeNull();
@@ -367,13 +308,13 @@ describe('CommunityNode', () => {
       expect(node.labels).toEqual(['Community']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe(KG_TEST_GROUP_ID);
+      expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
     it('should allow overriding nameEmbedding', () => {
       const node = createCommunityNode({
         name: n('Community'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [0.1, 0.2],
       });
       expect(node.nameEmbedding).toEqual([0.1, 0.2]);
@@ -382,7 +323,7 @@ describe('CommunityNode', () => {
     it('should allow overriding summary', () => {
       const node = createCommunityNode({
         name: n('Community'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         summary: 'A summary',
       });
       expect(node.summary).toBe('A summary');
@@ -393,7 +334,7 @@ describe('CommunityNode', () => {
     it('should accept valid community node', () => {
       const node = createCommunityNode({
         name: n('Community'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(() => CommunityNodeSchema.parse(node)).not.toThrow();
     });
@@ -402,7 +343,7 @@ describe('CommunityNode', () => {
       expect(() =>
         CommunityNodeSchema.parse({
           uuid: randomUUID(),
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
           nameEmbedding: null,
           summary: '',
@@ -410,18 +351,18 @@ describe('CommunityNode', () => {
       ).toThrow();
     });
 
-    it('should reject empty groupId', () => {
+    it('should reject empty graphId', () => {
       const node = createCommunityNode({
         name: n('Community'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
-      expect(() => CommunityNodeSchema.parse({ ...node, groupId: '' })).toThrow();
+      expect(() => CommunityNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });
 
     it('should accept null nameEmbedding', () => {
       const node = createCommunityNode({
         name: n('Community'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
       expect(() => CommunityNodeSchema.parse(node)).not.toThrow();
@@ -434,29 +375,29 @@ describe('SagaNode', () => {
     it('should create with correct defaults', () => {
       const node = createSagaNode({
         name: n('Saga 1'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(node.name).toBe('Saga 1');
       expect(node.labels).toEqual(['Saga']);
       expect(node.uuid).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.groupId).toBe(KG_TEST_GROUP_ID);
+      expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
-    it('should allow overriding groupId', () => {
-      const groupId = GroupIdSchema.parse('group-1');
-      const node = createSagaNode({ name: n('Saga'), groupId });
-      expect(node.groupId).toBe('group-1');
+    it('should allow overriding graphId', () => {
+      const graphId = UuidSchema.parse('00000000-0000-4000-8000-000000000001');
+      const node = createSagaNode({ name: n('Saga'), graphId });
+      expect(node.graphId).toBe('00000000-0000-4000-8000-000000000001');
     });
 
     it('should generate unique uuids', () => {
       const node1 = createSagaNode({
         name: n('Saga1'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       const node2 = createSagaNode({
         name: n('Saga2'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(node1.uuid).not.toBe(node2.uuid);
     });
@@ -466,7 +407,7 @@ describe('SagaNode', () => {
     it('should accept valid saga node', () => {
       const node = createSagaNode({
         name: n('Saga'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(() => SagaNodeSchema.parse(node)).not.toThrow();
     });
@@ -475,24 +416,24 @@ describe('SagaNode', () => {
       expect(() =>
         SagaNodeSchema.parse({
           uuid: randomUUID(),
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
         }),
       ).toThrow();
     });
 
-    it('should reject empty groupId', () => {
+    it('should reject empty graphId', () => {
       const node = createSagaNode({
         name: n('Saga'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
-      expect(() => SagaNodeSchema.parse({ ...node, groupId: '' })).toThrow();
+      expect(() => SagaNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });
 
     it('should reject invalid uuid', () => {
       const node = createSagaNode({
         name: n('Saga'),
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       expect(() => SagaNodeSchema.parse({ ...node, uuid: 'not-a-uuid' })).toThrow();
     });

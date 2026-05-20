@@ -6,6 +6,8 @@ import { Role as PrismaRole } from '@generated/prisma/client';
 import { PasswordSchema, UuidSchema } from '@/common/schemas';
 import { LlmProviderSchema } from '@/llm/dto';
 
+import { GraphSchema } from './graph.dto';
+
 // Schemas
 export const RoleSchema = z.enum(PrismaRole).meta({ id: 'Role' });
 
@@ -29,6 +31,7 @@ export const UserSchema = CreateUserSchema.omit({ password: true })
     activeLlmProvider: LlmProviderSchema.nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    graphs: z.array(GraphSchema),
   })
   .meta({ id: 'User' });
 

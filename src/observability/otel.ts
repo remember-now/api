@@ -3,6 +3,8 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import {
   ConsoleSpanExporter,
+  type ReadableSpan,
+  type Span as SdkSpan,
   SimpleSpanProcessor,
   type SpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
@@ -10,6 +12,44 @@ import { PrismaInstrumentation } from '@prisma/instrumentation';
 
 import { parseLangfuseConfig } from '@/config/langfuse';
 import { parseOtelConfig } from '@/config/otel';
+
+const REMEMBER_NOW_SCOPE = 'remember-now';
+const PRISMA_SCOPE = 'prisma';
+
+/**
+ * Tracks which trace ids contain at least one in-flight `remember-now` span.
+ * Ref-counted so nested `@Span`s in the same trace don't prematurely evict
+ * the trace id when an inner span ends.
+ */
+class RememberNowTraceTracker implements SpanProcessor {
+  private readonly counts = new Map<string, number>();
+
+  has(traceId: string): boolean {
+    return this.counts.has(traceId);
+  }
+
+  onStart(span: SdkSpan): void {
+    if (span.instrumentationScope.name !== REMEMBER_NOW_SCOPE) return;
+    const traceId = span.spanContext().traceId;
+    this.counts.set(traceId, (this.counts.get(traceId) ?? 0) + 1);
+  }
+
+  onEnd(span: ReadableSpan): void {
+    if (span.instrumentationScope.name !== REMEMBER_NOW_SCOPE) return;
+    const traceId = span.spanContext().traceId;
+    const next = (this.counts.get(traceId) ?? 0) - 1;
+    if (next <= 0) this.counts.delete(traceId);
+    else this.counts.set(traceId, next);
+  }
+
+  forceFlush(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Bootstraps the OpenTelemetry NodeSDK with any configured span processors.
@@ -44,14 +84,16 @@ export function startOtel(): { shutdown: () => Promise<void> } {
   // When telemetry is off we skip SDK registration entirely. `@Span`-decorated
   // methods still call `trace.getTracer(...)`, but with no SDK registered OTel
   // returns its built-in no-op tracer, so spans are created-but-discarded and
-  // nothing is exported. Legacy `TRACER`-injected call sites (Neo4jService)
-  // resolve to `NoOpTracer` via ObservabilityModule and skip span creation.
+  // nothing is exported.
   if (!otelConfig.telemetryEnabled) {
     return { shutdown: () => Promise.resolve() };
   }
   const processors: SpanProcessor[] = [];
 
   if (langfuseConfig.enabled) {
+    const traceTracker = new RememberNowTraceTracker();
+    processors.push(traceTracker);
+
     processors.push(
       new LangfuseSpanProcessor({
         publicKey: langfuseConfig.publicKey,
@@ -62,10 +104,17 @@ export function startOtel(): { shutdown: () => Promise<void> } {
         // Default filter keeps only LLM-focused spans (langfuse-sdk scope,
         // gen_ai.* attrs, known LLM instrumentation). Also let through our
         // own `remember-now` scope so manually-traced pipeline spans appear
-        // as parents of the LangChain generations.
-        shouldExportSpan: ({ otelSpan }) =>
-          isDefaultExportSpan(otelSpan) ||
-          otelSpan.instrumentationScope.name === 'remember-now',
+        // as parents of the LangChain generations, plus Prisma spans whose
+        // trace originated from a `remember-now` span
+        shouldExportSpan: ({ otelSpan }) => {
+          const scope = otelSpan.instrumentationScope.name;
+          if (isDefaultExportSpan(otelSpan)) return true;
+          if (scope === REMEMBER_NOW_SCOPE) return true;
+          if (scope === PRISMA_SCOPE) {
+            return traceTracker.has(otelSpan.spanContext().traceId);
+          }
+          return false;
+        },
       }),
     );
   }

@@ -2,17 +2,18 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { Uuid } from '@/common/schemas';
+import { UuidSchema } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
 import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import {
   KG_REFERENCE_TIME,
-  KG_TEST_GROUP_ID,
+  KG_TEST_GRAPH_ID,
   KG_TEST_SAGA_UUID,
   KG_TEST_USER_ID,
   KgEdgeFactory,
   KgNodeFactory,
   makeEpisode,
+  u,
 } from '@/test/factories';
 
 import { CommunityService } from '../community';
@@ -28,14 +29,10 @@ import {
   EpisodicEdgeRepository,
   EpisodicNodeRepository,
   HasEpisodeEdgeRepository,
-  NextEpisodeEdgeRepository,
   SagaNodeRepository,
-} from '../neo4j/repositories';
-import { GroupIdSchema } from '../neo4j/types';
+} from '../repository/repositories';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import { EpisodeService } from './episode.service';
-
-const u = (s: string) => s as Uuid;
 
 describe('EpisodeService', () => {
   let service: EpisodeService;
@@ -54,7 +51,6 @@ describe('EpisodeService', () => {
   let mockEpisodicEdgeRepo: DeepMocked<EpisodicEdgeRepository>;
   let mockSagaNodeRepo: DeepMocked<SagaNodeRepository>;
   let mockHasEpisodeEdgeRepo: DeepMocked<HasEpisodeEdgeRepository>;
-  let mockNextEpisodeEdgeRepo: DeepMocked<NextEpisodeEdgeRepository>;
 
   let mockModel: DeepMocked<BaseChatModel>;
   let mockRunnable: { invoke: jest.Mock };
@@ -81,7 +77,6 @@ describe('EpisodeService', () => {
     mockEpisodicEdgeRepo = module.get(EpisodicEdgeRepository);
     mockSagaNodeRepo = module.get(SagaNodeRepository);
     mockHasEpisodeEdgeRepo = module.get(HasEpisodeEdgeRepository);
-    mockNextEpisodeEdgeRepo = module.get(NextEpisodeEdgeRepository);
 
     mockModel = createMock<BaseChatModel>();
     mockRunnable = { invoke: jest.fn() };
@@ -103,11 +98,18 @@ describe('EpisodeService', () => {
     mockEdgeExtraction.extractEdges.mockResolvedValue([]);
     mockEntityEdgeRepo.searchByFact.mockResolvedValue([]);
     mockEntityEdgeRepo.searchBySimilarity.mockResolvedValue([]);
+    mockEntityEdgeRepo.getBetweenNodes.mockResolvedValue([]);
     mockEmbeddingService.embedEdges.mockResolvedValue([]);
     mockEdgeResolution.resolveEdges.mockResolvedValue({
       resolvedEdges: [],
       invalidatedEdges: [],
+      newEdges: [],
     });
+    // Default passthrough so per-episode edge arrays flow through unchanged
+    // to `resolveEdges`. Tests asserting cross-batch dedup behavior override this.
+    mockEdgeResolution.dedupeAcrossBatch.mockImplementation((_m, edges) =>
+      Promise.resolve(edges),
+    );
     mockEpisodicEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityNodeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityEdgeRepo.saveBulk.mockResolvedValue(undefined);
@@ -143,7 +145,7 @@ describe('EpisodeService', () => {
         name: 'Prior',
         content: 'Alice works at Acme Corp.',
         validAt: KG_REFERENCE_TIME,
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       mockEpisodicNodeRepo.retrieveEpisodes.mockResolvedValue([prevEpisode]);
 
@@ -154,7 +156,7 @@ describe('EpisodeService', () => {
 
       expect(mockNodeExtraction.extractNodes).toHaveBeenCalledWith(
         mockModel,
-        expect.objectContaining({ name: 'ep1', groupId: KG_TEST_GROUP_ID }),
+        expect.objectContaining({ name: 'ep1', graphId: KG_TEST_GRAPH_ID }),
         [prevEpisode],
         undefined,
         undefined,
@@ -357,11 +359,11 @@ describe('EpisodeService', () => {
     it('alias node is excluded from result entries when resolveNodes returns a duplicate pair', async () => {
       const canonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
 
       mockNodeExtraction.extractNodes
@@ -393,11 +395,11 @@ describe('EpisodeService', () => {
     it('existing node referenced as canonical target is pulled into the matching episode entry', async () => {
       const existingCanonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
 
       mockEntityNodeRepo.searchByName.mockResolvedValue([existingCanonical]);
@@ -423,11 +425,11 @@ describe('EpisodeService', () => {
     it('canonical extracted by two episodes is saved exactly once via saveBulk', async () => {
       const canonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
       const alias = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
       });
 
       mockNodeExtraction.extractNodes
@@ -462,12 +464,12 @@ describe('EpisodeService', () => {
     it('two nodes with identical embeddings → exactly one survives across the batch', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0],
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alicia',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0], // cosine([1,0],[1,0]) = 1.0 ≥ 0.9 threshold
       });
 
@@ -502,12 +504,12 @@ describe('EpisodeService', () => {
     it('two nodes with orthogonal embeddings → both kept (below threshold)', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0],
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Bob',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [0, 1],
       });
 
@@ -540,12 +542,12 @@ describe('EpisodeService', () => {
     it('identical names with null embeddings → deduplicated by exact match', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
 
@@ -578,12 +580,12 @@ describe('EpisodeService', () => {
     it('null embedding + same name as an embedded node → deduplicated by exact match', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0],
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
 
@@ -616,12 +618,12 @@ describe('EpisodeService', () => {
     it('different names with null embeddings → both kept', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Bob',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: null,
       });
 
@@ -658,17 +660,17 @@ describe('EpisodeService', () => {
     it('only the canonical survives when one node is a pass-1 alias and another is a pass-2 alias', async () => {
       const nodeA = KgNodeFactory.createEntityNode({
         name: 'Alice',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0],
       });
       const nodeB = KgNodeFactory.createEntityNode({
         name: 'Alice Smith',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [0, 1], // not a pass-2 pair
       });
       const nodeC = KgNodeFactory.createEntityNode({
         name: 'Alicia',
-        groupId: KG_TEST_GROUP_ID,
+        graphId: KG_TEST_GRAPH_ID,
         nameEmbedding: [1, 0], // pass-2 pair with nodeA
       });
 
@@ -719,59 +721,18 @@ describe('EpisodeService', () => {
         episodes: [ep],
       });
 
-      expect(mockSagaNodeRepo.save).toHaveBeenCalledWith(
+      expect(mockSagaNodeRepo.createIfNotExists).toHaveBeenCalledWith(
         expect.objectContaining({
           uuid: KG_TEST_SAGA_UUID,
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
         }),
       );
       expect(mockHasEpisodeEdgeRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceNodeUuid: KG_TEST_SAGA_UUID,
-          groupId: KG_TEST_GROUP_ID,
+          graphId: KG_TEST_GRAPH_ID,
         }),
       );
-    });
-
-    it('creates NextEpisodeEdge when a previous saga episode exists', async () => {
-      const prevEpisode = KgNodeFactory.createEpisodicNode({
-        name: 'Prior',
-        content: 'earlier content',
-        validAt: KG_REFERENCE_TIME,
-        groupId: KG_TEST_GROUP_ID,
-      });
-      prevEpisode.uuid = u('prev-episode-uuid');
-
-      mockEpisodicNodeRepo.retrieveEpisodes
-        .mockResolvedValueOnce([]) // step 2: previousEpisodes for extraction
-        .mockResolvedValueOnce([prevEpisode]); // step 21: saga previous lookup
-
-      const ep = makeEpisode('ep1');
-      ep.sagaUuid = KG_TEST_SAGA_UUID;
-
-      await service.addEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [ep],
-      });
-
-      expect(mockNextEpisodeEdgeRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sourceNodeUuid: prevEpisode.uuid,
-          groupId: KG_TEST_GROUP_ID,
-        }),
-      );
-    });
-
-    it('does not create NextEpisodeEdge when no previous saga episode exists', async () => {
-      const ep = makeEpisode('ep1');
-      ep.sagaUuid = KG_TEST_SAGA_UUID;
-
-      await service.addEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [ep],
-      });
-
-      expect(mockNextEpisodeEdgeRepo.save).not.toHaveBeenCalled();
     });
 
     it('skips saga handling when sagaUuid is omitted', async () => {
@@ -780,9 +741,9 @@ describe('EpisodeService', () => {
         episodes: [makeEpisode('ep1')],
       });
 
+      expect(mockSagaNodeRepo.createIfNotExists).not.toHaveBeenCalled();
       expect(mockSagaNodeRepo.save).not.toHaveBeenCalled();
       expect(mockHasEpisodeEdgeRepo.save).not.toHaveBeenCalled();
-      expect(mockNextEpisodeEdgeRepo.save).not.toHaveBeenCalled();
     });
 
     it('processes saga linking for each episode in the batch that has a sagaUuid', async () => {
@@ -797,8 +758,9 @@ describe('EpisodeService', () => {
         episodes: [ep1, ep2, ep3],
       });
 
-      // SagaNode saved once per saga-bearing episode (idempotent on saga side).
-      expect(mockSagaNodeRepo.save).toHaveBeenCalledTimes(2);
+      // SagaNode createIfNotExists is called once per unique saga (grouped),
+      // HAS_EPISODE edges once per saga-bearing episode.
+      expect(mockSagaNodeRepo.createIfNotExists).toHaveBeenCalledTimes(1);
       expect(mockHasEpisodeEdgeRepo.save).toHaveBeenCalledTimes(2);
     });
   });
@@ -873,15 +835,15 @@ describe('EpisodeService', () => {
       expect(persistOrder).toBeLessThan(communityOrder);
       expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
-        KG_TEST_GROUP_ID,
+        KG_TEST_GRAPH_ID,
       );
     });
 
-    it('calls buildCommunities once per distinct groupId across the batch', async () => {
-      const otherGroupId = GroupIdSchema.parse('other-group');
+    it('calls buildCommunities once per distinct graphId across the batch', async () => {
+      const otherGraphId = UuidSchema.parse('00000000-0000-4000-8000-000000000002');
       const ep1 = makeEpisode('ep1');
       const ep2 = makeEpisode('ep2');
-      const ep3 = { ...makeEpisode('ep3'), groupId: otherGroupId };
+      const ep3 = { ...makeEpisode('ep3'), graphId: otherGraphId };
 
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -892,11 +854,11 @@ describe('EpisodeService', () => {
       expect(mockCommunityService.buildCommunities).toHaveBeenCalledTimes(2);
       expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
-        KG_TEST_GROUP_ID,
+        KG_TEST_GRAPH_ID,
       );
       expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
-        otherGroupId,
+        otherGraphId,
       );
     });
   });

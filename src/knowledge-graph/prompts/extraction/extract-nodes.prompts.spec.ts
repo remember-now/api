@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
 import { EpisodeType } from '@/knowledge-graph/models';
-import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildExtractNodesMessages } from './extract-nodes.prompts';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and knows Bob.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 describe('buildExtractNodesMessages', () => {
@@ -45,7 +45,7 @@ describe('buildExtractNodesMessages', () => {
       name: 'Prev Episode',
       content: 'Charlie was here.',
       validAt: new Date('2023-12-01'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
     });
     const messages = buildExtractNodesMessages({
       episode: baseEpisode,

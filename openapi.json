@@ -819,6 +819,50 @@
         ],
         "id": "LlmProvider_Output"
       },
+      "Graph_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "id": "Graph_Output"
+      },
       "UserWithoutPasswordDto_Output": {
         "type": "object",
         "properties": {
@@ -852,6 +896,12 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "graphs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Graph_Output"
+            }
           }
         },
         "required": [
@@ -860,7 +910,8 @@
           "id",
           "activeLlmProvider",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "graphs"
         ],
         "additionalProperties": false
       },
@@ -978,6 +1029,12 @@
                 },
                 "updatedAt": {
                   "type": "string"
+                },
+                "graphs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Graph_Output"
+                  }
                 }
               },
               "required": [
@@ -986,7 +1043,8 @@
                 "id",
                 "activeLlmProvider",
                 "createdAt",
-                "updatedAt"
+                "updatedAt",
+                "graphs"
               ],
               "additionalProperties": false
             }
@@ -1075,6 +1133,12 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "graphs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Graph_Output"
+            }
           }
         },
         "required": [
@@ -1084,7 +1148,8 @@
           "passwordHash",
           "activeLlmProvider",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "graphs"
         ],
         "id": "User_Output",
         "additionalProperties": false
@@ -1169,6 +1234,12 @@
               },
               "updatedAt": {
                 "type": "string"
+              },
+              "graphs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Graph_Output"
+                }
               }
             },
             "required": [
@@ -1177,7 +1248,8 @@
               "id",
               "activeLlmProvider",
               "createdAt",
-              "updatedAt"
+              "updatedAt",
+              "graphs"
             ],
             "additionalProperties": false
           }
@@ -1217,10 +1289,6 @@
             "type": "string",
             "minLength": 1
           },
-          "groupId": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]+$"
-          },
           "source": {
             "default": "message",
             "type": "string",
@@ -1234,8 +1302,7 @@
         },
         "required": [
           "name",
-          "content",
-          "groupId"
+          "content"
         ]
       },
       "TestSearchDto": {
@@ -1244,15 +1311,10 @@
           "query": {
             "type": "string",
             "minLength": 1
-          },
-          "groupId": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]+$"
           }
         },
         "required": [
-          "query",
-          "groupId"
+          "query"
         ]
       },
       "LlmConfigResponse_Output": {

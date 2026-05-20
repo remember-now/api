@@ -3,22 +3,28 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { EmbeddingService } from '../embedding';
 import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import {
-  GroupId,
-  SearchByBfsParamsSchema,
-  SearchBySimilarityParamsSchema,
-  SearchByTextParamsSchema,
-} from '../neo4j';
 import {
   CommunityNodeRepository,
   EntityEdgeRepository,
   EntityNodeRepository,
   EpisodicNodeRepository,
-} from '../neo4j/repositories';
+} from '../repository/repositories';
+import {
+  SearchByBfsParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '../types';
 import {
   crossEncoderReranker,
   episodeMentionsReranker,
@@ -48,11 +54,6 @@ import {
   SearchResults,
 } from './types';
 
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
-
 const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
 
 @Injectable()
@@ -70,14 +71,14 @@ export class SearchService {
   async searchFromNodes(options: {
     nodeUuids: Uuid[];
     query: string;
-    groupIds: GroupId[];
+    graphIds: Uuid[];
     config: SearchConfigInput;
     userId: Uuid;
     filters?: SearchFilters;
   }): Promise<SearchResults> {
     return this.search({
       query: options.query,
-      groupIds: options.groupIds,
+      graphIds: options.graphIds,
       config: options.config,
       userId: options.userId,
       filters: options.filters,
@@ -102,14 +103,14 @@ export class SearchService {
       tags: [
         'knowledge-graph',
         'retrieval',
-        ...parsed.groupIds.map((id) => `group:${id}`),
+        ...parsed.graphIds.map((id) => `group:${id}`),
       ],
       metadata: {
         query: parsed.query.slice(0, 200),
       },
     };
 
-    const { query, groupIds, config, filters, centerNodeUuid, originNodeUuids, userId } =
+    const { query, graphIds, config, filters, centerNodeUuid, originNodeUuids, userId } =
       parsed;
 
     const baseMetrics: SpanMetrics = {
@@ -172,7 +173,7 @@ export class SearchService {
         ? this.edgeSearch(
             query,
             queryVector,
-            groupIds,
+            graphIds,
             config.edgeConfig,
             filters,
             limit,
@@ -187,7 +188,7 @@ export class SearchService {
         ? this.nodeSearch(
             query,
             queryVector,
-            groupIds,
+            graphIds,
             config.nodeConfig,
             filters,
             limit,
@@ -201,7 +202,7 @@ export class SearchService {
       config.episodeConfig
         ? this.episodeSearch(
             query,
-            groupIds,
+            graphIds,
             config.episodeConfig,
             limit,
             minScore,
@@ -213,7 +214,7 @@ export class SearchService {
         ? this.communitySearch(
             query,
             queryVector,
-            groupIds,
+            graphIds,
             config.communityConfig,
             limit,
             minScore,
@@ -252,7 +253,7 @@ export class SearchService {
   private async edgeSearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: EdgeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
@@ -265,7 +266,7 @@ export class SearchService {
     const { edges, scores } = await this.edgeSearchImpl(
       query,
       queryVector,
-      groupIds,
+      graphIds,
       config,
       filters,
       limit,
@@ -282,7 +283,7 @@ export class SearchService {
   private async edgeSearchImpl(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: EdgeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
@@ -304,7 +305,7 @@ export class SearchService {
     if (config.searchMethods.includes(EdgeSearchMethod.bm25)) {
       tasks.push(
         this.entityEdgeRepository
-          .searchByFact(SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }))
+          .searchByFact(SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }))
           .then((edges) => {
             for (const e of edges) edgeMap.set(e.uuid, e);
             bm25Uuids.push(...edges.map((e) => e.uuid));
@@ -321,7 +322,7 @@ export class SearchService {
           .searchBySimilarity(
             SearchBySimilarityParamsSchema.parse({
               embedding: queryVector,
-              groupIds,
+              graphIds,
               limit: fetch,
               minScore: config.simMinScore,
             }),
@@ -346,7 +347,7 @@ export class SearchService {
         const bfsEdges = await this.entityEdgeRepository.searchByBfs(
           SearchByBfsParamsSchema.parse({
             originNodeUuids: origins,
-            groupIds,
+            graphIds,
             limit: fetch,
             maxDepth: config.maxDepth,
           }),
@@ -461,7 +462,7 @@ export class SearchService {
   private async nodeSearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: NodeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
@@ -474,7 +475,7 @@ export class SearchService {
     const { nodes, scores } = await this.nodeSearchImpl(
       query,
       queryVector,
-      groupIds,
+      graphIds,
       config,
       filters,
       limit,
@@ -491,7 +492,7 @@ export class SearchService {
   private async nodeSearchImpl(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: NodeSearchConfig,
     filters: SearchFilters | undefined,
     limit: number,
@@ -514,7 +515,7 @@ export class SearchService {
       tasks.push(
         this.entityNodeRepository
           .searchByName(
-            SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
+            SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }),
             filters,
           )
           .then((nodes) => {
@@ -533,7 +534,7 @@ export class SearchService {
           .searchBySimilarity(
             SearchBySimilarityParamsSchema.parse({
               embedding: queryVector,
-              groupIds,
+              graphIds,
               limit: fetch,
               minScore: config.simMinScore,
             }),
@@ -558,7 +559,7 @@ export class SearchService {
         const bfsNodes = await this.entityNodeRepository.searchByBfs(
           SearchByBfsParamsSchema.parse({
             originNodeUuids: origins,
-            groupIds,
+            graphIds,
             limit: fetch,
             maxDepth: config.maxDepth,
           }),
@@ -647,7 +648,7 @@ export class SearchService {
 
   private async episodeSearch(
     query: string,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: EpisodeSearchConfig,
     limit: number,
     minScore: number,
@@ -656,7 +657,7 @@ export class SearchService {
   ): Promise<[EpisodicNode[], number[]]> {
     const { episodes, scores } = await this.episodeSearchImpl(
       query,
-      groupIds,
+      graphIds,
       config,
       limit,
       minScore,
@@ -669,7 +670,7 @@ export class SearchService {
   @Span('search.episode', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
   private async episodeSearchImpl(
     query: string,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: EpisodeSearchConfig,
     limit: number,
     minScore: number,
@@ -681,7 +682,7 @@ export class SearchService {
 
     const bm25Episodes = config.searchMethods.includes(EpisodeSearchMethod.bm25)
       ? await this.episodicNodeRepository.searchByContent(
-          SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }),
+          SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }),
         )
       : [];
 
@@ -726,7 +727,7 @@ export class SearchService {
   private async communitySearch(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: CommunitySearchConfig,
     limit: number,
     minScore: number,
@@ -736,7 +737,7 @@ export class SearchService {
     const { communities, scores } = await this.communitySearchImpl(
       query,
       queryVector,
-      groupIds,
+      graphIds,
       config,
       limit,
       minScore,
@@ -750,7 +751,7 @@ export class SearchService {
   private async communitySearchImpl(
     query: string,
     queryVector: number[] | null,
-    groupIds: GroupId[],
+    graphIds: Uuid[],
     config: CommunitySearchConfig,
     limit: number,
     minScore: number,
@@ -769,7 +770,7 @@ export class SearchService {
     if (config.searchMethods.includes(CommunitySearchMethod.bm25)) {
       tasks.push(
         this.communityNodeRepository
-          .searchByName(SearchByTextParamsSchema.parse({ query, groupIds, limit: fetch }))
+          .searchByName(SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }))
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.uuid, n);
             bm25Uuids.push(...nodes.map((n) => n.uuid));
@@ -786,7 +787,7 @@ export class SearchService {
           .searchBySimilarity(
             SearchBySimilarityParamsSchema.parse({
               embedding: queryVector,
-              groupIds,
+              graphIds,
               limit: fetch,
               minScore: config.simMinScore,
             }),

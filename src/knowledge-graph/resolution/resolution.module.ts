@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 
-import { Neo4jModule } from '../neo4j/neo4j.module';
+import { RepositoryModule } from '../repository/repository.module';
 import { EdgeResolutionService } from './edge-resolution.service';
 import { NodeResolutionService } from './node-resolution.service';
 
 @Module({
-  imports: [Neo4jModule],
+  imports: [RepositoryModule],
   providers: [NodeResolutionService, EdgeResolutionService],
   exports: [NodeResolutionService, EdgeResolutionService],
 })

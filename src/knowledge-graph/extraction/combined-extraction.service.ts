@@ -1,8 +1,14 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
-import { z } from 'zod';
 
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { EdgeTypeMap, EdgeTypeMappings, EntityTypeMap } from '../episode/types';
 import {
@@ -12,26 +18,13 @@ import {
   EntityNode,
   EpisodicNode,
 } from '../models';
-import { NodeLabel, NodeLabels, NodeLabelSchema } from '../neo4j';
 import {
   buildExtractNodesAndEdgesMessages,
   buildExtractTimestampsBatchMessages,
   combinedExtractionJsonSchema,
 } from '../prompts';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
-
-const TimestampsBatchSchema = z.object({
-  facts: z.array(
-    z.object({
-      validAt: z.string().nullable().optional(),
-      invalidAt: z.string().nullable().optional(),
-    }),
-  ),
-});
+import { NodeLabel, NodeLabels, NodeLabelSchema } from '../types';
+import { timestampsBatchJsonSchema } from './types';
 
 type CombinedExtractionResult = {
   nodes: EntityNode[];
@@ -145,7 +138,7 @@ export class CombinedExtractionService {
           nameLower,
           createEntityNode({
             name: entity.name,
-            groupId: episodes[0].groupId,
+            graphId: episodes[0].graphId,
             labels,
           }),
         );
@@ -167,7 +160,7 @@ export class CombinedExtractionService {
         referenceTime,
       });
       const tsResult = await model
-        .withStructuredOutput(z.toJSONSchema(TimestampsBatchSchema))
+        .withStructuredOutput(timestampsBatchJsonSchema)
         .invoke(tsMessages, {
           callbacks: this.llmTracer.getCallbacks(ctx),
           runName: 'extract-timestamps-batch',
@@ -223,7 +216,7 @@ export class CombinedExtractionService {
         createEntityEdge({
           name: f.relationType,
           fact: f.fact,
-          groupId: episodes[0].groupId,
+          graphId: episodes[0].graphId,
           sourceNodeUuid: srcNode.uuid,
           targetNodeUuid: tgtNode.uuid,
           episodes: episodeUuids,

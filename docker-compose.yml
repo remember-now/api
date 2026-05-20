@@ -1,15 +1,17 @@
 services:
   postgres:
-    image: postgres:18
+    image: timescale/timescaledb-ha:pg17
+    # diskann (pgvectorscale) graph builds and REINDEX use maintenance_work_mem;
+    # the default 64MB makes them painfully slow.
+    command: postgres -c maintenance_work_mem=2GB
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASS:-changeme}
       POSTGRES_MULTIPLE_DATABASES: langfuse
-      PGDATA: /data/postgres
       TZ: UTC
       PGTZ: UTC
     volumes:
-      - postgres:/data/postgres
+      - postgres:/home/postgres/pgdata
       # NOTE: Only runs on first volume creation
       - ./init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
     ports:
@@ -41,25 +43,6 @@ services:
       timeout: 3s
       retries: 10
 
-  neo4j:
-    image: neo4j:2026.02.2
-    environment:
-      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-changeme}
-    ports:
-      # http://localhost:7474/browser/
-      - '${NEO4J_HTTP_PORT:-7474}:7474'
-      - '${NEO4J_BOLT_PORT:-7687}:7687'
-    volumes:
-      - neo4j:/data
-    networks:
-      - app
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD', 'wget', '-O', '/dev/null', '-q', 'http://localhost:7474']
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   app:
     build: .
     environment:
@@ -71,9 +54,6 @@ services:
       - PLATFORM_MODEL_ENABLED=${PLATFORM_MODEL_ENABLED:-false}
       - LLM_PLATFORM_MODEL=${LLM_PLATFORM_MODEL:-gemini-2.5-flash}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - NEO4J_URI=${NEO4J_URI}
-      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
-      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-changeme}
       - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
@@ -89,8 +69,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      neo4j:
         condition: service_healthy
 
   clickhouse:
@@ -209,7 +187,6 @@ networks:
 volumes:
   postgres:
   redis:
-  neo4j:
   clickhouse_data:
   clickhouse_logs:
   minio_data:

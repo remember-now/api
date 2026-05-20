@@ -4,7 +4,14 @@ import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
 import { LlmService } from '@/llm/llm.service';
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
@@ -17,29 +24,11 @@ import {
   createEpisodicEdge,
   createEpisodicNode,
   createHasEpisodeEdge,
-  createNextEpisodeEdge,
   createSagaNode,
   EntityEdge,
   EntityNode,
-  EpisodeType,
   EpisodicNode,
 } from '../models';
-import {
-  GroupId,
-  NodeNameSchema,
-  RetrieveEpisodesParamsSchema,
-  SearchBySimilarityParamsSchema,
-  SearchByTextParamsSchema,
-} from '../neo4j';
-import {
-  EntityEdgeRepository,
-  EntityNodeRepository,
-  EpisodicEdgeRepository,
-  EpisodicNodeRepository,
-  HasEpisodeEdgeRepository,
-  NextEpisodeEdgeRepository,
-  SagaNodeRepository,
-} from '../neo4j/repositories';
 import {
   buildExtractEdgeAttributesMessages,
   buildExtractEntityAttributesMessages,
@@ -47,12 +36,27 @@ import {
   buildSummarizeSagaMessages,
   sagaSummaryJsonSchema,
 } from '../prompts';
+import {
+  EntityEdgeRepository,
+  EntityNodeRepository,
+  EpisodicEdgeRepository,
+  EpisodicNodeRepository,
+  HasEpisodeEdgeRepository,
+  SagaNodeRepository,
+} from '../repository';
 import { EdgeResolutionService, NodeResolutionService } from '../resolution';
 import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
   normalizeString,
 } from '../resolution/resolution-utils';
+import {
+  NodeNameSchema,
+  RetrieveEpisodesParamsInput,
+  RetrieveEpisodesParamsSchema,
+  SearchBySimilarityParamsSchema,
+  SearchByTextParamsSchema,
+} from '../types';
 import {
   buildDirectedUuidMap,
   LLM_CONCURRENCY_LIMIT,
@@ -76,11 +80,6 @@ import {
   PREVIOUS_EPISODES_WINDOW,
 } from './types';
 
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
-
 const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
 
 @Injectable()
@@ -100,33 +99,13 @@ export class EpisodeService {
     private readonly episodicEdgeRepository: EpisodicEdgeRepository,
     private readonly sagaNodeRepository: SagaNodeRepository,
     private readonly hasEpisodeEdgeRepository: HasEpisodeEdgeRepository,
-    private readonly nextEpisodeEdgeRepository: NextEpisodeEdgeRepository,
     @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
 
-  async getEpisodes(options: {
-    groupIds: GroupId[];
-    referenceTime?: Date;
-    lastN?: number;
-    source?: EpisodeType;
-    sagaUuid?: Uuid;
-  }): Promise<EpisodicNode[]> {
-    const {
-      groupIds,
-      referenceTime = new Date(),
-      lastN = 10,
-      source,
-      sagaUuid,
-    } = options;
-    return this.episodicNodeRepository.retrieveEpisodes(
-      RetrieveEpisodesParamsSchema.parse({
-        referenceTime,
-        lastN,
-        groupIds,
-        source,
-        sagaUuid,
-      }),
-    );
+  @Span('getEpisodes')
+  async getEpisodes(options: RetrieveEpisodesParamsInput): Promise<EpisodicNode[]> {
+    const params = RetrieveEpisodesParamsSchema.parse(options);
+    return this.episodicNodeRepository.retrieveEpisodes(params);
   }
 
   async deleteEpisode(uuid: Uuid): Promise<void> {
@@ -189,7 +168,7 @@ export class EpisodeService {
   async summarizeSaga(options: {
     userId: Uuid;
     sagaUuid: Uuid;
-    groupId: GroupId;
+    graphId: Uuid;
   }): Promise<string> {
     const { summary } = await this.summarizeSagaImpl(options);
     return summary;
@@ -199,21 +178,21 @@ export class EpisodeService {
   private async summarizeSagaImpl(options: {
     userId: Uuid;
     sagaUuid: Uuid;
-    groupId: GroupId;
+    graphId: Uuid;
   }): Promise<{ summary: string; metrics: SpanMetrics }> {
-    const { userId, sagaUuid, groupId } = options;
+    const { userId, sagaUuid, graphId } = options;
     const ctx: LlmContext = {
       userId,
       sessionId: userId,
       tags: ['knowledge-graph', 'saga'],
-      metadata: { sagaUuid, groupId },
+      metadata: { sagaUuid, graphId },
     };
 
     const baseMetrics: SpanMetrics = {
       'user.id': ctx.userId,
       'session.id': ctx.sessionId ?? ctx.userId,
       'saga.uuid': sagaUuid,
-      'group.id': groupId,
+      'graph.id': graphId,
     };
 
     const model = await this.llmService.getActiveModel(userId);
@@ -224,14 +203,18 @@ export class EpisodeService {
     }
 
     const referenceTime = saga.lastSummarizedAt ?? new Date(0);
-    const newEpisodes = await this.episodicNodeRepository.retrieveEpisodes(
-      RetrieveEpisodesParamsSchema.parse({
-        referenceTime: new Date(),
-        lastN: 100,
-        groupIds: [groupId],
-        sagaUuid,
-      }),
-    );
+    // retrieveEpisodes returns newest-first; the LLM summary expects narrative
+    // order (oldest-first) so events read sequentially.
+    const newEpisodes = (
+      await this.episodicNodeRepository.retrieveEpisodes(
+        RetrieveEpisodesParamsSchema.parse({
+          referenceTime: new Date(),
+          lastN: 100,
+          graphIds: [graphId],
+          sagaUuid,
+        }),
+      )
+    ).reverse();
 
     const unsummarized = newEpisodes.filter((ep) => ep.validAt > referenceTime);
 
@@ -270,7 +253,7 @@ export class EpisodeService {
 
   async addEpisodes(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult[]> {
     const parsed: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
-    const uniqueGroupIds = [...new Set(parsed.episodes.map((e) => e.groupId))];
+    const uniqueGraphIds = [...new Set(parsed.episodes.map((e) => e.graphId))];
 
     const ctx: LlmContext = {
       userId: parsed.userId,
@@ -278,7 +261,7 @@ export class EpisodeService {
       tags: [
         'knowledge-graph',
         'ingestion',
-        ...uniqueGroupIds.map((id) => `group:${id}`),
+        ...uniqueGraphIds.map((id) => `graph:${id}`),
       ],
       metadata: {
         episodeCount: String(parsed.episodes.length),
@@ -315,13 +298,17 @@ export class EpisodeService {
     const model = await this.llmService.getActiveModel(userId);
 
     // 2. Retrieve previous episodes in parallel
+    // TODO: upstream's singular `add_episode` filters previous episodes by
+    // source (graphiti.py:1045 - `source=source`). Upstream's bulk path doesn't.
+    // We took the bulk semantics; revisit if same-source context proves to
+    // matter for extraction quality.
     const prevEpisodesPerEpisode = await Promise.all(
       episodes.map((ep) =>
         this.episodicNodeRepository.retrieveEpisodes(
           RetrieveEpisodesParamsSchema.parse({
             referenceTime: ep.referenceTime,
             lastN: PREVIOUS_EPISODES_WINDOW,
-            groupIds: [ep.groupId],
+            graphIds: [ep.graphId],
           }),
         ),
       ),
@@ -334,7 +321,7 @@ export class EpisodeService {
         content: raw.content,
         source: raw.source,
         sourceDescription: raw.sourceDescription,
-        groupId: raw.groupId,
+        graphId: raw.graphId,
         validAt: raw.referenceTime,
       });
       return raw.uuid ? { ...node, uuid: raw.uuid } : node;
@@ -378,10 +365,10 @@ export class EpisodeService {
     );
 
     // 6. Collect search-based node candidates per episode
-    const groupIds = [...new Set(episodes.map((e) => e.groupId))];
+    const graphIds = [...new Set(episodes.map((e) => e.graphId))];
     const candidatesPerEpisode = await Promise.all(
       embeddedPerEpisode.map((nodes, i) =>
-        this.collectNodeCandidates(nodes, episodicNodes[i].groupId),
+        this.collectNodeCandidates(nodes, episodicNodes[i].graphId),
       ),
     );
     const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.uuid, n]));
@@ -411,25 +398,38 @@ export class EpisodeService {
       r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedUuid, p.canonicalUuid]),
     );
 
-    // 9. Pass 2 - within-batch dedup: exact name match first, then cosine
+    // 9. Pass 2 - within-batch dedup. The canonical pool is seeded with
+    // matched-existing nodes from pass 1 so a new node Y in episode B can be
+    // collapsed onto existing X even when X wasn't in B's own candidate set
+    // (it was surfaced only by episode A's search). Without this, Y would
+    // silently persist as a duplicate row alongside X. Mirrors upstream
+    // `dedupe_nodes_bulk` (bulk_utils.py:414). New-vs-new keeps first-seen
+    // as canonical.
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
+    const matchedExistingUuids = new Set(
+      nodeResolutions.flatMap((r) => r.duplicatePairs.map((p) => p.canonicalUuid)),
+    );
+    const matchedExistingNodes = [...matchedExistingUuids]
+      .map((uuid) => existingNodesMap.get(uuid))
+      .filter((n): n is NonNullable<typeof n> => n !== undefined);
+
+    const isDuplicateNode = (a: EntityNode, b: EntityNode): boolean => {
+      if (normalizeString(a.name) === normalizeString(b.name)) return true;
+      return (
+        a.nameEmbedding !== null &&
+        b.nameEmbedding !== null &&
+        cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >= COSINE_SIMILARITY_THRESHOLD
+      );
+    };
+
     const pass2Pairs: [Uuid, Uuid][] = [];
-    for (let i = 0; i < allNewNodes.length; i++) {
-      for (let j = i + 1; j < allNewNodes.length; j++) {
-        const a = allNewNodes[i];
-        const b = allNewNodes[j];
-
-        const exactMatch = normalizeString(a.name) === normalizeString(b.name);
-        const cosineMatch =
-          !exactMatch &&
-          a.nameEmbedding !== null &&
-          b.nameEmbedding !== null &&
-          cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >=
-            COSINE_SIMILARITY_THRESHOLD;
-
-        if (exactMatch || cosineMatch) {
-          pass2Pairs.push([b.uuid, a.uuid]); // b is alias → a (first-seen) is canonical
-        }
+    const canonicalPool: EntityNode[] = [...matchedExistingNodes];
+    for (const newNode of allNewNodes) {
+      const match = canonicalPool.find((c) => isDuplicateNode(newNode, c));
+      if (match) {
+        pass2Pairs.push([newNode.uuid, match.uuid]);
+      } else {
+        canonicalPool.push(newNode);
       }
     }
 
@@ -490,14 +490,26 @@ export class EpisodeService {
       pointedEdgesPerEpisode.map((a) => a.length),
     );
 
-    // 13. Collect search-based edge candidates per episode
+    // 13. Cross-batch edge dedup. Without this, two batch episodes that mention
+    // the same fact would each be resolved against the live graph independently
+    // and both persist as separate rows. Mirrors upstream `dedupe_edges_bulk`.
+    const dedupedEdgesPerEpisode = await this.edgeResolutionService.dedupeAcrossBatch(
+      model,
+      embeddedEdgesPerEpisode,
+      episodicNodes,
+      prevEpisodesPerEpisode,
+      customInstructions,
+      ctx,
+    );
+
+    // 14. Collect search-based edge candidates per episode
     const edgeCandidatesPerEpisode = await Promise.all(
-      embeddedEdgesPerEpisode.map((edges, i) =>
-        this.collectEdgeCandidates(edges, episodicNodes[i].groupId),
+      dedupedEdgesPerEpisode.map((edges, i) =>
+        this.collectEdgeCandidates(edges, episodicNodes[i].graphId),
       ),
     );
 
-    // 14. Resolve edges in parallel
+    // 15. Resolve edges in parallel
     const edgeResolutions = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       episodicNodes.map(
@@ -505,7 +517,7 @@ export class EpisodeService {
           this.edgeResolutionService.resolveEdges(
             model,
             ep,
-            embeddedEdgesPerEpisode[i],
+            dedupedEdgesPerEpisode[i],
             edgeCandidatesPerEpisode[i],
             finalUuidMap,
             ep.validAt,
@@ -518,14 +530,12 @@ export class EpisodeService {
 
     const allResolvedEdges = edgeResolutions.flatMap((r) => r.resolvedEdges);
     const allInvalidatedEdges = edgeResolutions.flatMap((r) => r.invalidatedEdges);
+    // Freshly extracted edges (no existing duplicate). Attribute extraction
+    // runs only over these so that re-matched existing edges aren't re-LLM'd
+    // and don't get prior attributes overwritten by a thinner new episode.
+    const allNewEdges = edgeResolutions.flatMap((r) => r.newEdges);
 
-    edgeResolutions.forEach((res, i) => {
-      episodicNodes[i].entityEdges = [...res.resolvedEdges, ...res.invalidatedEdges].map(
-        (e) => e.uuid,
-      );
-    });
-
-    // 15. Build per-node and per-edge episode context for the helpers below
+    // 16. Build per-node and per-edge episode context for the helpers below
     const allCanonicalNodes = [
       ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n])).values(),
     ];
@@ -553,10 +563,12 @@ export class EpisodeService {
       }
     });
 
-    // 16. Extract edge attributes post-resolution (custom edge types)
+    // 17. Extract edge attributes post-resolution (custom edge types). Only
+    // new edges - existing duplicates already carry attributes from prior
+    // ingestion and re-running risks overwriting them with thinner values.
     await this.extractEdgeAttributes(
       model,
-      allResolvedEdges,
+      allNewEdges,
       allCanonicalNodes,
       edgeTypes,
       effectiveEdgeTypeMappings,
@@ -564,88 +576,116 @@ export class EpisodeService {
       ctx,
     );
 
-    // 17. Extract entity attributes post-resolution (with resolved-edge context)
+    // 18. Extract entity attributes post-resolution (with resolved-edge context).
+    // Includes matched-existing nodes so attributes get refined from the new
+    // episode's content instead of frozen at first mention. Mirrors upstream
+    // `extract_attributes_from_nodes(... nodes ...)` which runs on the full
+    // resolved set, not just new ones.
     await this.extractEntityAttributes(
       model,
-      newNodesOnly,
+      allCanonicalNodes,
       allResolvedEdges,
       entityTypes,
       nodeContext,
       ctx,
     );
 
-    // 18. Generate node summaries for all new canonical nodes
-    await this.summarizeNodes(model, newNodesOnly, allResolvedEdges, nodeContext, ctx);
+    // 19. Generate / refine summaries for all canonical nodes (new + matched).
+    // Matched nodes accumulate new facts from this episode into their summary.
+    // Only new edges are passed as fact context - matched-existing edges already
+    // contributed to the node's prior summary, so re-feeding them risks the LLM
+    // re-emitting known facts. Mirrors upstream
+    // `extract_attributes_from_nodes(..., edges=new_edges)`.
+    await this.summarizeNodes(model, allCanonicalNodes, allNewEdges, nodeContext, ctx);
 
-    // 19. Create episodic edges per episode
+    // 20. Re-embed canonical nodes renamed during dedup. Resolution rewrites
+    // node.name and nulls nameEmbedding (stale vector) - if we don't refill
+    // them here, those rows save with NULL embeddings and become invisible to
+    // vector search until the next time they're touched.
+    const renamedNodes = allCanonicalNodes.filter((n) => n.nameEmbedding === null);
+    if (renamedNodes.length > 0) {
+      const reembedded = await this.embeddingService.embedNodes(renamedNodes);
+      const byUuid = new Map(reembedded.map((n) => [n.uuid, n]));
+
+      for (let i = 0; i < allCanonicalNodes.length; i++) {
+        const fresh = byUuid.get(allCanonicalNodes[i].uuid);
+        if (fresh) allCanonicalNodes[i] = fresh;
+      }
+    }
+
+    // 21. Create episodic edges per episode
     const episodicEdgesPerEpisode = episodicNodes.map((ep, i) =>
       canonicalNodesPerEpisode[i].map((node) =>
         createEpisodicEdge({
           sourceNodeUuid: ep.uuid,
           targetNodeUuid: node.uuid,
-          groupId: ep.groupId,
+          graphId: ep.graphId,
         }),
       ),
     );
     const allEpisodicEdges = episodicEdgesPerEpisode.flat();
 
-    // 20. Persist in parallel
+    // 22. Persist: nodes first, then edges. Postgres FK constraints reject
+    // edges whose endpoints don't yet exist; Neo4j silently no-op'd these via
+    // MATCH...MERGE, which masked the ordering bug.
     await Promise.all([
       this.entityNodeRepository.saveBulk(allCanonicalNodes),
+      this.episodicNodeRepository.saveBulk(episodicNodes),
+    ]);
+    await Promise.all([
       this.entityEdgeRepository.saveBulk(allResolvedEdges),
       this.entityEdgeRepository.saveBulk(allInvalidatedEdges),
       this.episodicEdgeRepository.saveBulk(allEpisodicEdges),
-      this.episodicNodeRepository.saveBulk(episodicNodes),
     ]);
 
-    // 21. Saga association per episode (sequential - keeps NEXT_EPISODE chain
-    // deterministic when multiple batch episodes share the same sagaUuid).
+    // 23. Saga association: ensure each referenced saga exists, then write
+    // HAS_EPISODE for every batch episode. Chronology lives in
+    // `episodic_nodes.valid_at` (createdAt tiebreaker), so no NEXT_EPISODE
+    // chain is needed - saga walks ORDER BY valid_at via retrieveEpisodes.
+    const sagaGroups = new Map<Uuid, number[]>();
     for (let i = 0; i < episodes.length; i++) {
-      const raw = episodes[i];
-      if (!raw.sagaUuid) continue;
-      const epNode = episodicNodes[i];
-
-      await this.sagaNodeRepository.save(
-        createSagaNode({
-          uuid: raw.sagaUuid,
-          name: NodeNameSchema.parse(raw.sagaUuid),
-          groupId: raw.groupId,
-        }),
-      );
-      await this.hasEpisodeEdgeRepository.save(
-        createHasEpisodeEdge({
-          sourceNodeUuid: raw.sagaUuid,
-          targetNodeUuid: epNode.uuid,
-          groupId: raw.groupId,
-        }),
-      );
-
-      const [prevEpisode] = await this.episodicNodeRepository.retrieveEpisodes(
-        RetrieveEpisodesParamsSchema.parse({
-          referenceTime: raw.referenceTime,
-          lastN: 1,
-          sagaUuid: raw.sagaUuid,
-        }),
-      );
-      if (prevEpisode && prevEpisode.uuid !== epNode.uuid) {
-        await this.nextEpisodeEdgeRepository.save(
-          createNextEpisodeEdge({
-            sourceNodeUuid: prevEpisode.uuid,
-            targetNodeUuid: epNode.uuid,
-            groupId: raw.groupId,
-          }),
-        );
-      }
+      const sagaUuid = episodes[i].sagaUuid;
+      if (!sagaUuid) continue;
+      sagaGroups.set(sagaUuid, [...(sagaGroups.get(sagaUuid) ?? []), i]);
     }
 
-    // 22. Optional community build per distinct groupId
-    // TODO: Concurrent addEpisodes calls for the same groupId can race here -
+    for (const [sagaUuid, indices] of sagaGroups) {
+      const graphId = episodes[indices[0]].graphId;
+
+      // TODO: saga name defaults to the UUID string. Plan: accept an optional
+      // caller-provided name on AddEpisodeOptions, and otherwise let
+      // summarizeSaga generate one alongside the summary (extend
+      // sagaSummaryJsonSchema to return { name, summary }). Free naming pass
+      // since summarizeSaga already runs an LLM call over saga episodes.
+      await this.sagaNodeRepository.createIfNotExists(
+        createSagaNode({
+          uuid: sagaUuid,
+          name: NodeNameSchema.parse(sagaUuid),
+          graphId,
+        }),
+      );
+
+      await Promise.all(
+        indices.map((i) =>
+          this.hasEpisodeEdgeRepository.save(
+            createHasEpisodeEdge({
+              sourceNodeUuid: sagaUuid,
+              targetNodeUuid: episodicNodes[i].uuid,
+              graphId: episodicNodes[i].graphId,
+            }),
+          ),
+        ),
+      );
+    }
+
+    // 24. Optional community build per distinct graphId
+    // TODO: Concurrent addEpisodes calls for the same graphId can race here -
     // two community builds may project conflicting graph snapshots and race on
-    // deleteByGroupId. Investigate a per-groupId mutex or advisory lock before
+    // deleteByGraphId. Investigate a per-graphId mutex or advisory lock before
     // enabling concurrent bulk ingestion.
     if (updateCommunities) {
       await Promise.all(
-        groupIds.map((gid) => this.communityService.buildCommunities(userId, gid)),
+        graphIds.map((gid) => this.communityService.buildCommunities(userId, gid)),
       );
     }
 
@@ -672,13 +712,14 @@ export class EpisodeService {
         'session.id': ctx.sessionId ?? ctx.userId,
         'episode.count': episodes.length,
         'episode.uuids': episodicNodes.map((e) => e.uuid).join(','),
-        'group.ids': groupIds.join(','),
+        'graph.ids': graphIds.join(','),
         'node.count.extracted': allExtractedNodes.length,
         'node.count.canonical': allCanonicalNodes.length,
         'node.count.new': newNodesOnly.length,
         'edge.count.extracted': allExtractedEdges.length,
         'edge.count.resolved': allResolvedEdges.length,
         'edge.count.invalidated': allInvalidatedEdges.length,
+        'edge.count.new': allNewEdges.length,
         'previousEpisodes.totalCount': prevEpisodesPerEpisode.reduce(
           (s, a) => s + a.length,
           0,
@@ -810,9 +851,9 @@ export class EpisodeService {
 
   private async collectNodeCandidates(
     nodes: EntityNode[],
-    groupId: GroupId,
+    graphId: Uuid,
   ): Promise<EntityNode[]> {
-    const { candidates } = await this.collectNodeCandidatesImpl(nodes, groupId);
+    const { candidates } = await this.collectNodeCandidatesImpl(nodes, graphId);
     return candidates;
   }
 
@@ -822,14 +863,14 @@ export class EpisodeService {
   })
   private async collectNodeCandidatesImpl(
     nodes: EntityNode[],
-    groupId: GroupId,
+    graphId: Uuid,
   ): Promise<{ candidates: EntityNode[]; metrics: SpanMetrics }> {
     const results = await Promise.all(
       nodes.flatMap((n) => [
         this.entityNodeRepository.searchByName(
           SearchByTextParamsSchema.parse({
             query: n.name,
-            groupIds: [groupId],
+            graphIds: [graphId],
             limit: CANDIDATE_LIMIT,
           }),
         ),
@@ -837,7 +878,7 @@ export class EpisodeService {
           ? this.entityNodeRepository.searchBySimilarity(
               SearchBySimilarityParamsSchema.parse({
                 embedding: n.nameEmbedding,
-                groupIds: [groupId],
+                graphIds: [graphId],
                 limit: CANDIDATE_LIMIT,
               }),
             )
@@ -854,7 +895,7 @@ export class EpisodeService {
       candidates,
       metrics: {
         'input.count': nodes.length,
-        'group.id': groupId,
+        'graph.id': graphId,
         'candidates.count': candidates.length,
       },
     };
@@ -862,9 +903,9 @@ export class EpisodeService {
 
   private async collectEdgeCandidates(
     edges: EntityEdge[],
-    groupId: GroupId,
+    graphId: Uuid,
   ): Promise<EntityEdge[]> {
-    const { candidates } = await this.collectEdgeCandidatesImpl(edges, groupId);
+    const { candidates } = await this.collectEdgeCandidatesImpl(edges, graphId);
     return candidates;
   }
 
@@ -874,14 +915,19 @@ export class EpisodeService {
   })
   private async collectEdgeCandidatesImpl(
     edges: EntityEdge[],
-    groupId: GroupId,
+    graphId: Uuid,
   ): Promise<{ candidates: EntityEdge[]; metrics: SpanMetrics }> {
+    // Same-endpoint edges (`getBetweenNodes`) are fetched explicitly per edge:
+    // text + similarity searches may not surface an existing edge whose fact
+    // differs textually from the new one, but a duplicate or contradiction
+    // between the same two nodes still needs to be considered during dedup.
+    // Mirrors upstream `EntityEdge.get_between_nodes` in edge_operations.py.
     const results = await Promise.all(
       edges.flatMap((e) => [
         this.entityEdgeRepository.searchByFact(
           SearchByTextParamsSchema.parse({
             query: e.fact,
-            groupIds: [groupId],
+            graphIds: [graphId],
             limit: CANDIDATE_LIMIT,
           }),
         ),
@@ -889,11 +935,12 @@ export class EpisodeService {
           ? this.entityEdgeRepository.searchBySimilarity(
               SearchBySimilarityParamsSchema.parse({
                 embedding: e.factEmbedding,
-                groupIds: [groupId],
+                graphIds: [graphId],
                 limit: CANDIDATE_LIMIT,
               }),
             )
           : Promise.resolve([] as EntityEdge[]),
+        this.entityEdgeRepository.getBetweenNodes(e.sourceNodeUuid, e.targetNodeUuid),
       ]),
     );
     const seen = new Set<Uuid>();
@@ -906,7 +953,7 @@ export class EpisodeService {
       candidates,
       metrics: {
         'input.count': edges.length,
-        'group.id': groupId,
+        'graph.id': graphId,
         'candidates.count': candidates.length,
       },
     };

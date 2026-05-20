@@ -7,7 +7,7 @@ import {
   KG_DIFF_EMBEDDING,
   KG_HIGH_SIM_EMBEDDING,
   KG_NEAR_SAME_EMBEDDING,
-  KG_TEST_GROUP_ID,
+  KG_TEST_GRAPH_ID,
   KgNodeFactory,
 } from '@/test/factories';
 
@@ -19,13 +19,13 @@ const u = (s: string) => s as Uuid;
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 function makeNode(name: string, embedding: number[] | null = null): EntityNode {
   return KgNodeFactory.createEntityNode({
     name,
-    groupId: KG_TEST_GROUP_ID,
+    graphId: KG_TEST_GRAPH_ID,
     nameEmbedding: embedding,
   });
 }

@@ -99,7 +99,9 @@ describe('UserService', () => {
           passwordHash: 'hashedPassword',
           role: RoleSchema.enum.USER,
           activeLlmProvider: LlmProvider.PLATFORM,
+          graphs: { create: { name: 'main' } },
         },
+        include: { graphs: true },
       });
       expect(result).toEqual(expectedUserWithoutPassword);
     });
@@ -154,7 +156,9 @@ describe('UserService', () => {
           passwordHash: hashedPassword,
           role: createUserDto.role,
           activeLlmProvider: LlmProvider.PLATFORM,
+          graphs: { create: { name: 'main' } },
         },
+        include: { graphs: true },
       });
       expect(result).toEqual(expectedUserWithoutPassword);
     });
@@ -191,6 +195,7 @@ describe('UserService', () => {
         orderBy: {
           createdAt: 'desc',
         },
+        include: { graphs: true },
       });
       expect(result).toEqual(mockPaginatedResult);
     });
@@ -224,6 +229,7 @@ describe('UserService', () => {
         orderBy: {
           createdAt: 'desc',
         },
+        include: { graphs: true },
       });
       expect(result).toEqual(mockPaginatedResult);
     });
@@ -264,6 +270,7 @@ describe('UserService', () => {
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
+        include: { graphs: true },
       });
       expect(result).toEqual(expectedUser);
     });
@@ -285,6 +292,7 @@ describe('UserService', () => {
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
+        include: { graphs: true },
       });
       expect(result).toEqual(expectedUser);
     });
@@ -314,6 +322,7 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
         data: { email: 'updated@example.com' },
+        include: { graphs: true },
       });
       expect(result.email).toBe('updated@example.com');
     });
@@ -333,6 +342,7 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
         data: { passwordHash: hashedPassword },
+        include: { graphs: true },
       });
     });
 
@@ -351,6 +361,7 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
         data: { role: RoleSchema.enum.ADMIN },
+        include: { graphs: true },
       });
     });
 
@@ -405,6 +416,7 @@ describe('UserService', () => {
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
+        include: { graphs: true },
       });
       expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,
@@ -413,6 +425,7 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
         data: { email: 'newemail@example.com' },
+        include: { graphs: true },
       });
       expect(result.email).toBe('newemail@example.com');
     });
@@ -435,6 +448,7 @@ describe('UserService', () => {
       expect(prismaService.user.update).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
         data: { passwordHash: hashedNewPassword },
+        include: { graphs: true },
       });
     });
 
@@ -525,6 +539,7 @@ describe('UserService', () => {
 
       expect(prismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: TEST_USER_UUID },
+        include: { graphs: true },
       });
       expect(passwordService.verify).toHaveBeenCalledWith(
         mockUser.passwordHash,

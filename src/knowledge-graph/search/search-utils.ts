@@ -1,12 +1,11 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
 import type { LlmContext, LlmTracer } from '@/observability';
 
-import { EntityNodeRepository } from '../neo4j/repositories';
-import { DEFAULT_MMR_LAMBDA } from './types';
+import { EntityNodeRepository } from '../repository/repositories';
+import { crossEncoderScoreJsonSchema, DEFAULT_MMR_LAMBDA } from './types';
 
 // ─── RRF ─────────────────────────────────────────────────────────────────────
 
@@ -178,9 +177,6 @@ export async function episodeMentionsReranker(
 // neural cross-encoder model (graphiti_core/cross_encoder/) for higher-quality
 // relevance scoring at lower latency. Replace with a dedicated cross-encoder
 // inference endpoint when available.
-const CrossEncoderScoreSchema = z.object({
-  score: z.number().min(0).max(100),
-});
 
 /**
  * LLM-based cross-encoder reranker. Scores each item 0–100 for relevance to
@@ -195,7 +191,7 @@ export async function crossEncoderReranker(
 ): Promise<[Uuid[], number[]]> {
   if (items.length === 0) return [[], []];
 
-  const scoredModel = model.withStructuredOutput(z.toJSONSchema(CrossEncoderScoreSchema));
+  const scoredModel = model.withStructuredOutput(crossEncoderScoreJsonSchema);
   const callbacks = opts?.llmTracer?.getCallbacks(opts.ctx) ?? [];
 
   const rawScores = await Promise.all(

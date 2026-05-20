@@ -12,11 +12,12 @@ Rules:
 - A duplicate fact expresses the same relationship with no new information
 - A contradiction occurs when the new fact directly negates or supersedes an existing fact (e.g. a person changed jobs — the old job fact is contradicted)
 - Temporal change is not deletion; use contradiction only when the new fact makes an old fact false
-- Return integer indices from the unified EXISTING FACTS list (which includes both same-endpoint facts and similar-topic candidates, numbered continuously)
-- duplicate_facts: indices of facts that say the same thing as the new fact (should only reference same-endpoint facts)
+- Return integer indices from the unified EXISTING FACTS list (numbered continuously across all sections)
+- duplicate_facts: indices of facts that say the same thing as the new fact (should only reference EXISTING FACTS or REVERSED-DIRECTION FACTS)
 - contradicted_facts: indices of facts that are made false by the new fact (can reference any fact in the list)
 - A fact can appear in BOTH arrays — this means it is superseded: the same information but now outdated
-- Return empty arrays when no duplicates or contradictions exist`;
+- Return empty arrays when no duplicates or contradictions exist
+- REVERSED-DIRECTION FACTS are duplicates only when the relation is symmetric (sibling, spouse, colleague). For asymmetric relations (manages, owns, loves), reversed direction means a different statement — not a duplicate.`;
 
 function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>): string {
   if (edges.length === 0) return 'None';
@@ -25,11 +26,17 @@ function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>):
     .join('\n');
 }
 
+function rangeLabel(offset: number, count: number): string {
+  if (count === 0) return `index ${offset} (none)`;
+  return count === 1 ? `index ${offset}` : `indices ${offset}–${offset + count - 1}`;
+}
+
 export function buildDedupeEdgesMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   newEdge: { name: string; fact: string };
-  existingEndpointEdges: Array<{ idx: number; name: string; fact: string }>;
+  sameDirectionEdges: Array<{ idx: number; name: string; fact: string }>;
+  reversedDirectionEdges: Array<{ idx: number; name: string; fact: string }>;
   similarEdges: Array<{ idx: number; name: string; fact: string }>;
   referenceTime: Date;
   customInstructions?: string;
@@ -38,24 +45,32 @@ export function buildDedupeEdgesMessages(ctx: {
     episode,
     previousEpisodes,
     newEdge,
-    existingEndpointEdges,
+    sameDirectionEdges,
+    reversedDirectionEdges,
     similarEdges,
     referenceTime,
     customInstructions,
   } = ctx;
 
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
-  const endpointEdgesText = formatEdges(existingEndpointEdges);
-  const similarEdgesText = formatEdges(similarEdges);
+  const sameRange = rangeLabel(0, sameDirectionEdges.length);
+  const reversedRange = rangeLabel(
+    sameDirectionEdges.length,
+    reversedDirectionEdges.length,
+  );
+  const similarRange = rangeLabel(
+    sameDirectionEdges.length + reversedDirectionEdges.length,
+    similarEdges.length,
+  );
 
-  // Indices are continuous: endpoint edges come first (0..N-1), then similar edges (N..M)
   let humanContent =
     `REFERENCE TIME: ${referenceTime.toISOString()}\n\n` +
     `PREVIOUS EPISODES:\n${previousEpisodesText}\n\n` +
     `CURRENT EPISODE:\n${episode.content}\n\n` +
     `NEW FACT:\n- name: ${newEdge.name}, fact: "${newEdge.fact}"\n\n` +
-    `EXISTING FACTS (same source→target, indices 0–${Math.max(0, existingEndpointEdges.length - 1)}):\n${endpointEdgesText}\n\n` +
-    `FACT INVALIDATION CANDIDATES (similar topic, indices ${existingEndpointEdges.length}–${existingEndpointEdges.length + Math.max(0, similarEdges.length - 1)}):\n${similarEdgesText}`;
+    `EXISTING FACTS (same source→target as new fact, ${sameRange}):\n${formatEdges(sameDirectionEdges)}\n\n` +
+    `REVERSED-DIRECTION FACTS (same nodes swapped, ${reversedRange}):\n${formatEdges(reversedDirectionEdges)}\n\n` +
+    `FACT INVALIDATION CANDIDATES (similar topic, ${similarRange}):\n${formatEdges(similarEdges)}`;
 
   if (customInstructions) {
     humanContent += `\n\n${customInstructions}`;

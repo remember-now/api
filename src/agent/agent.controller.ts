@@ -8,7 +8,6 @@ import { LoggedInGuard } from '@/auth/guard';
 import { Uuid } from '@/common/schemas';
 import { EpisodeService } from '@/knowledge-graph/episode';
 import { EpisodeType } from '@/knowledge-graph/models';
-import { GroupIdSchema } from '@/knowledge-graph/neo4j/types';
 import { SearchService } from '@/knowledge-graph/search';
 import {
   EdgeReranker,
@@ -17,22 +16,21 @@ import {
   NodeSearchMethod,
 } from '@/knowledge-graph/search/types';
 import { Traceable } from '@/observability';
+import { UserWithoutPassword } from '@/user/dto';
 
 import { AgentService } from './agent.service';
 
-// TODO: REMOVE — test DTOs
+// TODO: REMOVE - test DTOs
 const TestIngestSchema = z.object({
   name: z.string().min(1),
   content: z.string().min(1),
-  groupId: GroupIdSchema,
   source: z.enum(EpisodeType).default(EpisodeType.message),
 });
 class TestIngestDto extends createZodDto(TestIngestSchema) {}
 
-// TODO: REMOVE — test DTOs
+// TODO: REMOVE - test DTOs
 const TestSearchSchema = z.object({
   query: z.string().min(1),
-  groupId: GroupIdSchema,
 });
 class TestSearchDto extends createZodDto(TestSearchSchema) {}
 
@@ -58,14 +56,15 @@ export class AgentController {
   @ApiOperation({
     summary: '[TEST] Ingest an episode into the knowledge graph',
   })
-  async testIngest(@Body() body: TestIngestDto, @GetUser('id') userId: Uuid) {
+  async testIngest(@Body() body: TestIngestDto, @GetUser() user: UserWithoutPassword) {
+    const graphId = user.graphs.find((g) => g.name === 'main')!.id;
     const [result] = await this.episodeService.addEpisodes({
-      userId,
+      userId: user.id,
       episodes: [
         {
           name: body.name,
           content: body.content,
-          groupId: body.groupId,
+          graphId,
           source: body.source,
         },
       ],
@@ -93,11 +92,12 @@ export class AgentController {
   // TODO: REMOVE
   @Post('test/search')
   @ApiOperation({ summary: '[TEST] Search the knowledge graph' })
-  async testSearch(@Body() body: TestSearchDto, @GetUser('id') userId: Uuid) {
+  async testSearch(@Body() body: TestSearchDto, @GetUser() user: UserWithoutPassword) {
+    const graphId = user.graphs.find((g) => g.name === 'main')!.id;
     const results = await this.searchService.search({
-      userId,
+      userId: user.id,
       query: body.query,
-      groupIds: [body.groupId],
+      graphIds: [graphId],
       config: {
         limit: 10,
         edgeConfig: {

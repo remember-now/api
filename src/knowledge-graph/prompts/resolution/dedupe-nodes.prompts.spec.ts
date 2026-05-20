@@ -1,11 +1,11 @@
-import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildDedupeNodesMessages } from './dedupe-nodes.prompts';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 const extractedNodes = [
@@ -92,7 +92,7 @@ describe('buildDedupeNodesMessages', () => {
       name: 'Prev Episode',
       content: 'Bob was here.',
       validAt: new Date('2023-12-01'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
     });
     const messages = buildDedupeNodesMessages({
       episode: baseEpisode,

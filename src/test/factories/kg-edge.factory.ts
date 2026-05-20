@@ -4,15 +4,13 @@ import {
   createEntityEdge,
   createEpisodicEdge,
   createHasEpisodeEdge,
-  createNextEpisodeEdge,
   EntityEdge,
   EpisodicEdge,
   HasEpisodeEdge,
-  NextEpisodeEdge,
 } from '@/knowledge-graph/models';
-import { RelationshipTypeSchema } from '@/knowledge-graph/neo4j';
+import { RelationshipTypeSchema } from '@/knowledge-graph/types';
 
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, kgUuid } from './kg-constants';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgUuid } from './kg-constants';
 
 type WithStringName<T> = Omit<Partial<T>, 'name'> & { name?: string };
 
@@ -22,7 +20,7 @@ export class KgEdgeFactory {
     return createEntityEdge({
       name: RelationshipTypeSchema.parse(name ?? 'RELATED_TO'),
       fact: 'A is related to B',
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       sourceNodeUuid: kgUuid(),
       targetNodeUuid: kgUuid(),
       validAt: KG_REFERENCE_TIME,
@@ -32,7 +30,7 @@ export class KgEdgeFactory {
 
   static createEpisodicEdge(opts: Partial<EpisodicEdge> = {}): EpisodicEdge {
     return createEpisodicEdge({
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       sourceNodeUuid: kgUuid(),
       targetNodeUuid: kgUuid(),
       ...opts,
@@ -41,16 +39,7 @@ export class KgEdgeFactory {
 
   static createHasEpisodeEdge(opts: Partial<HasEpisodeEdge> = {}): HasEpisodeEdge {
     return createHasEpisodeEdge({
-      groupId: KG_TEST_GROUP_ID,
-      sourceNodeUuid: kgUuid(),
-      targetNodeUuid: kgUuid(),
-      ...opts,
-    });
-  }
-
-  static createNextEpisodeEdge(opts: Partial<NextEpisodeEdge> = {}): NextEpisodeEdge {
-    return createNextEpisodeEdge({
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       sourceNodeUuid: kgUuid(),
       targetNodeUuid: kgUuid(),
       ...opts,
@@ -59,7 +48,7 @@ export class KgEdgeFactory {
 
   static createCommunityEdge(opts: Partial<CommunityEdge> = {}): CommunityEdge {
     return createCommunityEdge({
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       sourceNodeUuid: kgUuid(),
       targetNodeUuid: kgUuid(),
       ...opts,

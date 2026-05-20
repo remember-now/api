@@ -1,0 +1,9 @@
+export { CommunityNodeRepository } from './community-node.repository';
+export { CommunityEdgeRepository } from './community-edge.repository';
+export { GdsCommunityRepository } from './gds-community.repository';
+export { EntityNodeRepository } from './entity-node.repository';
+export { EntityEdgeRepository } from './entity-edge.repository';
+export { EpisodicNodeRepository } from './episodic-node.repository';
+export { EpisodicEdgeRepository } from './episodic-edge.repository';
+export { SagaNodeRepository } from './saga-node.repository';
+export { HasEpisodeEdgeRepository } from './has-episode-edge.repository';

@@ -3,7 +3,7 @@ import { mockDeep } from 'jest-mock-extended';
 
 import { Uuid } from '@/common/schemas';
 
-import { EntityNodeRepository } from '../neo4j/repositories';
+import { EntityNodeRepository } from '../repository/repositories';
 import {
   crossEncoderReranker,
   episodeMentionsReranker,
@@ -12,7 +12,7 @@ import {
   rrf,
 } from './search-utils';
 
-// Branded test sentinels — narrow string aliases for branded uuids in mocks.
+// Branded test sentinels - narrow string aliases for branded uuids in mocks.
 const u = (s: string) => s as Uuid;
 
 // ─── rrf ─────────────────────────────────────────────────────────────────────
@@ -96,9 +96,9 @@ describe('mmr', () => {
 
   it('with lambda=0 (pure diversity) ranks least correlated candidate first', () => {
     // query = [1, 0, 0]
-    // 'a' = [1, 0, 0]  — strongly correlated with 'c'
-    // 'b' = [0, 1, 0]  — uncorrelated with both others
-    // 'c' = [0.9, 0.1, 0] — strongly correlated with 'a'
+    // 'a' = [1, 0, 0]  - strongly correlated with 'c'
+    // 'b' = [0, 1, 0]  - uncorrelated with both others
+    // 'c' = [0.9, 0.1, 0] - strongly correlated with 'a'
     // With lambda=0: mmr = -maxPairwiseSim
     // maxSim(b) ≈ 0.1  → mmr(b) ≈ -0.1  (highest / least penalised)
     // maxSim(a) ≈ 0.99 → mmr(a) ≈ -0.99 (most penalised)
@@ -325,8 +325,8 @@ describe('crossEncoderReranker', () => {
 
   it('filters items whose normalised score is below minScore', async () => {
     mockRunnable.invoke
-      .mockResolvedValueOnce({ score: 80 }) // 0.8 — passes
-      .mockResolvedValueOnce({ score: 40 }); // 0.4 — filtered
+      .mockResolvedValueOnce({ score: 80 }) // 0.8 - passes
+      .mockResolvedValueOnce({ score: 40 }); // 0.4 - filtered
 
     const [uuids] = await crossEncoderReranker(
       model,

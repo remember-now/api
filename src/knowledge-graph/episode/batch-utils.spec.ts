@@ -1,6 +1,6 @@
 import { Uuid } from '@/common/schemas';
 
-import { GroupId, RelationshipTypeSchema } from '../neo4j/types';
+import { RelationshipTypeSchema } from '../types';
 import {
   buildDirectedUuidMap,
   compressUuidMap,
@@ -155,7 +155,7 @@ const makeEdge = (uuid: string, sourceNodeUuid: string, targetNodeUuid: string) 
   targetNodeUuid: u(targetNodeUuid),
   name: RelationshipTypeSchema.parse('RELATES_TO'),
   fact: 'test',
-  groupId: 'g' as GroupId,
+  graphId: 'g' as Uuid,
   episodes: [],
   createdAt: new Date(),
   validAt: null,

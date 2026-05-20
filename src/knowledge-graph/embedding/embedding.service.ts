@@ -1,21 +1,21 @@
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
+// We use @google/genai instead of @langchain/google-genai (which the LLM
+// factory still uses for chat) because LangChain's GoogleGenerativeAIEmbeddings
+// wrapper doesn't expose `outputDimensionality` as of now. We need it to truncate to the
+// Postgres `vector(768)` schema and to opt into gemini-embedding-2's
+// server-side L2 normalization on truncated outputs.
+import { GoogleGenAI } from '@google/genai';
 import { Injectable } from '@nestjs/common';
 
 import { EmbeddingConfigService } from '@/config/embedding';
-import { Span } from '@/observability';
+import { metricsOnResult, Span, type SpanMetrics } from '@/observability';
 
 import { EntityEdge, EntityNode } from '../models';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
 
 const EMBEDDING_ATTRS = { 'langfuse.observation.type': 'embedding' };
 
 @Injectable()
 export class EmbeddingService {
-  private readonly model: GoogleGenerativeAIEmbeddings | null;
+  private readonly client: GoogleGenAI | null;
   private readonly modelName: string;
   private readonly _dimensions: number;
 
@@ -24,7 +24,7 @@ export class EmbeddingService {
     this.modelName = embeddingConfig.googleModel;
 
     if (!embeddingConfig.embeddingEnabled) {
-      this.model = null;
+      this.client = null;
       return;
     }
     const apiKey = embeddingConfig.googleApiKey;
@@ -33,16 +33,23 @@ export class EmbeddingService {
         'GOOGLE_EMBEDDING_API_KEY is required when EMBEDDING_ENABLED is true',
       );
     }
-
-    this.model = new GoogleGenerativeAIEmbeddings({
-      apiKey,
-      model: embeddingConfig.googleModel,
-    });
+    this.client = new GoogleGenAI({ apiKey });
   }
 
   /** Output dimension of the configured embedding model. */
   get dimensions(): number {
     return this._dimensions;
+  }
+
+  private async embed(texts: string[]): Promise<number[][]> {
+    const res = await this.client!.models.embedContent({
+      model: this.modelName,
+      // Wrap each text as its own Content so the SDK returns N embeddings,
+      // not a single embedding for N concatenated parts.
+      contents: texts.map((text) => ({ parts: [{ text }] })),
+      config: { outputDimensionality: this._dimensions },
+    });
+    return (res.embeddings ?? []).map((e) => e.values ?? []);
   }
 
   async embedNodes(nodes: EntityNode[]): Promise<EntityNode[]> {
@@ -54,7 +61,7 @@ export class EmbeddingService {
   private async embedNodesImpl(
     nodes: EntityNode[],
   ): Promise<{ nodes: EntityNode[]; metrics: SpanMetrics }> {
-    if (this.model === null) {
+    if (this.client === null) {
       return { nodes, metrics: { count: 0, model: this.modelName, skipped: true } };
     }
 
@@ -63,15 +70,14 @@ export class EmbeddingService {
       return { nodes, metrics: { count: 0, model: this.modelName } };
     }
 
-    const texts = toEmbed.map((n) => n.name);
-    const vectors = await this.model.embedDocuments(texts);
+    const vectors = await this.embed(toEmbed.map((n) => n.name));
 
     let vectorIdx = 0;
     const out = nodes.map((n) => {
       if (n.nameEmbedding !== null) return n;
       return { ...n, nameEmbedding: vectors[vectorIdx++] };
     });
-    return { nodes: out, metrics: { count: texts.length, model: this.modelName } };
+    return { nodes: out, metrics: { count: toEmbed.length, model: this.modelName } };
   }
 
   async embedText(text: string): Promise<number[] | null> {
@@ -83,10 +89,10 @@ export class EmbeddingService {
   private async embedTextImpl(
     text: string,
   ): Promise<{ vector: number[] | null; metrics: SpanMetrics }> {
-    if (this.model === null) {
+    if (this.client === null) {
       return { vector: null, metrics: { model: this.modelName, skipped: true } };
     }
-    const [vector] = await this.model.embedDocuments([text]);
+    const [vector] = await this.embed([text]);
     return { vector, metrics: { model: this.modelName } };
   }
 
@@ -99,7 +105,7 @@ export class EmbeddingService {
   private async embedEdgesImpl(
     edges: EntityEdge[],
   ): Promise<{ edges: EntityEdge[]; metrics: SpanMetrics }> {
-    if (this.model === null) {
+    if (this.client === null) {
       return { edges, metrics: { count: 0, model: this.modelName, skipped: true } };
     }
 
@@ -108,14 +114,13 @@ export class EmbeddingService {
       return { edges, metrics: { count: 0, model: this.modelName } };
     }
 
-    const texts = toEmbed.map((e) => e.fact);
-    const vectors = await this.model.embedDocuments(texts);
+    const vectors = await this.embed(toEmbed.map((e) => e.fact));
 
     let vectorIdx = 0;
     const out = edges.map((e) => {
       if (e.factEmbedding !== null) return e;
       return { ...e, factEmbedding: vectors[vectorIdx++] };
     });
-    return { edges: out, metrics: { count: texts.length, model: this.modelName } };
+    return { edges: out, metrics: { count: toEmbed.length, model: this.modelName } };
   }
 }

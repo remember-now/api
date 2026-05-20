@@ -1,7 +1,13 @@
-import { Role as PrismaRole, User as PrismaUser } from '@generated/prisma/client';
+import {
+  Graph as PrismaGraph,
+  Role as PrismaRole,
+  User as PrismaUser,
+} from '@generated/prisma/client';
 
 import { Uuid, UuidSchema } from '@/common/schemas';
 import { Role, RoleSchema, User, UserWithoutPassword } from '@/user/dto';
+
+export type PrismaUserWithGraphs = PrismaUser & { graphs: PrismaGraph[] };
 
 export const TEST_USER_UUID = UuidSchema.parse('00000000-0000-4000-8000-000000000001');
 export const TEST_USER_UUID_2 = UuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -33,9 +39,10 @@ export class UserFactory {
     createdAt: new Date('2025-01-01').toISOString(),
     updatedAt: new Date('2025-01-01').toISOString(),
     passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
+    graphs: [],
   };
 
-  private static defaultPrismaUser: PrismaUser = {
+  private static defaultPrismaUser: PrismaUserWithGraphs = {
     id: TEST_USER_UUID,
     email: 'test@example.com',
     role: PrismaRole.USER,
@@ -43,6 +50,7 @@ export class UserFactory {
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$...',
+    graphs: [],
   };
 
   /**
@@ -92,7 +100,7 @@ export class UserFactory {
    * Creates a full Prisma User object (including passwordHash) with Date objects
    * Use this for mocking Prisma service calls
    */
-  static createPrismaUser(options: PrismaUserFactoryOptions = {}): PrismaUser {
+  static createPrismaUser(options: PrismaUserFactoryOptions = {}): PrismaUserWithGraphs {
     return {
       ...this.defaultPrismaUser,
       ...options,
@@ -105,7 +113,7 @@ export class UserFactory {
    */
   static createPrismaUserWithoutPassword(
     options: PrismaUserFactoryOptions = {},
-  ): Omit<PrismaUser, 'passwordHash'> {
+  ): Omit<PrismaUserWithGraphs, 'passwordHash'> {
     const user = this.createPrismaUser(options);
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;

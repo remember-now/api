@@ -13,9 +13,9 @@ import {
   NodeLabelSchema,
   NodeLabelsSchema,
   NodeNameSchema,
-} from '@/knowledge-graph/neo4j';
+} from '@/knowledge-graph/types';
 
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID } from './kg-constants';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID } from './kg-constants';
 
 type WithStrings<T> = Omit<Partial<T>, 'name' | 'labels'> & {
   name?: string;
@@ -28,7 +28,7 @@ export class KgNodeFactory {
     return createEntityNode({
       name: NodeNameSchema.parse(name ?? 'TestEntity'),
       labels: labels ? NodeLabelsSchema.parse(labels) : [NodeLabelSchema.parse('Entity')],
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       ...rest,
     });
   }
@@ -37,7 +37,7 @@ export class KgNodeFactory {
     const { name, labels, ...rest } = opts;
     return createEpisodicNode({
       name: NodeNameSchema.parse(name ?? 'Test Episode'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       content: 'test content',
       validAt: KG_REFERENCE_TIME,
       source: EpisodeType.text,
@@ -52,7 +52,7 @@ export class KgNodeFactory {
     const { name, labels, ...rest } = opts;
     return createCommunityNode({
       name: NodeNameSchema.parse(name ?? 'Test Community'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       labels: labels
         ? NodeLabelsSchema.parse(labels)
         : [NodeLabelSchema.parse('Community')],
@@ -64,7 +64,7 @@ export class KgNodeFactory {
     const { name, labels, ...rest } = opts;
     return createSagaNode({
       name: NodeNameSchema.parse(name ?? 'Test Saga'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
       labels: labels ? NodeLabelsSchema.parse(labels) : [NodeLabelSchema.parse('Saga')],
       ...rest,
     });

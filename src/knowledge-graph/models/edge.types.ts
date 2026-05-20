@@ -4,18 +4,13 @@ import { z } from 'zod';
 
 import { Uuid, UuidSchema } from '@/common/schemas';
 
-import {
-  GroupId,
-  GroupIdSchema,
-  RelationshipType,
-  RelationshipTypeSchema,
-} from '../neo4j/types';
+import { RelationshipType, RelationshipTypeSchema } from '../types';
 
 // Schemas
 
 export const EdgeBaseSchema = z.object({
   uuid: UuidSchema,
-  groupId: GroupIdSchema,
+  graphId: UuidSchema,
   sourceNodeUuid: UuidSchema,
   targetNodeUuid: UuidSchema,
   createdAt: z.date(),
@@ -24,22 +19,20 @@ export const EdgeBaseSchema = z.object({
 export const EntityEdgeSchema = EdgeBaseSchema.extend({
   name: RelationshipTypeSchema,
   fact: z.string(),
-  factEmbedding: z.array(z.number()).nullable(),
-  episodes: z.array(UuidSchema),
-  expiredAt: z.date().nullable(),
-  validAt: z.date().nullable(),
-  invalidAt: z.date().nullable(),
-  attributes: z.record(z.string(), z.unknown()),
+  factEmbedding: z.array(z.number()).nullable().default(null),
+  episodes: z.array(UuidSchema).default([]),
+  expiredAt: z.date().nullable().default(null),
+  validAt: z.date().nullable().default(null),
+  invalidAt: z.date().nullable().default(null),
+  attributes: z.record(z.string(), z.unknown()).default({}),
 });
 
-// EpisodicEdge  = MENTIONS         (Episodic → Entity)
-// CommunityEdge = HAS_MEMBER       (Community → Entity)
-// HasEpisodeEdge = HAS_EPISODE     (Saga     → Episodic)
-// NextEpisodeEdge = NEXT_EPISODE   (Episodic → Episodic)
+// EpisodicEdge  = MENTIONS         (Episodic -> Entity)
+// CommunityEdge = HAS_MEMBER       (Community -> Entity)
+// HasEpisodeEdge = HAS_EPISODE     (Saga      -> Episodic)
 export const EpisodicEdgeSchema = EdgeBaseSchema;
 export const CommunityEdgeSchema = EdgeBaseSchema;
 export const HasEpisodeEdgeSchema = EdgeBaseSchema;
-export const NextEpisodeEdgeSchema = EdgeBaseSchema;
 
 // Types
 
@@ -48,13 +41,12 @@ export type EntityEdge = z.infer<typeof EntityEdgeSchema>;
 export type EpisodicEdge = z.infer<typeof EpisodicEdgeSchema>;
 export type CommunityEdge = z.infer<typeof CommunityEdgeSchema>;
 export type HasEpisodeEdge = z.infer<typeof HasEpisodeEdgeSchema>;
-export type NextEpisodeEdge = z.infer<typeof NextEpisodeEdgeSchema>;
 
 // Factories
 
 export function createEdgeDefaults(): Omit<
   EdgeBase,
-  'groupId' | 'sourceNodeUuid' | 'targetNodeUuid'
+  'graphId' | 'sourceNodeUuid' | 'targetNodeUuid'
 > {
   return {
     uuid: UuidSchema.parse(randomUUID()),
@@ -66,59 +58,43 @@ export function createEntityEdge(
   partial: Partial<EntityEdge> & {
     name: RelationshipType;
     fact: string;
-    groupId: GroupId;
+    graphId: Uuid;
     sourceNodeUuid: Uuid;
     targetNodeUuid: Uuid;
   },
 ): EntityEdge {
-  return {
+  return EntityEdgeSchema.parse({
     ...createEdgeDefaults(),
-    factEmbedding: null,
-    episodes: [] as Uuid[],
-    expiredAt: null,
-    validAt: null,
-    invalidAt: null,
-    attributes: {},
     ...partial,
-  };
+  });
 }
 
 export function createEpisodicEdge(
   partial: Partial<EpisodicEdge> & {
-    groupId: GroupId;
+    graphId: Uuid;
     sourceNodeUuid: Uuid;
     targetNodeUuid: Uuid;
   },
 ): EpisodicEdge {
-  return { ...createEdgeDefaults(), ...partial };
+  return EpisodicEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });
 }
 
 export function createCommunityEdge(
   partial: Partial<CommunityEdge> & {
-    groupId: GroupId;
+    graphId: Uuid;
     sourceNodeUuid: Uuid;
     targetNodeUuid: Uuid;
   },
 ): CommunityEdge {
-  return { ...createEdgeDefaults(), ...partial };
+  return CommunityEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });
 }
 
 export function createHasEpisodeEdge(
   partial: Partial<HasEpisodeEdge> & {
-    groupId: GroupId;
+    graphId: Uuid;
     sourceNodeUuid: Uuid;
     targetNodeUuid: Uuid;
   },
 ): HasEpisodeEdge {
-  return { ...createEdgeDefaults(), ...partial };
-}
-
-export function createNextEpisodeEdge(
-  partial: Partial<NextEpisodeEdge> & {
-    groupId: GroupId;
-    sourceNodeUuid: Uuid;
-    targetNodeUuid: Uuid;
-  },
-): NextEpisodeEdge {
-  return { ...createEdgeDefaults(), ...partial };
+  return HasEpisodeEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });
 }

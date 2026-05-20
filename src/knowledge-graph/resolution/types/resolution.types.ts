@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { UuidSchema } from '@/common/schemas';
 
 import { EntityEdgeSchema, EntityNodeSchema } from '../../models';
-import { NodeNameSchema } from '../../neo4j';
+import { NodeNameSchema } from '../../types';
 
 // Schemas
 
@@ -25,6 +25,10 @@ export const EdgeDedupeSchema = z.object({
 export const EdgeResolutionResultSchema = z.object({
   resolvedEdges: z.array(EntityEdgeSchema),
   invalidatedEdges: z.array(EntityEdgeSchema),
+  // Subset of resolvedEdges that were freshly extracted (not duplicates of
+  // existing graph edges). Attribute extraction runs only on these to avoid
+  // overwriting prior values when an existing edge is matched as a duplicate.
+  newEdges: z.array(EntityEdgeSchema),
 });
 
 export const NodeResolutionResultSchema = z.object({

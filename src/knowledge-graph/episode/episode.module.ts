@@ -5,7 +5,7 @@ import { LlmModule } from '@/llm/llm.module';
 import { CommunityModule } from '../community/community.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ExtractionModule } from '../extraction/extraction.module';
-import { Neo4jModule } from '../neo4j/neo4j.module';
+import { RepositoryModule } from '../repository/repository.module';
 import { ResolutionModule } from '../resolution/resolution.module';
 import { EpisodeService } from './episode.service';
 
@@ -16,7 +16,7 @@ import { EpisodeService } from './episode.service';
     ExtractionModule,
     ResolutionModule,
     CommunityModule,
-    Neo4jModule,
+    RepositoryModule,
   ],
   providers: [EpisodeService],
   exports: [EpisodeService],

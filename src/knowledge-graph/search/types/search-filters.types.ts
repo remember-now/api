@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { UuidSchema } from '@/common/schemas';
 
-import { NodeLabelSchema, RelationshipTypeSchema } from '../../neo4j/types';
+import { NodeLabelSchema, RelationshipTypeSchema } from '../../types';
 
 // Enums
 
@@ -42,8 +42,8 @@ export const SearchFiltersSchema = z.object({
    * Temporal conditions applied to the matched entities.
    *
    * Mirrors Python Graphiti's `list[list[DateFilter]]` structure:
-   * - Outer array: OR groups — at least one group must match.
-   * - Inner array: AND conditions — all conditions within a group must match.
+   * - Outer array: OR groups - at least one group must match.
+   * - Inner array: AND conditions - all conditions within a group must match.
    *
    * Example: `[[{ field: 'valid_at', op: gte, value: t1 }, { field: 'valid_at', op: lt, value: t2 }], [{ field: 'valid_at', op: isNull }]]`
    * produces: `((e.valid_at >= $p AND e.valid_at < $p2) OR (e.valid_at IS NULL))`

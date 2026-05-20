@@ -3,26 +3,24 @@ import type { Logger as PinoLogger } from 'pino';
 
 import { AppConfigModule, AppConfigService, Environment } from '@/config/app';
 import { LangfuseConfigModule, LangfuseConfigService } from '@/config/langfuse';
-import { OtelConfigModule, OtelConfigService } from '@/config/otel';
 
 import { createRootPinoLogger, PINO_LOGGER } from './pino';
 import { PinoLoggerService } from './pino-logger.service';
-import { LangfuseLlmTracer, NoOpLlmTracer, NoOpTracer, OtelTracer } from './tracers';
-import { LLM_TRACER, type LlmTracer, TRACER, type Tracer } from './types';
+import { LangfuseLlmTracer, NoOpLlmTracer } from './tracers';
+import { LLM_TRACER, type LlmTracer } from './types';
 
 /**
  * Tracer shutdown is handled by the OTel SDK's own SIGTERM/SIGINT handlers
  * registered in `otel.ts`.
  *
- * Two independent tracers are provided:
- *  - `TRACER` (Tracer) - structural OTel-backed tracing, gated by
- *    `TELEMETRY_ENABLED`. NoOp when telemetry is off.
- *  - `LLM_TRACER` (LlmTracer) - Langfuse callbacks that capture full LLM
- *    prompts/completions, gated by `LANGFUSE_ENABLED`. NoOp otherwise.
+ * Structural OTel tracing flows through the `@Span` decorator (which calls
+ * `trace.getTracer(...)` directly). The `LLM_TRACER` (LlmTracer) provider
+ * supplies Langfuse callbacks that capture full LLM prompts/completions,
+ * gated by `LANGFUSE_ENABLED`. NoOp otherwise.
  */
 @Global()
 @Module({
-  imports: [AppConfigModule, LangfuseConfigModule, OtelConfigModule],
+  imports: [AppConfigModule, LangfuseConfigModule],
   providers: [
     {
       provide: PINO_LOGGER,
@@ -35,18 +33,12 @@ import { LLM_TRACER, type LlmTracer, TRACER, type Tracer } from './types';
     },
     PinoLoggerService,
     {
-      provide: TRACER,
-      inject: [OtelConfigService],
-      useFactory: (otelConfig: OtelConfigService): Tracer =>
-        otelConfig.telemetryEnabled ? new OtelTracer() : new NoOpTracer(),
-    },
-    {
       provide: LLM_TRACER,
       inject: [LangfuseConfigService],
       useFactory: (config: LangfuseConfigService): LlmTracer =>
         config.enabled ? new LangfuseLlmTracer(config) : new NoOpLlmTracer(),
     },
   ],
-  exports: [PINO_LOGGER, PinoLoggerService, TRACER, LLM_TRACER],
+  exports: [PINO_LOGGER, PinoLoggerService, LLM_TRACER],
 })
 export class ObservabilityModule {}

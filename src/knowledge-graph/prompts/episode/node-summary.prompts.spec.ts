@@ -1,11 +1,11 @@
-import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildNodeSummaryMessages } from './node-summary.prompts';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and manages Bob.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 const baseNodes = [
@@ -83,7 +83,7 @@ describe('buildNodeSummaryMessages', () => {
       name: 'Prev Episode',
       content: 'Charlie was at the office.',
       validAt: new Date('2023-12-01'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
     });
     const messages = buildNodeSummaryMessages({
       episode: baseEpisode,

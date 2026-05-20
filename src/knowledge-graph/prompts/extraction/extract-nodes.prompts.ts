@@ -5,6 +5,13 @@ import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 
 import { formatPreviousEpisodes } from '../text-utils';
 
+// TODO: the "bare head noun" / "bare animal noun" exclusions reject kinds
+// even when they are the subject of a declarative claim about the kind itself
+// ("Frogs are slow", "Wolves hunt in packs"). The node is dropped, then any
+// edge referencing it is filtered out in edge-extraction post-processing, and
+// the fact is lost. Consider carving out an exception: allow bare kind nouns
+// when they are the subject of a generic claim, OR have edge-extraction
+// promote unmatched referents into nodes when the claim is declarative.
 const EXTRACTION_RULES = `
 EXTRACT (real-world, nameable entities only):
 - Named people, organisations, places, events with specific proper names

@@ -20,8 +20,7 @@ LangChain + LangGraph
 Zod validation
 Swagger docs generated automatically using `nestjs-zod`, as all DTOs (in, out) are specified
 BullMQ (Redis)
-Prisma (PostgreSQL)
-Neo4j Community Edition
+Prisma (PostgreSQL + pgvector + pgvectorscale for ANN search)
 
 All environment variables are split by domain and loaded in `src/config`.
 
@@ -39,6 +38,10 @@ it only formats files that were changed in git, and is significantly faster.
 Never add "migration code" to make sure the code is compatible with previous
 versions of the graph. If something requires a manual migration, tell that
 to me explicitly.
+
+Never pipe `npm run lint` into something like `tail` or `grep` because the lint
+takes 22 seconds to run, so you're wasting time. The output isn't that big.
+Same for `npm test`.
 
 Lastly, `tsconfig.json`:
 

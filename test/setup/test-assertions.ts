@@ -41,7 +41,7 @@ export class TestAssertions {
         for (const [key, value] of Object.entries(userData)) {
           if (body[key as keyof UserWithoutPassword] !== value) {
             throw new Error(
-              `Expected ${key} to be ${String(value)} but got ${String(body[key as keyof UserWithoutPassword])}`,
+              `Expected ${key} to be ${JSON.stringify(value)} but got ${JSON.stringify(body[key as keyof UserWithoutPassword])}`,
             );
           }
         }
@@ -74,7 +74,7 @@ export class TestAssertions {
         for (const [key, value] of Object.entries(userData)) {
           if (body.user[key as keyof UserWithoutPassword] !== value) {
             throw new Error(
-              `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
+              `Expected user.${key} to be ${JSON.stringify(value)} but got ${JSON.stringify(body.user[key as keyof UserWithoutPassword])}`,
             );
           }
         }
@@ -103,7 +103,7 @@ export class TestAssertions {
         for (const [key, value] of Object.entries(userData)) {
           if (body.user[key as keyof UserWithoutPassword] !== value) {
             throw new Error(
-              `Expected user.${key} to be ${String(value)} but got ${String(body.user[key as keyof UserWithoutPassword])}`,
+              `Expected user.${key} to be ${JSON.stringify(value)} but got ${JSON.stringify(body.user[key as keyof UserWithoutPassword])}`,
             );
           }
         }

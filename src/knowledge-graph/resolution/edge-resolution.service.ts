@@ -2,12 +2,24 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
+import {
+  compressUuidMap,
+  LLM_CONCURRENCY_LIMIT,
+  withConcurrency,
+} from '../episode/batch-utils';
 import { EntityEdge, EpisodicNode } from '../models';
-import { SearchByTextParamsSchema } from '../neo4j';
-import { EntityEdgeRepository } from '../neo4j/repositories';
 import { buildDedupeEdgesMessages } from '../prompts';
+import { EntityEdgeRepository } from '../repository/repositories';
+import { SearchByTextParamsSchema } from '../types';
 import {
   cosineSimilarity,
   FACT_SIMILARITY_THRESHOLD,
@@ -16,11 +28,6 @@ import {
   normalizeString,
 } from './resolution-utils';
 import { edgeDedupeJsonSchema, EdgeResolutionResult } from './types';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
 
 @Injectable()
 export class EdgeResolutionService {
@@ -96,6 +103,7 @@ export class EdgeResolutionService {
     }
 
     const resolvedEdges: EntityEdge[] = [];
+    const newEdges: EntityEdge[] = [];
     const resolvedExistingUuids = new Set<Uuid>();
     const invalidatedEdgesMap = new Map<Uuid, EntityEdge>();
 
@@ -127,11 +135,11 @@ export class EdgeResolutionService {
               .map((s) => s.edge)
           : [];
 
-      // Keyword candidates (BM25 via Neo4j fulltext)
+      // Keyword candidates (BM25 fulltext)
       const keywordEdges = await this.edgeRepo.searchByFact(
         SearchByTextParamsSchema.parse({
           query: edge.fact,
-          groupIds: [edge.groupId],
+          graphIds: [edge.graphId],
           limit: MAX_KEYWORD_CANDIDATES,
         }),
       );
@@ -145,49 +153,21 @@ export class EdgeResolutionService {
 
       if (endpointEdges.length === 0 && similarEdges.length === 0) {
         resolvedEdges.push(edge);
+        newEdges.push(edge);
         continue;
       }
 
-      // Assign integer indices: endpoint edges first, then similar edges
-      const endpointWithIdx = endpointEdges.map((e, i) => ({
-        idx: i,
-        edge: e,
-      }));
-      const similarOffset = endpointEdges.length;
-      const similarWithIdx = similarEdges.map((e, i) => ({
-        idx: similarOffset + i,
-        edge: e,
-      }));
-
-      const idxToEdge = new Map<number, EntityEdge>();
-      for (const { idx, edge: e } of endpointWithIdx) idxToEdge.set(idx, e);
-      for (const { idx, edge: e } of similarWithIdx) idxToEdge.set(idx, e);
-
-      const messages = buildDedupeEdgesMessages({
+      const { dedupe, idxToEdge } = await this.dedupeEdgeViaLlm(
+        model,
+        edge,
+        endpointEdges,
+        similarEdges,
         episode,
         previousEpisodes,
-        newEdge: { name: edge.name, fact: edge.fact },
-        existingEndpointEdges: endpointWithIdx.map(({ idx, edge: e }) => ({
-          idx,
-          name: e.name,
-          fact: e.fact,
-        })),
-        similarEdges: similarWithIdx.map(({ idx, edge: e }) => ({
-          idx,
-          name: e.name,
-          fact: e.fact,
-        })),
         referenceTime,
         customInstructions,
-      });
-
-      const dedupe = await model
-        .withStructuredOutput(edgeDedupeJsonSchema)
-        .invoke(messages, {
-          callbacks: this.llmTracer.getCallbacks(ctx),
-          runName: 'resolve-edges',
-          tags: ['knowledge-graph', 'resolution.edge'],
-        });
+        ctx,
+      );
 
       // A fact is duplicate only if it matches an endpoint-range index
       const isDuplicate = dedupe.duplicate_facts.some(
@@ -217,6 +197,7 @@ export class EdgeResolutionService {
         }
 
         resolvedEdges.push(edge);
+        newEdges.push(edge);
       } else {
         // Append this episode's UUID to the matching existing endpoint edge(s)
         // and include them in resolvedEdges so they are re-saved with updated episodes.
@@ -278,13 +259,269 @@ export class EdgeResolutionService {
     return {
       resolvedEdges,
       invalidatedEdges,
+      newEdges,
       metrics: {
         'episode.uuid': episode.uuid,
         'extracted.count': extractedEdges.length,
         'existing.count': existingEdges.length,
         'resolved.count': resolvedEdges.length,
         'invalidated.count': invalidatedEdges.length,
+        'new.count': newEdges.length,
       },
     };
+  }
+
+  // Cross-batch edge dedup. Mirrors upstream `dedupe_edges_bulk`
+  // (bulk_utils.py:489): for each batch edge, surface peer edges from other
+  // episodes in the same batch as candidates and let the LLM identify
+  // duplicates. Without this, two episodes mentioning the same fact would each
+  // persist a separate row because per-episode resolution only consults the
+  // live graph. Returns deduped per-episode lists where collapsed duplicates
+  // are replaced with a single canonical edge whose `episodes` field is the
+  // union of the originating episode UUIDs.
+  async dedupeAcrossBatch(
+    model: BaseChatModel,
+    edgesPerEpisode: EntityEdge[][],
+    episodes: EpisodicNode[],
+    previousEpisodesPerEpisode: EpisodicNode[][],
+    customInstructions?: string,
+    ctx?: LlmContext,
+  ): Promise<EntityEdge[][]> {
+    return this.dedupeAcrossBatchImpl(
+      model,
+      edgesPerEpisode,
+      episodes,
+      previousEpisodesPerEpisode,
+      customInstructions,
+      ctx,
+    ).then((r) => r.deduped);
+  }
+
+  @Span('dedupeAcrossBatch', { onResult: metricsOnResult })
+  private async dedupeAcrossBatchImpl(
+    model: BaseChatModel,
+    edgesPerEpisode: EntityEdge[][],
+    episodes: EpisodicNode[],
+    previousEpisodesPerEpisode: EpisodicNode[][],
+    customInstructions: string | undefined,
+    ctx: LlmContext | undefined,
+  ): Promise<{ deduped: EntityEdge[][]; metrics: SpanMetrics }> {
+    const allEdges = edgesPerEpisode.flat();
+    const baseMetrics: SpanMetrics = {
+      'episodes.count': episodes.length,
+      'edges.in': allEdges.length,
+    };
+
+    if (allEdges.length < 2) {
+      return { deduped: edgesPerEpisode, metrics: { ...baseMetrics, 'pairs.found': 0 } };
+    }
+
+    // Owner index: which episode each edge came from. Edge UUIDs are unique
+    // (factory generates randomUUID per extraction), so a Map keyed by uuid
+    // is unambiguous.
+    const edgeOwner = new Map<Uuid, number>();
+    edgesPerEpisode.forEach((edges, i) => {
+      for (const e of edges) edgeOwner.set(e.uuid, i);
+    });
+
+    type Task = {
+      edge: EntityEdge;
+      endpointEdges: EntityEdge[];
+      similarEdges: EntityEdge[];
+    };
+    const tasks: Task[] = [];
+    for (const edge of allEdges) {
+      const endpointEdges: EntityEdge[] = [];
+      const similarEdges: EntityEdge[] = [];
+      for (const peer of allEdges) {
+        if (peer.uuid === edge.uuid) continue;
+        const sameEndpoints =
+          (peer.sourceNodeUuid === edge.sourceNodeUuid &&
+            peer.targetNodeUuid === edge.targetNodeUuid) ||
+          (peer.sourceNodeUuid === edge.targetNodeUuid &&
+            peer.targetNodeUuid === edge.sourceNodeUuid);
+        if (sameEndpoints) {
+          endpointEdges.push(peer);
+          continue;
+        }
+        if (
+          edge.factEmbedding !== null &&
+          peer.factEmbedding !== null &&
+          cosineSimilarity(edge.factEmbedding, peer.factEmbedding) >=
+            FACT_SIMILARITY_THRESHOLD
+        ) {
+          similarEdges.push(peer);
+        }
+      }
+      if (endpointEdges.length === 0 && similarEdges.length === 0) continue;
+      tasks.push({
+        edge,
+        endpointEdges,
+        similarEdges: similarEdges.slice(0, MAX_CANDIDATES),
+      });
+    }
+
+    const pairResults = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      tasks.map((t) => async (): Promise<[Uuid, Uuid][]> => {
+        const ownerIdx = edgeOwner.get(t.edge.uuid)!;
+        const { dedupe, idxToEdge } = await this.dedupeEdgeViaLlm(
+          model,
+          t.edge,
+          t.endpointEdges,
+          t.similarEdges,
+          episodes[ownerIdx],
+          previousEpisodesPerEpisode[ownerIdx],
+          episodes[ownerIdx].validAt,
+          customInstructions,
+          ctx,
+        );
+        // Only endpoint-range indices (same + reversed) count as duplicates.
+        // The similar-topic section is for contradictions; accepting duplicates
+        // from it would collapse edges with different endpoints. Matches the
+        // guard in `resolveEdges` and upstream `dedupe_edges_bulk` semantics
+        // (bulk_utils.py:521-524) which never surfaces non-endpoint duplicates.
+        const endpointCount = t.endpointEdges.length;
+        const localPairs: [Uuid, Uuid][] = [];
+        for (const idx of dedupe.duplicate_facts) {
+          if (idx >= endpointCount) continue;
+          const peer = idxToEdge.get(idx);
+          if (peer) localPairs.push([t.edge.uuid, peer.uuid]);
+        }
+        return localPairs;
+      }),
+    );
+
+    const duplicatePairs = pairResults.flat();
+    if (duplicatePairs.length === 0) {
+      return {
+        deduped: edgesPerEpisode,
+        metrics: { ...baseMetrics, 'pairs.found': 0, 'edges.out': allEdges.length },
+      };
+    }
+
+    // Union-find collapses transitive duplicates and picks lex-smallest UUID
+    // as canonical. Build canonical edge objects with merged episode UUIDs.
+    const uuidMap = compressUuidMap<Uuid>(duplicatePairs);
+    const edgesByUuid = new Map<Uuid, EntityEdge>(allEdges.map((e) => [e.uuid, e]));
+    const canonicalByUuid = new Map<Uuid, EntityEdge>();
+
+    for (const edge of allEdges) {
+      const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
+      if (canonicalUuid === edge.uuid) {
+        canonicalByUuid.set(canonicalUuid, edge);
+      }
+    }
+    for (const edge of allEdges) {
+      const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
+      if (canonicalUuid === edge.uuid) continue;
+      const canonical = canonicalByUuid.get(canonicalUuid);
+      if (!canonical) continue;
+      for (const ep of edge.episodes) {
+        if (!canonical.episodes.includes(ep)) canonical.episodes.push(ep);
+      }
+    }
+
+    const deduped = edgesPerEpisode.map((edges) => {
+      const seen = new Set<Uuid>();
+      const out: EntityEdge[] = [];
+      for (const edge of edges) {
+        const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
+        if (seen.has(canonicalUuid)) continue;
+        seen.add(canonicalUuid);
+        out.push(
+          canonicalByUuid.get(canonicalUuid) ?? edgesByUuid.get(canonicalUuid) ?? edge,
+        );
+      }
+      return out;
+    });
+
+    return {
+      deduped,
+      metrics: {
+        ...baseMetrics,
+        'pairs.found': duplicatePairs.length,
+        'edges.out': deduped.reduce((s, a) => s + a.length, 0),
+      },
+    };
+  }
+
+  // Shared LLM-driven dedup call used by both per-episode `resolveEdges` and
+  // batch-wide `dedupeAcrossBatch`. Builds the integer-indexed candidate list,
+  // invokes the structured-output prompt, and returns the raw decisions plus
+  // the idx → edge map so callers can act on duplicate_facts / contradicted_facts.
+  private async dedupeEdgeViaLlm(
+    model: BaseChatModel,
+    edge: EntityEdge,
+    endpointEdges: EntityEdge[],
+    similarEdges: EntityEdge[],
+    episode: EpisodicNode,
+    previousEpisodes: EpisodicNode[],
+    referenceTime: Date,
+    customInstructions: string | undefined,
+    ctx: LlmContext | undefined,
+  ): Promise<{
+    dedupe: { duplicate_facts: number[]; contradicted_facts: number[] };
+    idxToEdge: Map<number, EntityEdge>;
+  }> {
+    // Split endpoint candidates by direction so the LLM can treat reversed
+    // pairs as duplicates only for symmetric relations. Indices stay
+    // continuous: same → reversed → similar.
+    const sameDirection = endpointEdges.filter(
+      (e) => e.sourceNodeUuid === edge.sourceNodeUuid,
+    );
+    const reversedDirection = endpointEdges.filter(
+      (e) => e.sourceNodeUuid !== edge.sourceNodeUuid,
+    );
+
+    const sameWithIdx = sameDirection.map((e, i) => ({ idx: i, edge: e }));
+    const reversedOffset = sameDirection.length;
+    const reversedWithIdx = reversedDirection.map((e, i) => ({
+      idx: reversedOffset + i,
+      edge: e,
+    }));
+    const similarOffset = reversedOffset + reversedDirection.length;
+    const similarWithIdx = similarEdges.map((e, i) => ({
+      idx: similarOffset + i,
+      edge: e,
+    }));
+
+    const idxToEdge = new Map<number, EntityEdge>();
+    for (const { idx, edge: e } of sameWithIdx) idxToEdge.set(idx, e);
+    for (const { idx, edge: e } of reversedWithIdx) idxToEdge.set(idx, e);
+    for (const { idx, edge: e } of similarWithIdx) idxToEdge.set(idx, e);
+
+    const messages = buildDedupeEdgesMessages({
+      episode,
+      previousEpisodes,
+      newEdge: { name: edge.name, fact: edge.fact },
+      sameDirectionEdges: sameWithIdx.map(({ idx, edge: e }) => ({
+        idx,
+        name: e.name,
+        fact: e.fact,
+      })),
+      reversedDirectionEdges: reversedWithIdx.map(({ idx, edge: e }) => ({
+        idx,
+        name: e.name,
+        fact: e.fact,
+      })),
+      similarEdges: similarWithIdx.map(({ idx, edge: e }) => ({
+        idx,
+        name: e.name,
+        fact: e.fact,
+      })),
+      referenceTime,
+      customInstructions,
+    });
+
+    const dedupe = await model
+      .withStructuredOutput(edgeDedupeJsonSchema)
+      .invoke(messages, {
+        callbacks: this.llmTracer.getCallbacks(ctx),
+        runName: 'resolve-edges',
+        tags: ['knowledge-graph', 'resolution.edge'],
+      });
+
+    return { dedupe, idxToEdge };
   }
 }

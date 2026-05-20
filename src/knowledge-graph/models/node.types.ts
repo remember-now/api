@@ -4,47 +4,49 @@ import { z } from 'zod';
 
 import { Uuid, UuidSchema } from '@/common/schemas';
 
-import {
-  EpisodeType,
-  GroupId,
-  GroupIdSchema,
-  NodeLabelSchema,
-  NodeName,
-  NodeNameSchema,
-} from '../neo4j/types';
+import { EpisodeType, NodeLabelSchema, NodeName, NodeNameSchema } from '../types';
 
 // Schemas
 
 export const NodeBaseSchema = z.object({
   uuid: UuidSchema,
   name: NodeNameSchema,
-  groupId: GroupIdSchema,
+  graphId: UuidSchema,
   labels: z.array(NodeLabelSchema),
   createdAt: z.date(),
 });
 
 export const EntityNodeSchema = NodeBaseSchema.extend({
-  nameEmbedding: z.array(z.number()).nullable(),
-  summary: z.string(),
-  attributes: z.record(z.string(), z.unknown()),
+  nameEmbedding: z.array(z.number()).nullable().default(null),
+  summary: z.string().default(''),
+  attributes: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const EpisodicNodeSchema = NodeBaseSchema.extend({
   source: z.enum(EpisodeType),
-  sourceDescription: z.string(),
+  sourceDescription: z.string().default(''),
   content: z.string(),
   validAt: z.date(),
-  entityEdges: z.array(UuidSchema),
+  // entityEdges omitted: upstream's Neo4j denormalization of "facts this
+  // episode contributed to" lives on `entity_edges.episodes` here. For the
+  // upstream semantic, query `EntityEdge WHERE thisEpisode = ANY(episodes)`.
+
+  // episodeMetadata omitted: upstream declares a "customer-defined metadata
+  // for filtering" field but never writes or reads it. Add only if a
+  // concrete filterable-metadata requirement materializes.
 });
 
 export const CommunityNodeSchema = NodeBaseSchema.extend({
-  nameEmbedding: z.array(z.number()).nullable(),
-  summary: z.string(),
+  nameEmbedding: z.array(z.number()).nullable().default(null),
+  summary: z.string().default(''),
 });
 
 export const SagaNodeSchema = NodeBaseSchema.extend({
-  summary: z.string(),
-  lastSummarizedAt: z.date().nullable(),
+  summary: z.string().default(''),
+  lastSummarizedAt: z.date().nullable().default(null),
+  // firstEpisodeUuid / lastEpisodeUuid omitted: upstream persists them but
+  // never reads either. The queries they'd optimize (start/end of saga) are
+  // cheap via HAS_EPISODE + ORDER BY valid_at.
 });
 
 // Types
@@ -57,7 +59,7 @@ export type SagaNode = z.infer<typeof SagaNodeSchema>;
 
 // Factories
 
-export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
+export function createNodeDefaults(): Omit<NodeBase, 'name' | 'graphId'> {
   return {
     uuid: UuidSchema.parse(randomUUID()),
     labels: [],
@@ -66,56 +68,47 @@ export function createNodeDefaults(): Omit<NodeBase, 'name' | 'groupId'> {
 }
 
 export function createEntityNode(
-  partial: Partial<EntityNode> & { name: NodeName; groupId: GroupId },
+  partial: Partial<EntityNode> & { name: NodeName; graphId: Uuid },
 ): EntityNode {
-  return {
+  return EntityNodeSchema.parse({
     ...createNodeDefaults(),
     labels: [NodeLabelSchema.parse('Entity')],
-    nameEmbedding: null,
-    summary: '',
-    attributes: {},
     ...partial,
-  };
+  });
 }
 
 export function createEpisodicNode(
   partial: Partial<EpisodicNode> & {
     name: NodeName;
-    groupId: GroupId;
+    graphId: Uuid;
     content: string;
     validAt: Date;
   },
 ): EpisodicNode {
-  return {
+  return EpisodicNodeSchema.parse({
     ...createNodeDefaults(),
     labels: [NodeLabelSchema.parse('Episodic')],
     source: EpisodeType.text,
-    sourceDescription: '',
-    entityEdges: [] as Uuid[],
     ...partial,
-  };
+  });
 }
 
 export function createCommunityNode(
-  partial: Partial<CommunityNode> & { name: NodeName; groupId: GroupId },
+  partial: Partial<CommunityNode> & { name: NodeName; graphId: Uuid },
 ): CommunityNode {
-  return {
+  return CommunityNodeSchema.parse({
     ...createNodeDefaults(),
     labels: [NodeLabelSchema.parse('Community')],
-    nameEmbedding: null,
-    summary: '',
     ...partial,
-  };
+  });
 }
 
 export function createSagaNode(
-  partial: Partial<SagaNode> & { name: NodeName; groupId: GroupId },
+  partial: Partial<SagaNode> & { name: NodeName; graphId: Uuid },
 ): SagaNode {
-  return {
+  return SagaNodeSchema.parse({
     ...createNodeDefaults(),
     labels: [NodeLabelSchema.parse('Saga')],
-    summary: '',
-    lastSummarizedAt: null,
     ...partial,
-  };
+  });
 }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { NodeNameSchema, RelationshipTypeSchema } from '../../neo4j';
+import { NodeNameSchema, RelationshipTypeSchema } from '../../types';
 
 // Schemas
 
@@ -27,12 +27,23 @@ export const ExtractedEdgesSchema = z.object({
   edges: z.array(ExtractedEdgeSchema),
 });
 
+export const TimestampsBatchSchema = z.object({
+  facts: z.array(
+    z.object({
+      validAt: z.string().nullable().optional(),
+      invalidAt: z.string().nullable().optional(),
+    }),
+  ),
+});
+
 // Types
 
 export type ExtractedEntities = z.infer<typeof ExtractedEntitiesSchema>;
 export type ExtractedEdges = z.infer<typeof ExtractedEdgesSchema>;
+export type TimestampsBatch = z.infer<typeof TimestampsBatchSchema>;
 
 // JSON Schemas
 
 export const extractedEntitiesJsonSchema = z.toJSONSchema(ExtractedEntitiesSchema);
 export const extractedEdgesJsonSchema = z.toJSONSchema(ExtractedEdgesSchema);
+export const timestampsBatchJsonSchema = z.toJSONSchema(TimestampsBatchSchema);

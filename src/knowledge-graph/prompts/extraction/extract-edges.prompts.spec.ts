@@ -1,19 +1,19 @@
-import { KG_REFERENCE_TIME, KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { buildExtractEdgesMessages } from './extract-edges.prompts';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp. Bob is the CEO of Acme Corp.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 const nodes = [
-  KgNodeFactory.createEntityNode({ name: 'Alice', groupId: KG_TEST_GROUP_ID }),
-  KgNodeFactory.createEntityNode({ name: 'Bob', groupId: KG_TEST_GROUP_ID }),
+  KgNodeFactory.createEntityNode({ name: 'Alice', graphId: KG_TEST_GRAPH_ID }),
+  KgNodeFactory.createEntityNode({ name: 'Bob', graphId: KG_TEST_GRAPH_ID }),
   KgNodeFactory.createEntityNode({
     name: 'Acme Corp',
-    groupId: KG_TEST_GROUP_ID,
+    graphId: KG_TEST_GRAPH_ID,
   }),
 ];
 
@@ -59,7 +59,7 @@ describe('buildExtractEdgesMessages', () => {
       name: 'Prev Episode',
       content: 'Alice joined Acme in 2020.',
       validAt: new Date('2023-12-01'),
-      groupId: KG_TEST_GROUP_ID,
+      graphId: KG_TEST_GRAPH_ID,
     });
     const messages = buildExtractEdgesMessages({
       episode: baseEpisode,

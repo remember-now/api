@@ -1,17 +1,19 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import { buildExtractEdgesMessages } from '../prompts';
 import { extractedEdgesJsonSchema } from './types';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
 
 @Injectable()
 export class EdgeExtractionService {
@@ -88,7 +90,7 @@ export class EdgeExtractionService {
         return createEntityEdge({
           name: e.name,
           fact: e.description,
-          groupId: episode.groupId,
+          graphId: episode.graphId,
           sourceNodeUuid: sourceNode.uuid,
           targetNodeUuid: targetNode.uuid,
           episodes: [episode.uuid],
@@ -103,6 +105,8 @@ export class EdgeExtractionService {
         'episode.uuid': episode.uuid,
         'nodes.input.count': nodes.length,
         'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
+        'edges.llm_returned.count': result.edges.length,
+        'edges.dropped.count': result.edges.length - edges.length,
         'edges.extracted.count': edges.length,
       },
     };

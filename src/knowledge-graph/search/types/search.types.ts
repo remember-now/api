@@ -8,7 +8,6 @@ import {
   EntityNodeSchema,
   EpisodicNodeSchema,
 } from '../../models';
-import { GroupIdSchema } from '../../neo4j/types';
 import { SearchConfigSchema } from './search-config.types';
 import { SearchFiltersSchema } from './search-filters.types';
 
@@ -28,7 +27,7 @@ export const SearchResultsSchema = z.object({
 export const SearchOptionsSchema = z.object({
   userId: UuidSchema,
   query: z.string(),
-  groupIds: z.array(GroupIdSchema),
+  graphIds: z.array(UuidSchema),
   config: SearchConfigSchema,
   filters: SearchFiltersSchema.optional(),
   /** UUID of the node to use as the graph-distance anchor for node_distance reranking. */
@@ -37,11 +36,20 @@ export const SearchOptionsSchema = z.object({
   originNodeUuids: z.array(UuidSchema).optional(),
 });
 
+export const CrossEncoderScoreSchema = z.object({
+  score: z.number().min(0).max(100),
+});
+
 // Types
 
 export type SearchResults = z.infer<typeof SearchResultsSchema>;
 export type SearchOptions = z.infer<typeof SearchOptionsSchema>;
 export type SearchOptionsInput = z.input<typeof SearchOptionsSchema>;
+export type CrossEncoderScore = z.infer<typeof CrossEncoderScoreSchema>;
+
+// JSON Schemas
+
+export const crossEncoderScoreJsonSchema = z.toJSONSchema(CrossEncoderScoreSchema);
 
 // Helpers
 

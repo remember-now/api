@@ -2,7 +2,14 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
-import { LLM_TRACER, type LlmContext, type LlmTracer, Span } from '@/observability';
+import {
+  LLM_TRACER,
+  type LlmContext,
+  type LlmTracer,
+  metricsOnResult,
+  Span,
+  type SpanMetrics,
+} from '@/observability';
 
 import { EntityNode, EpisodicNode } from '../models';
 import { buildDedupeNodesMessages } from '../prompts';
@@ -16,11 +23,6 @@ import {
   shannonEntropy,
 } from './resolution-utils';
 import { NodeResolutionResult, nodeResolutionsJsonSchema } from './types';
-
-type SpanMetrics = Record<string, string | number | boolean | undefined>;
-const metricsOnResult = (r: unknown) => ({
-  attributes: (r as { metrics: SpanMetrics }).metrics,
-});
 
 @Injectable()
 export class NodeResolutionService {

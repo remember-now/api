@@ -3,14 +3,14 @@ import { mockDeep } from 'jest-mock-extended';
 import { z } from 'zod';
 
 import { NoOpLlmTracer } from '@/observability';
-import { KG_TEST_GROUP_ID, KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
 
 import { NodeExtractionService } from './node-extraction.service';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice works at Acme Corp and knows Bob.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 describe('NodeExtractionService', () => {
@@ -25,7 +25,7 @@ describe('NodeExtractionService', () => {
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
   });
 
-  it('should return EntityNode[] with correct names and groupId', async () => {
+  it('should return EntityNode[] with correct names and graphId', async () => {
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [{ name: 'Alice' }, { name: 'Acme Corp' }, { name: 'Bob' }],
     });
@@ -34,7 +34,7 @@ describe('NodeExtractionService', () => {
 
     expect(nodes).toHaveLength(3);
     expect(nodes.map((n) => n.name)).toEqual(['Alice', 'Acme Corp', 'Bob']);
-    nodes.forEach((n) => expect(n.groupId).toBe(KG_TEST_GROUP_ID));
+    nodes.forEach((n) => expect(n.graphId).toBe(KG_TEST_GRAPH_ID));
   });
 
   it('should filter empty names', async () => {

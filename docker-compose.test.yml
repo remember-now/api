@@ -8,10 +8,6 @@ services:
     volumes: []
     restart: 'no'
 
-  neo4j:
-    volumes: []
-    restart: 'no'
-
   app:
     # App runs on host for e2e tests
     profiles: [disabled]

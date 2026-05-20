@@ -7,7 +7,7 @@ const envSchema = z.object({
     .default('false')
     .transform((val) => val === 'true' || val === 'TRUE'),
   GOOGLE_EMBEDDING_API_KEY: z.string().optional(),
-  GOOGLE_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
+  GOOGLE_EMBEDDING_MODEL: z.string().default('gemini-embedding-2'),
   GOOGLE_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(768),
 });
 

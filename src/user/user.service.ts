@@ -1,6 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
-import { LlmProvider, Prisma } from '@generated/prisma/client';
+import {
+  LlmProvider,
+  Prisma,
+  Graph as PrismaGraph,
+  User as PrismaUser,
+} from '@generated/prisma/client';
 
 import { PasswordService } from '@/auth/password.service';
 import { Uuid } from '@/common/schemas';
@@ -29,18 +34,19 @@ export class UserService {
     private readonly passwordService: PasswordService,
   ) {}
 
-  private transformUserDates<T extends { id: string; createdAt: Date; updatedAt: Date }>(
-    user: T,
-  ): Omit<T, 'id' | 'createdAt' | 'updatedAt'> & {
-    id: Uuid;
-    createdAt: string;
-    updatedAt: string;
-  } {
+  private transformUserDates(user: PrismaUser & { graphs: PrismaGraph[] }): User {
     return {
       ...user,
       id: user.id as Uuid,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
+      graphs: user.graphs.map((g) => ({
+        ...g,
+        id: g.id as Uuid,
+        userId: g.userId as Uuid,
+        createdAt: g.createdAt.toISOString(),
+        updatedAt: g.updatedAt.toISOString(),
+      })),
     };
   }
 
@@ -56,7 +62,9 @@ export class UserService {
           passwordHash: passwordHash,
           role: role,
           activeLlmProvider: LlmProvider.PLATFORM,
+          graphs: { create: { name: 'main' } },
         },
+        include: { graphs: true },
       });
 
       const { passwordHash: _, ...userWithoutPassword } = this.transformUserDates(user);
@@ -98,6 +106,7 @@ export class UserService {
       orderBy: {
         createdAt: 'desc',
       },
+      include: { graphs: true },
     });
     const totalPages = Math.ceil(total / limit);
 
@@ -120,6 +129,7 @@ export class UserService {
   async getUserById(id: Uuid): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      include: { graphs: true },
     });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -130,6 +140,7 @@ export class UserService {
   async getUserByEmail(email: string): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { graphs: true },
     });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -138,7 +149,7 @@ export class UserService {
   }
 
   async updateUser(id: Uuid, dto: UpdateUserDto): Promise<UserWithoutPassword> {
-    const updateData: Partial<User> = {};
+    const updateData: Prisma.UserUpdateInput = {};
 
     if (dto.email) {
       updateData.email = dto.email;
@@ -154,6 +165,7 @@ export class UserService {
       const updatedUser = await this.prisma.user.update({
         where: { id },
         data: updateData,
+        include: { graphs: true },
       });
       const { passwordHash: _, ...userWithoutPassword } =
         this.transformUserDates(updatedUser);
@@ -181,7 +193,7 @@ export class UserService {
     if (!pwMatches) {
       throw new ForbiddenException('Current password is incorrect');
     }
-    const updateData: Partial<User> = {};
+    const updateData: Prisma.UserUpdateInput = {};
 
     if (dto.email) {
       updateData.email = dto.email;
@@ -194,6 +206,7 @@ export class UserService {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
         data: updateData,
+        include: { graphs: true },
       });
       const { passwordHash: _, ...userWithoutPassword } =
         this.transformUserDates(updatedUser);

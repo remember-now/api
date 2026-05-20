@@ -2,22 +2,21 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { Uuid } from '@/common/schemas';
+import { Uuid } from '@/common';
 import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import {
   KG_HIGH_SIM_EMBEDDING,
   KG_NEAR_SAME_EMBEDDING,
   KG_REFERENCE_TIME,
-  KG_TEST_GROUP_ID,
+  KG_TEST_GRAPH_ID,
   KgEdgeFactory,
   KgNodeFactory,
+  u,
 } from '@/test/factories';
 
 import { EntityEdge } from '../models';
-import { EntityEdgeRepository } from '../neo4j/repositories';
+import { EntityEdgeRepository } from '../repository/repositories';
 import { EdgeResolutionService } from './edge-resolution.service';
-
-const u = (s: string) => s as Uuid;
 
 // Stable test UUIDs so intra-batch dedup and endpoint matching reliably fire
 // across edges constructed by `makeEdge` without explicit overrides.
@@ -27,7 +26,7 @@ const DEFAULT_TGT = u('tgt-uuid');
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
   content: 'Alice joined Acme Corp as CEO.',
-  groupId: KG_TEST_GROUP_ID,
+  graphId: KG_TEST_GRAPH_ID,
 });
 
 function makeEdge(
@@ -117,8 +116,8 @@ describe('EdgeResolutionService', () => {
       KG_REFERENCE_TIME,
     );
 
-    expect(result.resolvedEdges[0].sourceNodeUuid).toBe('new-src-uuid');
-    expect(result.resolvedEdges[0].targetNodeUuid).toBe('new-tgt-uuid');
+    expect(result.resolvedEdges[0].sourceNodeUuid).toBe(u('new-src-uuid'));
+    expect(result.resolvedEdges[0].targetNodeUuid).toBe(u('new-tgt-uuid'));
   });
 
   it('should add edge to resolvedEdges when no candidates exist', async () => {
@@ -172,7 +171,7 @@ describe('EdgeResolutionService', () => {
     // The existing edge is returned in resolvedEdges with the episode UUID appended
     // so it can be re-persisted with the updated episodes array.
     expect(result.resolvedEdges).toHaveLength(1);
-    expect(result.resolvedEdges[0].uuid).toBe('exist-edge-uuid');
+    expect(result.resolvedEdges[0].uuid).toBe(u('exist-edge-uuid'));
     expect(result.resolvedEdges[0].episodes).toContain(baseEpisode.uuid);
     expect(result.invalidatedEdges).toHaveLength(0);
   });
@@ -242,7 +241,7 @@ describe('EdgeResolutionService', () => {
 
     expect(result.resolvedEdges).toHaveLength(1);
     expect(result.invalidatedEdges).toHaveLength(1);
-    expect(result.invalidatedEdges[0].uuid).toBe('old-edge-uuid');
+    expect(result.invalidatedEdges[0].uuid).toBe(u('old-edge-uuid'));
     expect(result.invalidatedEdges[0].invalidAt).toEqual(new Date('2024-06-01'));
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
 import { EpisodicNode } from '@/knowledge-graph/models';
-import { NodeNameSchema, RelationshipTypeSchema } from '@/knowledge-graph/neo4j';
+import { NodeNameSchema, RelationshipTypeSchema } from '@/knowledge-graph/types';
 
 import { concatenateEpisodes } from '../text-utils';
 
@@ -43,12 +43,12 @@ ENTITY EXTRACTION RULES:
 - Extract only real-world, nameable entities: people, organisations, places, events, concepts with specific names
 - Hobbies and activities count as entities when referenced as meaningful things ("video games", "watercolor painting")
 - Possessive constructions: "Nisha's dad" → entity "Nisha's dad", NOT just "dad"
-- Qualified specific objects: "wool coat", "dog leash" — not bare generic nouns
+- Qualified specific objects: "wool coat", "dog leash" - not bare generic nouns
 - NEVER extract: pronouns, bare kinship terms, unnamed roles, abstract concepts, generic nouns
-- Each entity must appear in at least one fact — do not include isolated entities
+- Each entity must appear in at least one fact - do not include isolated entities
 
 FACT EXTRACTION RULES:
-- Extract one fact per relationship — a complete sentence
+- Extract one fact per relationship - a complete sentence
 - Only extract relationships clearly supported by the episode content
 - Skip semantically redundant facts already captured by other facts in this batch
 - Self-referencing facts (source = target) are allowed when clearly justified

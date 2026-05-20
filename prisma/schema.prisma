@@ -28,23 +28,45 @@ enum LlmProvider {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email        String  @unique
+  email        String @unique
   passwordHash String
 
   activeLlmProvider LlmProvider?
   llmConfigs        LlmConfig[]
+  graphs            Graph[]
 
   @@map("users")
 }
 
+model Graph {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityNodes     EntityNode[]
+  entityEdges     EntityEdge[]
+  episodicNodes   EpisodicNode[]
+  episodicEdges   EpisodicEdge[]
+  sagaNodes       SagaNode[]
+  hasEpisodeEdges HasEpisodeEdge[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("graphs")
+}
+
 model LlmConfig {
-  id        String      @id @default(uuid())
-  userId    String
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
   provider  LlmProvider
   config    Json
   createdAt DateTime    @default(now())
@@ -54,4 +76,135 @@ model LlmConfig {
 
   @@unique([userId, provider])
   @@map("llm_configs")
+}
+
+// ─── Knowledge Graph ──────────────────────────────────────────────────────────
+// Postgres-backed replacement for the old Neo4j layer.
+// all vector I/O goes through $queryRaw / $executeRaw with ::vector casts
+// See migrations/20260517000000_knowledge_graph/migration.sql for:
+// vectorscale extension, graph_label_for fn, graph_label SMALLINT[] column +
+// trigger, diskann + GIN indexes.
+
+model EntityNode {
+  uuid          String                      @id @db.Uuid
+  graphId       String                      @map("graph_id") @db.Uuid
+  name          String
+  summary       String                      @default("")
+  attributes    Json                        @default("{}")
+  labels        String[]
+  nameEmbedding Unsupported("vector(768)")? @map("name_embedding")
+  // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
+  // Declared here so Prisma's shadow-DB diff sees the column. Never written by app code.
+  graphLabel    Int[]                       @map("graph_label") @db.SmallInt
+  createdAt     DateTime                    @default(now()) @map("created_at")
+
+  graph       Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  sourceEdges EntityEdge[]   @relation("EntityEdgeSource")
+  targetEdges EntityEdge[]   @relation("EntityEdgeTarget")
+  mentions    EpisodicEdge[]
+
+  @@index([graphId])
+  // Declared so Prisma's diff sees the index by name and stops proposing a drop.
+  // Actual index is created as `USING diskann (name_embedding vector_cosine_ops, graph_label)` in the migration.
+  @@index([nameEmbedding, graphLabel], map: "entity_nodes_embedding_idx")
+  @@map("entity_nodes")
+}
+
+model EntityEdge {
+  uuid          String                      @id @db.Uuid
+  graphId       String                      @map("graph_id") @db.Uuid
+  sourceUuid    String                      @map("source_uuid") @db.Uuid
+  targetUuid    String                      @map("target_uuid") @db.Uuid
+  name          String
+  fact          String
+  factEmbedding Unsupported("vector(768)")? @map("fact_embedding")
+  // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
+  graphLabel    Int[]                       @map("graph_label") @db.SmallInt
+  attributes    Json                        @default("{}")
+  episodes      String[]                    @db.Uuid
+  validAt       DateTime?                   @map("valid_at")
+  invalidAt     DateTime?                   @map("invalid_at")
+  expiredAt     DateTime?                   @map("expired_at")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+
+  graph      Graph      @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  sourceNode EntityNode @relation("EntityEdgeSource", fields: [sourceUuid], references: [uuid], onDelete: Cascade)
+  targetNode EntityNode @relation("EntityEdgeTarget", fields: [targetUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([graphId])
+  @@index([sourceUuid])
+  @@index([targetUuid])
+  // See EntityNode for rationale - declared so Prisma stops proposing to drop our diskann index.
+  @@index([factEmbedding, graphLabel], map: "entity_edges_embedding_idx")
+  @@map("entity_edges")
+}
+
+model EpisodicNode {
+  uuid              String   @id @db.Uuid
+  graphId           String   @map("graph_id") @db.Uuid
+  name              String
+  labels            String[]
+  source            String
+  sourceDescription String   @map("source_description")
+  content           String
+  validAt           DateTime @map("valid_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  graph           Graph            @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  mentions        EpisodicEdge[]
+  hasEpisodeEdges HasEpisodeEdge[]
+
+  @@index([graphId])
+  @@index([validAt])
+  @@map("episodic_nodes")
+}
+
+model EpisodicEdge {
+  uuid         String   @id @db.Uuid
+  graphId      String   @map("graph_id") @db.Uuid
+  episodicUuid String   @map("episodic_uuid") @db.Uuid
+  entityUuid   String   @map("entity_uuid") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  graph   Graph        @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  episode EpisodicNode @relation(fields: [episodicUuid], references: [uuid], onDelete: Cascade)
+  entity  EntityNode   @relation(fields: [entityUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([graphId])
+  @@index([episodicUuid])
+  @@index([entityUuid])
+  @@map("episodic_edges")
+}
+
+model SagaNode {
+  uuid             String    @id @db.Uuid
+  graphId          String    @map("graph_id") @db.Uuid
+  name             String
+  labels           String[]
+  summary          String    @default("")
+  lastSummarizedAt DateTime? @map("last_summarized_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  graph           Graph            @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  hasEpisodeEdges HasEpisodeEdge[]
+
+  @@index([graphId])
+  @@index([name])
+  @@map("saga_nodes")
+}
+
+model HasEpisodeEdge {
+  uuid         String   @id @db.Uuid
+  graphId      String   @map("graph_id") @db.Uuid
+  sagaUuid     String   @map("saga_uuid") @db.Uuid
+  episodicUuid String   @map("episodic_uuid") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  graph   Graph        @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  saga    SagaNode     @relation(fields: [sagaUuid], references: [uuid], onDelete: Cascade)
+  episode EpisodicNode @relation(fields: [episodicUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([graphId])
+  @@index([sagaUuid])
+  @@map("has_episode_edges")
 }
