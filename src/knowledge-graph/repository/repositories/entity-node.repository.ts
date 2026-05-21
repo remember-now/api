@@ -21,7 +21,7 @@ import { fromPgVector, toPgVector } from '../pgvector-utils';
 import { buildNodeFilterClause } from '../sql-filter-builders';
 
 type RawRow = {
-  uuid: string;
+  id: string;
   graph_id: string;
   name: string;
   created_at: Date;
@@ -38,7 +38,7 @@ export class EntityNodeRepository {
   @Span()
   async save(node: EntityNode): Promise<string> {
     await this.prisma.$executeRaw`
-      INSERT INTO entity_nodes (uuid, graph_id, name, summary, attributes, labels, name_embedding, created_at)
+      INSERT INTO entity_nodes (id, graph_id, name, summary, attributes, labels, name_embedding, created_at)
       VALUES (
         ${node.uuid}::uuid,
         ${node.graphId}::uuid,
@@ -49,7 +49,7 @@ export class EntityNodeRepository {
         ${toPgVector(node.nameEmbedding)}::vector,
         ${node.createdAt}
       )
-      ON CONFLICT (uuid) DO UPDATE SET
+      ON CONFLICT (id) DO UPDATE SET
         graph_id       = EXCLUDED.graph_id,
         name           = EXCLUDED.name,
         summary        = EXCLUDED.summary,
@@ -73,21 +73,21 @@ export class EntityNodeRepository {
 
   @Span()
   async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.entityNode.delete({ where: { uuid } });
+    await this.prisma.entityNode.delete({ where: { id: uuid } });
   }
 
   @Span()
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     if (uuids.length === 0) return;
-    await this.prisma.entityNode.deleteMany({ where: { uuid: { in: uuids } } });
+    await this.prisma.entityNode.deleteMany({ where: { id: { in: uuids } } });
   }
 
   @Span()
   async deleteIfSoleMentioned(nodeUuid: Uuid): Promise<void> {
     await this.prisma.$executeRaw`
       DELETE FROM entity_nodes en
-      WHERE en.uuid = ${nodeUuid}::uuid
-        AND (SELECT COUNT(*) FROM episodic_edges ee WHERE ee.entity_uuid = en.uuid) = 1
+      WHERE en.id = ${nodeUuid}::uuid
+        AND (SELECT COUNT(*) FROM episodic_edges ee WHERE ee.entity_id = en.id) = 1
     `;
   }
 
@@ -99,10 +99,10 @@ export class EntityNodeRepository {
   @Span()
   async getByUuid(uuid: Uuid): Promise<EntityNode | null> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, name, summary, attributes, labels,
+      SELECT id, graph_id, name, summary, attributes, labels,
              name_embedding::text AS name_embedding, created_at
       FROM entity_nodes
-      WHERE uuid = ${uuid}::uuid
+      WHERE id = ${uuid}::uuid
     `;
     if (rows.length === 0) return null;
     return this.mapRow(rows[0]);
@@ -112,10 +112,10 @@ export class EntityNodeRepository {
   async getByUuids(uuids: Uuid[]): Promise<EntityNode[]> {
     if (uuids.length === 0) return [];
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, name, summary, attributes, labels,
+      SELECT id, graph_id, name, summary, attributes, labels,
              name_embedding::text AS name_embedding, created_at
       FROM entity_nodes
-      WHERE uuid = ANY(${uuids}::uuid[])
+      WHERE id = ANY(${uuids}::uuid[])
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -126,7 +126,7 @@ export class EntityNodeRepository {
     if (graphIds.length === 0) return [];
     const limitSql = limit !== undefined ? Prisma.sql`LIMIT ${limit}` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, name, summary, attributes, labels,
+      SELECT id, graph_id, name, summary, attributes, labels,
              name_embedding::text AS name_embedding, created_at
       FROM entity_nodes
       WHERE graph_id = ANY(${graphIds}::uuid[])
@@ -146,7 +146,7 @@ export class EntityNodeRepository {
     const filterSql = buildNodeFilterClause(filters, 'n');
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
-      SELECT n.uuid, n.graph_id, n.name, n.summary, n.attributes, n.labels,
+      SELECT n.id, n.graph_id, n.name, n.summary, n.attributes, n.labels,
              n.name_embedding::text AS name_embedding, n.created_at,
              ts_rank(to_tsvector('english', n.name || ' ' || n.summary), ${tsquery}) AS score
       FROM entity_nodes n
@@ -178,7 +178,7 @@ export class EntityNodeRepository {
     )}]::smallint[]`;
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
-      SELECT n.uuid, n.graph_id, n.name, n.summary, n.attributes, n.labels,
+      SELECT n.id, n.graph_id, n.name, n.summary, n.attributes, n.labels,
              n.name_embedding::text AS name_embedding, n.created_at,
              1 - (n.name_embedding <=> ${vec}) AS score
       FROM entity_nodes n
@@ -205,11 +205,11 @@ export class EntityNodeRepository {
     const cte = buildBfsCte(originNodeUuids, graphIds, depth);
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       ${cte}
-      SELECT DISTINCT reachable.uuid, reachable.graph_id, reachable.name, reachable.summary,
+      SELECT DISTINCT reachable.id, reachable.graph_id, reachable.name, reachable.summary,
                       reachable.attributes, reachable.labels,
                       reachable.name_embedding::text AS name_embedding, reachable.created_at
       FROM bfs b
-      JOIN entity_nodes reachable ON reachable.uuid = b.uuid
+      JOIN entity_nodes reachable ON reachable.id = b.id
       WHERE reachable.graph_id = ANY(${graphIds}::uuid[])
         AND b.depth > 0
         ${filterSql}
@@ -225,11 +225,11 @@ export class EntityNodeRepository {
   ): Promise<{ uuid: Uuid; score: number }[]> {
     if (nodeUuids.length === 0) return [];
     const rows = await this.prisma.$queryRaw<{ uuid: Uuid; score: number }[]>`
-      SELECT DISTINCT n.uuid AS uuid, 1 AS score
-      FROM UNNEST(${nodeUuids}::uuid[]) AS n(uuid)
+      SELECT DISTINCT n.id AS uuid, 1 AS score
+      FROM UNNEST(${nodeUuids}::uuid[]) AS n(id)
       JOIN entity_edges ee
-        ON (ee.source_uuid = ${centerNodeUuid}::uuid AND ee.target_uuid = n.uuid)
-        OR (ee.target_uuid = ${centerNodeUuid}::uuid AND ee.source_uuid = n.uuid)
+        ON (ee.source_id = ${centerNodeUuid}::uuid AND ee.target_id = n.id)
+        OR (ee.target_id = ${centerNodeUuid}::uuid AND ee.source_id = n.id)
     `;
     return rows;
   }
@@ -240,17 +240,17 @@ export class EntityNodeRepository {
   ): Promise<{ uuid: Uuid; score: number }[]> {
     if (nodeUuids.length === 0) return [];
     const rows = await this.prisma.episodicEdge.groupBy({
-      by: ['entityUuid'],
+      by: ['entityId'],
       _count: { _all: true },
-      where: { entityUuid: { in: nodeUuids } },
+      where: { entityId: { in: nodeUuids } },
     });
-    return rows.map((r) => ({ uuid: r.entityUuid as Uuid, score: r._count._all }));
+    return rows.map((r) => ({ uuid: r.entityId as Uuid, score: r._count._all }));
   }
 
   private mapRow(row: RawRow): EntityNode {
     const attrs = row.attributes;
     return {
-      uuid: row.uuid as Uuid,
+      uuid: row.id as Uuid,
       name: row.name as NodeName,
       graphId: row.graph_id as Uuid,
       createdAt: row.created_at,

@@ -3,7 +3,7 @@ import { Prisma } from '@generated/prisma/client';
 import { Uuid } from '@/common/schemas';
 
 /**
- * Builds the `WITH RECURSIVE bfs(uuid, kind, depth, visited) AS (...)` CTE
+ * Builds the `WITH RECURSIVE bfs(id, kind, depth, visited) AS (...)` CTE
  * shared by EntityNodeRepository.searchByBfs and EntityEdgeRepository.searchByBfs.
  *
  * The CTE seeds from `originNodeUuids` resolved against both entity_nodes and
@@ -17,7 +17,7 @@ import { Uuid } from '@/common/schemas';
  *   const cte = buildBfsCte(originNodeUuids, graphIds, depth);
  *   await prisma.$queryRaw`
  *     ${cte}
- *     SELECT ... FROM bfs b JOIN entity_nodes n ON n.uuid = b.uuid WHERE ...
+ *     SELECT ... FROM bfs b JOIN entity_nodes n ON n.id = b.id WHERE ...
  *   `;
  *
  * Shape constraints worth knowing: Postgres requires exactly one non-recursive
@@ -37,37 +37,37 @@ export function buildBfsCte(
     );
   }
   return Prisma.sql`
-    WITH RECURSIVE bfs(uuid, kind, depth, visited) AS (
-      SELECT seeds.uuid, seeds.kind, 0, ARRAY[seeds.uuid]
+    WITH RECURSIVE bfs(id, kind, depth, visited) AS (
+      SELECT seeds.id, seeds.kind, 0, ARRAY[seeds.id]
       FROM (
-        SELECT uuid, 'entity'::text AS kind
+        SELECT id, 'entity'::text AS kind
         FROM entity_nodes
-        WHERE uuid = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
+        WHERE id = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
         UNION ALL
-        SELECT uuid, 'episodic'::text AS kind
+        SELECT id, 'episodic'::text AS kind
         FROM episodic_nodes
-        WHERE uuid = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
+        WHERE id = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
       ) seeds
 
       UNION ALL
 
-      SELECT step.next_uuid, 'entity'::text, b.depth + 1, b.visited || step.next_uuid
+      SELECT step.next_id, 'entity'::text, b.depth + 1, b.visited || step.next_id
       FROM bfs b,
            LATERAL (
-             SELECT next_uuid FROM (
-               SELECT (CASE WHEN ee.source_uuid = b.uuid THEN ee.target_uuid ELSE ee.source_uuid END) AS next_uuid
+             SELECT next_id FROM (
+               SELECT (CASE WHEN ee.source_id = b.id THEN ee.target_id ELSE ee.source_id END) AS next_id
                FROM entity_edges ee
                WHERE b.kind = 'entity'
-                 AND (ee.source_uuid = b.uuid OR ee.target_uuid = b.uuid)
+                 AND (ee.source_id = b.id OR ee.target_id = b.id)
                  AND ee.graph_id = ANY(${graphIds}::uuid[])
                UNION ALL
-               SELECT me.entity_uuid AS next_uuid
+               SELECT me.entity_id AS next_id
                FROM episodic_edges me
                WHERE b.kind = 'episodic'
-                 AND me.episodic_uuid = b.uuid
+                 AND me.episodic_id = b.id
                  AND me.graph_id = ANY(${graphIds}::uuid[])
              ) candidates
-             WHERE NOT (next_uuid = ANY(b.visited))
+             WHERE NOT (next_id = ANY(b.visited))
            ) step
       WHERE b.depth < ${depth}
     )

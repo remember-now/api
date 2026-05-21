@@ -46,6 +46,7 @@ services:
   app:
     build: .
     environment:
+      - TZ=UTC
       - POSTGRES_URL=${POSTGRES_URL}
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
       - APP_FRONTEND_URL=${APP_FRONTEND_URL}

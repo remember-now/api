@@ -20,10 +20,10 @@ import { fromPgVector, toPgVector } from '../pgvector-utils';
 import { buildEdgeFilterClause } from '../sql-filter-builders';
 
 type RawRow = {
-  uuid: string;
+  id: string;
   graph_id: string;
-  source_uuid: string;
-  target_uuid: string;
+  source_id: string;
+  target_id: string;
   name: string;
   fact: string;
   fact_embedding: string | null;
@@ -43,7 +43,7 @@ export class EntityEdgeRepository {
   async save(edge: EntityEdge): Promise<string> {
     await this.prisma.$executeRaw`
       INSERT INTO entity_edges (
-        uuid, graph_id, source_uuid, target_uuid, name, fact,
+        id, graph_id, source_id, target_id, name, fact,
         fact_embedding, attributes, episodes, valid_at, invalid_at, expired_at, created_at
       ) VALUES (
         ${edge.uuid}::uuid,
@@ -60,10 +60,10 @@ export class EntityEdgeRepository {
         ${edge.expiredAt},
         ${edge.createdAt}
       )
-      ON CONFLICT (uuid) DO UPDATE SET
+      ON CONFLICT (id) DO UPDATE SET
         graph_id       = EXCLUDED.graph_id,
-        source_uuid    = EXCLUDED.source_uuid,
-        target_uuid    = EXCLUDED.target_uuid,
+        source_id      = EXCLUDED.source_id,
+        target_id      = EXCLUDED.target_id,
         name           = EXCLUDED.name,
         fact           = EXCLUDED.fact,
         fact_embedding = EXCLUDED.fact_embedding,
@@ -86,23 +86,23 @@ export class EntityEdgeRepository {
 
   @Span()
   async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.entityEdge.delete({ where: { uuid } });
+    await this.prisma.entityEdge.delete({ where: { id: uuid } });
   }
 
   @Span()
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     if (uuids.length === 0) return;
-    await this.prisma.entityEdge.deleteMany({ where: { uuid: { in: uuids } } });
+    await this.prisma.entityEdge.deleteMany({ where: { id: { in: uuids } } });
   }
 
   @Span()
   async getByUuid(uuid: Uuid): Promise<EntityEdge | null> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, source_uuid, target_uuid, name, fact,
+      SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
-      WHERE uuid = ${uuid}::uuid
+      WHERE id = ${uuid}::uuid
     `;
     if (rows.length === 0) return null;
     return this.mapRow(rows[0]);
@@ -112,11 +112,11 @@ export class EntityEdgeRepository {
   async getByUuids(uuids: Uuid[]): Promise<EntityEdge[]> {
     if (uuids.length === 0) return [];
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, source_uuid, target_uuid, name, fact,
+      SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
-      WHERE uuid = ANY(${uuids}::uuid[])
+      WHERE id = ANY(${uuids}::uuid[])
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -126,12 +126,12 @@ export class EntityEdgeRepository {
     // Only edges whose FIRST episode in the
     // ordered `episodes` array matches are considered. Edges that merely
     // accumulated this episode as a later contributor are intentionally kept.
-    const rows = await this.prisma.$queryRaw<{ uuid: Uuid }[]>`
-      SELECT uuid
+    const rows = await this.prisma.$queryRaw<{ id: Uuid }[]>`
+      SELECT id
       FROM entity_edges
       WHERE episodes[1] = ${episodeUuid}::uuid
     `;
-    return rows.map((r) => r.uuid);
+    return rows.map((r) => r.id);
   }
 
   @Span()
@@ -140,7 +140,7 @@ export class EntityEdgeRepository {
     if (graphIds.length === 0) return [];
     const limitSql = limit !== undefined ? Prisma.sql`LIMIT ${limit}` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, source_uuid, target_uuid, name, fact,
+      SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
@@ -153,11 +153,11 @@ export class EntityEdgeRepository {
   @Span()
   async getBetweenNodes(sourceUuid: Uuid, targetUuid: Uuid): Promise<EntityEdge[]> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, source_uuid, target_uuid, name, fact,
+      SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
-      WHERE source_uuid = ${sourceUuid}::uuid AND target_uuid = ${targetUuid}::uuid
+      WHERE source_id = ${sourceUuid}::uuid AND target_id = ${targetUuid}::uuid
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -165,11 +165,11 @@ export class EntityEdgeRepository {
   @Span()
   async getByNodeUuid(nodeUuid: Uuid): Promise<EntityEdge[]> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT uuid, graph_id, source_uuid, target_uuid, name, fact,
+      SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
-      WHERE source_uuid = ${nodeUuid}::uuid OR target_uuid = ${nodeUuid}::uuid
+      WHERE source_id = ${nodeUuid}::uuid OR target_id = ${nodeUuid}::uuid
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -180,7 +180,7 @@ export class EntityEdgeRepository {
     if (graphIds.length === 0) return [];
     const tsquery = Prisma.sql`plainto_tsquery('english', ${query})`;
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
-      SELECT e.uuid, e.graph_id, e.source_uuid, e.target_uuid, e.name, e.fact,
+      SELECT e.id, e.graph_id, e.source_id, e.target_id, e.name, e.fact,
              e.fact_embedding::text AS fact_embedding, e.attributes, e.episodes,
              e.valid_at, e.invalid_at, e.expired_at, e.created_at,
              ts_rank(to_tsvector('english', e.name || ' ' || e.fact), ${tsquery}) AS score
@@ -209,7 +209,7 @@ export class EntityEdgeRepository {
     )}]::smallint[]`;
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
-      SELECT e.uuid, e.graph_id, e.source_uuid, e.target_uuid, e.name, e.fact,
+      SELECT e.id, e.graph_id, e.source_id, e.target_id, e.name, e.fact,
              e.fact_embedding::text AS fact_embedding, e.attributes, e.episodes,
              e.valid_at, e.invalid_at, e.expired_at, e.created_at,
              1 - (e.fact_embedding <=> ${vec}) AS score
@@ -238,13 +238,13 @@ export class EntityEdgeRepository {
     const cte = buildBfsCte(originNodeUuids, graphIds, depth);
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       ${cte}
-      SELECT DISTINCT e.uuid, e.graph_id, e.source_uuid, e.target_uuid, e.name, e.fact,
+      SELECT DISTINCT e.id, e.graph_id, e.source_id, e.target_id, e.name, e.fact,
                       e.fact_embedding::text AS fact_embedding, e.attributes, e.episodes,
                       e.valid_at, e.invalid_at, e.expired_at, e.created_at
       FROM entity_edges e
       WHERE e.graph_id = ANY(${graphIds}::uuid[])
-        AND e.source_uuid IN (SELECT uuid FROM bfs)
-        AND e.target_uuid IN (SELECT uuid FROM bfs)
+        AND e.source_id IN (SELECT id FROM bfs)
+        AND e.target_id IN (SELECT id FROM bfs)
         ${filterSql}
       LIMIT ${limit}
     `;
@@ -255,17 +255,17 @@ export class EntityEdgeRepository {
   async hasRelatesEdgesForGraph(graphId: Uuid): Promise<boolean> {
     const result = await this.prisma.entityEdge.findFirst({
       where: { graphId },
-      select: { uuid: true },
+      select: { id: true },
     });
     return result !== null;
   }
 
   private mapRow(row: RawRow): EntityEdge {
     return {
-      uuid: row.uuid as Uuid,
+      uuid: row.id as Uuid,
       graphId: row.graph_id as Uuid,
-      sourceNodeUuid: row.source_uuid as Uuid,
-      targetNodeUuid: row.target_uuid as Uuid,
+      sourceNodeUuid: row.source_id as Uuid,
+      targetNodeUuid: row.target_id as Uuid,
       name: row.name as RelationshipType,
       fact: row.fact,
       factEmbedding: fromPgVector(row.fact_embedding),

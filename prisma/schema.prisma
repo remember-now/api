@@ -19,24 +19,28 @@ datasource db {
 enum Role {
   USER
   ADMIN
+
+  @@map("role")
 }
 
 enum LlmProvider {
   ANTHROPIC
   GOOGLE_GEMINI
   PLATFORM
+
+  @@map("llm_provider")
 }
 
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   email        String @unique
-  passwordHash String
+  passwordHash String @map("password_hash")
 
-  activeLlmProvider LlmProvider?
+  activeLlmProvider LlmProvider? @map("active_llm_provider")
   llmConfigs        LlmConfig[]
   graphs            Graph[]
 
@@ -48,8 +52,8 @@ model Graph {
   userId      String   @map("user_id") @db.Uuid
   name        String
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   entityNodes     EntityNode[]
@@ -66,11 +70,11 @@ model Graph {
 
 model LlmConfig {
   id        String      @id @default(uuid()) @db.Uuid
-  userId    String      @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
   provider  LlmProvider
   config    Json
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -86,7 +90,7 @@ model LlmConfig {
 // trigger, diskann + GIN indexes.
 
 model EntityNode {
-  uuid          String                      @id @db.Uuid
+  id            String                      @id @db.Uuid
   graphId       String                      @map("graph_id") @db.Uuid
   name          String
   summary       String                      @default("")
@@ -96,7 +100,7 @@ model EntityNode {
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
   // Declared here so Prisma's shadow-DB diff sees the column. Never written by app code.
   graphLabel    Int[]                       @map("graph_label") @db.SmallInt
-  createdAt     DateTime                    @default(now()) @map("created_at")
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph       Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
   sourceEdges EntityEdge[]   @relation("EntityEdgeSource")
@@ -111,10 +115,10 @@ model EntityNode {
 }
 
 model EntityEdge {
-  uuid          String                      @id @db.Uuid
+  id            String                      @id @db.Uuid
   graphId       String                      @map("graph_id") @db.Uuid
-  sourceUuid    String                      @map("source_uuid") @db.Uuid
-  targetUuid    String                      @map("target_uuid") @db.Uuid
+  sourceId      String                      @map("source_id") @db.Uuid
+  targetId      String                      @map("target_id") @db.Uuid
   name          String
   fact          String
   factEmbedding Unsupported("vector(768)")? @map("fact_embedding")
@@ -122,33 +126,33 @@ model EntityEdge {
   graphLabel    Int[]                       @map("graph_label") @db.SmallInt
   attributes    Json                        @default("{}")
   episodes      String[]                    @db.Uuid
-  validAt       DateTime?                   @map("valid_at")
-  invalidAt     DateTime?                   @map("invalid_at")
-  expiredAt     DateTime?                   @map("expired_at")
-  createdAt     DateTime                    @default(now()) @map("created_at")
+  validAt       DateTime?                   @map("valid_at") @db.Timestamptz(3)
+  invalidAt     DateTime?                   @map("invalid_at") @db.Timestamptz(3)
+  expiredAt     DateTime?                   @map("expired_at") @db.Timestamptz(3)
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph      Graph      @relation(fields: [graphId], references: [id], onDelete: Cascade)
-  sourceNode EntityNode @relation("EntityEdgeSource", fields: [sourceUuid], references: [uuid], onDelete: Cascade)
-  targetNode EntityNode @relation("EntityEdgeTarget", fields: [targetUuid], references: [uuid], onDelete: Cascade)
+  sourceNode EntityNode @relation("EntityEdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetNode EntityNode @relation("EntityEdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@index([graphId])
-  @@index([sourceUuid])
-  @@index([targetUuid])
+  @@index([sourceId])
+  @@index([targetId])
   // See EntityNode for rationale - declared so Prisma stops proposing to drop our diskann index.
   @@index([factEmbedding, graphLabel], map: "entity_edges_embedding_idx")
   @@map("entity_edges")
 }
 
 model EpisodicNode {
-  uuid              String   @id @db.Uuid
+  id                String   @id @db.Uuid
   graphId           String   @map("graph_id") @db.Uuid
   name              String
   labels            String[]
   source            String
   sourceDescription String   @map("source_description")
   content           String
-  validAt           DateTime @map("valid_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  validAt           DateTime @map("valid_at") @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph           Graph            @relation(fields: [graphId], references: [id], onDelete: Cascade)
   mentions        EpisodicEdge[]
@@ -160,30 +164,30 @@ model EpisodicNode {
 }
 
 model EpisodicEdge {
-  uuid         String   @id @db.Uuid
-  graphId      String   @map("graph_id") @db.Uuid
-  episodicUuid String   @map("episodic_uuid") @db.Uuid
-  entityUuid   String   @map("entity_uuid") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
+  id         String   @id @db.Uuid
+  graphId    String   @map("graph_id") @db.Uuid
+  episodicId String   @map("episodic_id") @db.Uuid
+  entityId   String   @map("entity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph   Graph        @relation(fields: [graphId], references: [id], onDelete: Cascade)
-  episode EpisodicNode @relation(fields: [episodicUuid], references: [uuid], onDelete: Cascade)
-  entity  EntityNode   @relation(fields: [entityUuid], references: [uuid], onDelete: Cascade)
+  episode EpisodicNode @relation(fields: [episodicId], references: [id], onDelete: Cascade)
+  entity  EntityNode   @relation(fields: [entityId], references: [id], onDelete: Cascade)
 
   @@index([graphId])
-  @@index([episodicUuid])
-  @@index([entityUuid])
+  @@index([episodicId])
+  @@index([entityId])
   @@map("episodic_edges")
 }
 
 model SagaNode {
-  uuid             String    @id @db.Uuid
+  id               String    @id @db.Uuid
   graphId          String    @map("graph_id") @db.Uuid
   name             String
   labels           String[]
   summary          String    @default("")
-  lastSummarizedAt DateTime? @map("last_summarized_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  lastSummarizedAt DateTime? @map("last_summarized_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph           Graph            @relation(fields: [graphId], references: [id], onDelete: Cascade)
   hasEpisodeEdges HasEpisodeEdge[]
@@ -194,17 +198,17 @@ model SagaNode {
 }
 
 model HasEpisodeEdge {
-  uuid         String   @id @db.Uuid
-  graphId      String   @map("graph_id") @db.Uuid
-  sagaUuid     String   @map("saga_uuid") @db.Uuid
-  episodicUuid String   @map("episodic_uuid") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
+  id         String   @id @db.Uuid
+  graphId    String   @map("graph_id") @db.Uuid
+  sagaId     String   @map("saga_id") @db.Uuid
+  episodicId String   @map("episodic_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph   Graph        @relation(fields: [graphId], references: [id], onDelete: Cascade)
-  saga    SagaNode     @relation(fields: [sagaUuid], references: [uuid], onDelete: Cascade)
-  episode EpisodicNode @relation(fields: [episodicUuid], references: [uuid], onDelete: Cascade)
+  saga    SagaNode     @relation(fields: [sagaId], references: [id], onDelete: Cascade)
+  episode EpisodicNode @relation(fields: [episodicId], references: [id], onDelete: Cascade)
 
   @@index([graphId])
-  @@index([sagaUuid])
+  @@index([sagaId])
   @@map("has_episode_edges")
 }

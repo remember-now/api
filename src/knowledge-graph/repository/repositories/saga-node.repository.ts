@@ -8,7 +8,7 @@ import { PrismaService } from '@/providers/database/postgres/prisma.service';
 import { GetByGraphIdsWithCursorParams, NodeLabels, NodeName } from '../../types';
 
 type Row = {
-  uuid: string;
+  id: string;
   graphId: string;
   name: string;
   labels: string[];
@@ -24,9 +24,9 @@ export class SagaNodeRepository {
   @Span()
   async save(node: SagaNode): Promise<string> {
     await this.prisma.sagaNode.upsert({
-      where: { uuid: node.uuid },
+      where: { id: node.uuid },
       create: {
-        uuid: node.uuid,
+        id: node.uuid,
         graphId: node.graphId,
         name: node.name,
         labels: node.labels,
@@ -49,7 +49,7 @@ export class SagaNodeRepository {
   async createIfNotExists(node: SagaNode): Promise<void> {
     await this.prisma.sagaNode.createMany({
       data: {
-        uuid: node.uuid,
+        id: node.uuid,
         graphId: node.graphId,
         name: node.name,
         labels: node.labels,
@@ -69,13 +69,13 @@ export class SagaNodeRepository {
 
   @Span()
   async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.sagaNode.delete({ where: { uuid } });
+    await this.prisma.sagaNode.delete({ where: { id: uuid } });
   }
 
   @Span()
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     if (uuids.length === 0) return;
-    await this.prisma.sagaNode.deleteMany({ where: { uuid: { in: uuids } } });
+    await this.prisma.sagaNode.deleteMany({ where: { id: { in: uuids } } });
   }
 
   @Span()
@@ -85,14 +85,14 @@ export class SagaNodeRepository {
 
   @Span()
   async getByUuid(uuid: Uuid): Promise<SagaNode | null> {
-    const row = await this.prisma.sagaNode.findUnique({ where: { uuid } });
+    const row = await this.prisma.sagaNode.findUnique({ where: { id: uuid } });
     return row ? this.mapRow(row) : null;
   }
 
   @Span()
   async getByUuids(uuids: Uuid[]): Promise<SagaNode[]> {
     if (uuids.length === 0) return [];
-    const rows = await this.prisma.sagaNode.findMany({ where: { uuid: { in: uuids } } });
+    const rows = await this.prisma.sagaNode.findMany({ where: { id: { in: uuids } } });
     return rows.map((r) => this.mapRow(r));
   }
 
@@ -103,9 +103,9 @@ export class SagaNodeRepository {
     const rows = await this.prisma.sagaNode.findMany({
       where: {
         graphId: { in: graphIds },
-        ...(uuidCursor ? { uuid: { lt: uuidCursor } } : {}),
+        ...(uuidCursor ? { id: { lt: uuidCursor } } : {}),
       },
-      orderBy: { uuid: 'desc' },
+      orderBy: { id: 'desc' },
       ...(limit !== undefined ? { take: limit } : {}),
     });
     return rows.map((r) => this.mapRow(r));
@@ -113,7 +113,7 @@ export class SagaNodeRepository {
 
   private mapRow(row: Row): SagaNode {
     return {
-      uuid: row.uuid as Uuid,
+      uuid: row.id as Uuid,
       graphId: row.graphId as Uuid,
       name: row.name as NodeName,
       labels: (row.labels ?? []) as NodeLabels,

@@ -8,10 +8,10 @@ import { PrismaService } from '@/providers/database/postgres/prisma.service';
 import { GetByGraphIdsWithCursorParams } from '../../types';
 
 type Row = {
-  uuid: string;
+  id: string;
   graphId: string;
-  sagaUuid: string;
-  episodicUuid: string;
+  sagaId: string;
+  episodicId: string;
   createdAt: Date;
 };
 
@@ -22,18 +22,18 @@ export class HasEpisodeEdgeRepository {
   @Span()
   async save(edge: HasEpisodeEdge): Promise<string> {
     await this.prisma.hasEpisodeEdge.upsert({
-      where: { uuid: edge.uuid },
+      where: { id: edge.uuid },
       create: {
-        uuid: edge.uuid,
+        id: edge.uuid,
         graphId: edge.graphId,
-        sagaUuid: edge.sourceNodeUuid,
-        episodicUuid: edge.targetNodeUuid,
+        sagaId: edge.sourceNodeUuid,
+        episodicId: edge.targetNodeUuid,
         createdAt: edge.createdAt,
       },
       update: {
         graphId: edge.graphId,
-        sagaUuid: edge.sourceNodeUuid,
-        episodicUuid: edge.targetNodeUuid,
+        sagaId: edge.sourceNodeUuid,
+        episodicId: edge.targetNodeUuid,
       },
     });
     return edge.uuid;
@@ -47,18 +47,18 @@ export class HasEpisodeEdgeRepository {
 
   @Span()
   async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.hasEpisodeEdge.delete({ where: { uuid } });
+    await this.prisma.hasEpisodeEdge.delete({ where: { id: uuid } });
   }
 
   @Span()
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     if (uuids.length === 0) return;
-    await this.prisma.hasEpisodeEdge.deleteMany({ where: { uuid: { in: uuids } } });
+    await this.prisma.hasEpisodeEdge.deleteMany({ where: { id: { in: uuids } } });
   }
 
   @Span()
   async getByUuid(uuid: Uuid): Promise<HasEpisodeEdge | null> {
-    const row = await this.prisma.hasEpisodeEdge.findUnique({ where: { uuid } });
+    const row = await this.prisma.hasEpisodeEdge.findUnique({ where: { id: uuid } });
     return row ? this.mapRow(row) : null;
   }
 
@@ -66,7 +66,7 @@ export class HasEpisodeEdgeRepository {
   async getByUuids(uuids: Uuid[]): Promise<HasEpisodeEdge[]> {
     if (uuids.length === 0) return [];
     const rows = await this.prisma.hasEpisodeEdge.findMany({
-      where: { uuid: { in: uuids } },
+      where: { id: { in: uuids } },
     });
     return rows.map((r) => this.mapRow(r));
   }
@@ -78,9 +78,9 @@ export class HasEpisodeEdgeRepository {
     const rows = await this.prisma.hasEpisodeEdge.findMany({
       where: {
         graphId: { in: graphIds },
-        ...(uuidCursor ? { uuid: { lt: uuidCursor } } : {}),
+        ...(uuidCursor ? { id: { lt: uuidCursor } } : {}),
       },
-      orderBy: { uuid: 'desc' },
+      orderBy: { id: 'desc' },
       ...(limit !== undefined ? { take: limit } : {}),
     });
     return rows.map((r) => this.mapRow(r));
@@ -88,10 +88,10 @@ export class HasEpisodeEdgeRepository {
 
   private mapRow(row: Row): HasEpisodeEdge {
     return {
-      uuid: row.uuid as Uuid,
+      uuid: row.id as Uuid,
       graphId: row.graphId as Uuid,
-      sourceNodeUuid: row.sagaUuid as Uuid,
-      targetNodeUuid: row.episodicUuid as Uuid,
+      sourceNodeUuid: row.sagaId as Uuid,
+      targetNodeUuid: row.episodicId as Uuid,
       createdAt: row.createdAt,
     };
   }
