@@ -155,13 +155,10 @@ export async function episodeMentionsReranker(
   if (sortedUuids.length > 0) {
     const results = await repo.getEpisodeMentionCounts(sortedUuids);
     for (const row of results) {
-      scores.set(row.uuid, Number(row.score));
+      scores.set(row.uuid, row.score);
     }
   }
 
-  for (const uuid of sortedUuids) {
-    if (!scores.has(uuid)) scores.set(uuid, 0);
-  }
   sortedUuids.sort((a, b) => scores.get(b)! - scores.get(a)!);
 
   const result = sortedUuids

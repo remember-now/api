@@ -9,7 +9,6 @@ import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
 import {
   EpisodeType,
-  GetByGraphIdsParams,
   NodeLabels,
   NodeName,
   RetrieveEpisodesParams,
@@ -73,40 +72,9 @@ export class EpisodicNodeRepository {
   }
 
   @Span()
-  async deleteByUuids(uuids: Uuid[]): Promise<void> {
-    if (uuids.length === 0) return;
-    await this.prisma.episodicNode.deleteMany({ where: { id: { in: uuids } } });
-  }
-
-  @Span()
-  async deleteByGraphId(graphId: Uuid): Promise<void> {
-    await this.prisma.episodicNode.deleteMany({ where: { graphId } });
-  }
-
-  @Span()
   async getByUuid(uuid: Uuid): Promise<EpisodicNode | null> {
     const row = await this.prisma.episodicNode.findUnique({ where: { id: uuid } });
     return row ? this.mapRow(row) : null;
-  }
-
-  @Span()
-  async getByUuids(uuids: Uuid[]): Promise<EpisodicNode[]> {
-    if (uuids.length === 0) return [];
-    const rows = await this.prisma.episodicNode.findMany({
-      where: { id: { in: uuids } },
-    });
-    return rows.map((r) => this.mapRow(r));
-  }
-
-  @Span()
-  async getByGraphIds(params: GetByGraphIdsParams): Promise<EpisodicNode[]> {
-    const { graphIds, limit } = params;
-    if (graphIds.length === 0) return [];
-    const rows = await this.prisma.episodicNode.findMany({
-      where: { graphId: { in: graphIds } },
-      ...(limit !== undefined ? { take: limit } : {}),
-    });
-    return rows.map((r) => this.mapRow(r));
   }
 
   @Span()

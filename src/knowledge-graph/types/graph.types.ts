@@ -51,17 +51,6 @@ export const SearchByBfsParamsSchema = z.object({
   maxDepth: z.number().int().positive().optional(),
 });
 
-export const GetByGraphIdsParamsSchema = z.object({
-  graphIds: z.array(UuidSchema),
-  limit: z.number().int().positive().optional(),
-});
-
-export const GetByGraphIdsWithCursorParamsSchema = z.object({
-  graphIds: z.array(UuidSchema),
-  limit: z.number().int().positive().optional(),
-  uuidCursor: UuidSchema.optional(),
-});
-
 export const RetrieveEpisodesParamsSchema = z.object({
   graphIds: z.array(UuidSchema),
   referenceTime: z.date().default(() => new Date()),
@@ -77,9 +66,5 @@ export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
 export type SearchByTextParams = z.infer<typeof SearchByTextParamsSchema>;
 export type SearchBySimilarityParams = z.infer<typeof SearchBySimilarityParamsSchema>;
 export type SearchByBfsParams = z.infer<typeof SearchByBfsParamsSchema>;
-export type GetByGraphIdsParams = z.infer<typeof GetByGraphIdsParamsSchema>;
-export type GetByGraphIdsWithCursorParams = z.infer<
-  typeof GetByGraphIdsWithCursorParamsSchema
->;
 export type RetrieveEpisodesParamsInput = z.input<typeof RetrieveEpisodesParamsSchema>;
 export type RetrieveEpisodesParams = z.infer<typeof RetrieveEpisodesParamsSchema>;

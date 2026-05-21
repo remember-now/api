@@ -108,6 +108,13 @@ export class EpisodeService {
     return this.episodicNodeRepository.retrieveEpisodes(params);
   }
 
+  // TODO: Deletion is currently best-effort and leaves downstream graph state
+  // inconsistent. Non-originating episodes can still mutate surviving edges
+  // (invalidAt/expiredAt stamps, episodes[] arrays, node attributes); none of
+  // that is unwound here. The right design is dependency-aware reconsolidation
+  // on retrieval over an append-only graph, but the trade-offs only become
+  // legible against a real graph with real query patterns - revisit once we
+  // have one. Design notes: PLAN.md.
   async deleteEpisode(uuid: Uuid): Promise<void> {
     await this.deleteEpisodeImpl(uuid);
   }
@@ -680,9 +687,9 @@ export class EpisodeService {
 
     // 24. Optional community build per distinct graphId
     // TODO: Concurrent addEpisodes calls for the same graphId can race here -
-    // two community builds may project conflicting graph snapshots and race on
-    // deleteByGraphId. Investigate a per-graphId mutex or advisory lock before
-    // enabling concurrent bulk ingestion.
+    // two community builds may project conflicting graph snapshots and race
+    // on the per-graph community teardown/rebuild. Investigate a per-graphId
+    // mutex or advisory lock before enabling concurrent bulk ingestion.
     if (updateCommunities) {
       await Promise.all(
         graphIds.map((gid) => this.communityService.buildCommunities(userId, gid)),

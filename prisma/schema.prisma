@@ -8,8 +8,9 @@
 // https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["strictUndefinedChecks"]
 }
 
 datasource db {
@@ -138,7 +139,7 @@ model EntityEdge {
   @@index([graphId])
   @@index([sourceId])
   @@index([targetId])
-  // See EntityNode for rationale - declared so Prisma stops proposing to drop our diskann index.
+  // See EntityNode for rationale
   @@index([factEmbedding, graphLabel], map: "entity_edges_embedding_idx")
   @@map("entity_edges")
 }

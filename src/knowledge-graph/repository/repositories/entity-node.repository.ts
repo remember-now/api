@@ -9,7 +9,6 @@ import { Span } from '@/observability';
 import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
 import {
-  GetByGraphIdsParams,
   NodeLabels,
   NodeName,
   SearchByBfsParams,
@@ -72,67 +71,12 @@ export class EntityNodeRepository {
   }
 
   @Span()
-  async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.entityNode.delete({ where: { id: uuid } });
-  }
-
-  @Span()
-  async deleteByUuids(uuids: Uuid[]): Promise<void> {
-    if (uuids.length === 0) return;
-    await this.prisma.entityNode.deleteMany({ where: { id: { in: uuids } } });
-  }
-
-  @Span()
   async deleteIfSoleMentioned(nodeUuid: Uuid): Promise<void> {
     await this.prisma.$executeRaw`
       DELETE FROM entity_nodes en
       WHERE en.id = ${nodeUuid}::uuid
         AND (SELECT COUNT(*) FROM episodic_edges ee WHERE ee.entity_id = en.id) = 1
     `;
-  }
-
-  @Span()
-  async deleteByGraphId(graphId: Uuid): Promise<void> {
-    await this.prisma.entityNode.deleteMany({ where: { graphId } });
-  }
-
-  @Span()
-  async getByUuid(uuid: Uuid): Promise<EntityNode | null> {
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, name, summary, attributes, labels,
-             name_embedding::text AS name_embedding, created_at
-      FROM entity_nodes
-      WHERE id = ${uuid}::uuid
-    `;
-    if (rows.length === 0) return null;
-    return this.mapRow(rows[0]);
-  }
-
-  @Span()
-  async getByUuids(uuids: Uuid[]): Promise<EntityNode[]> {
-    if (uuids.length === 0) return [];
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, name, summary, attributes, labels,
-             name_embedding::text AS name_embedding, created_at
-      FROM entity_nodes
-      WHERE id = ANY(${uuids}::uuid[])
-    `;
-    return rows.map((r) => this.mapRow(r));
-  }
-
-  @Span()
-  async getByGraphIds(params: GetByGraphIdsParams): Promise<EntityNode[]> {
-    const { graphIds, limit } = params;
-    if (graphIds.length === 0) return [];
-    const limitSql = limit !== undefined ? Prisma.sql`LIMIT ${limit}` : Prisma.empty;
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, name, summary, attributes, labels,
-             name_embedding::text AS name_embedding, created_at
-      FROM entity_nodes
-      WHERE graph_id = ANY(${graphIds}::uuid[])
-      ${limitSql}
-    `;
-    return rows.map((r) => this.mapRow(r));
   }
 
   @Span()
@@ -218,6 +162,9 @@ export class EntityNodeRepository {
     return rows.map((r) => this.mapRow(r));
   }
 
+  // Currently emits only 1-hop scores (score=1 for direct neighbors, absent otherwise).
+  // The reranker treats score as graph distance with harmonic decay (1/d), so this can be
+  // extended to multi-hop via BFS (e.g. buildBfsCte) without changing the caller contract.
   @Span()
   async getNodeDistanceScores(
     nodeUuids: Uuid[],
@@ -239,12 +186,13 @@ export class EntityNodeRepository {
     nodeUuids: Uuid[],
   ): Promise<{ uuid: Uuid; score: number }[]> {
     if (nodeUuids.length === 0) return [];
-    const rows = await this.prisma.episodicEdge.groupBy({
-      by: ['entityId'],
-      _count: { _all: true },
-      where: { entityId: { in: nodeUuids } },
-    });
-    return rows.map((r) => ({ uuid: r.entityId as Uuid, score: r._count._all }));
+    const rows = await this.prisma.$queryRaw<{ uuid: Uuid; score: number }[]>`
+      SELECT n.id AS uuid, COUNT(ee.id)::int AS score
+      FROM UNNEST(${nodeUuids}::uuid[]) AS n(id)
+      LEFT JOIN episodic_edges ee ON ee.entity_id = n.id
+      GROUP BY n.id
+    `;
+    return rows;
   }
 
   private mapRow(row: RawRow): EntityNode {

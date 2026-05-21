@@ -9,7 +9,6 @@ import { Span } from '@/observability';
 import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
 import {
-  GetByGraphIdsParams,
   RelationshipType,
   SearchByBfsParams,
   SearchBySimilarityParams,
@@ -85,40 +84,9 @@ export class EntityEdgeRepository {
   }
 
   @Span()
-  async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.entityEdge.delete({ where: { id: uuid } });
-  }
-
-  @Span()
   async deleteByUuids(uuids: Uuid[]): Promise<void> {
     if (uuids.length === 0) return;
     await this.prisma.entityEdge.deleteMany({ where: { id: { in: uuids } } });
-  }
-
-  @Span()
-  async getByUuid(uuid: Uuid): Promise<EntityEdge | null> {
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, source_id, target_id, name, fact,
-             fact_embedding::text AS fact_embedding, attributes, episodes,
-             valid_at, invalid_at, expired_at, created_at
-      FROM entity_edges
-      WHERE id = ${uuid}::uuid
-    `;
-    if (rows.length === 0) return null;
-    return this.mapRow(rows[0]);
-  }
-
-  @Span()
-  async getByUuids(uuids: Uuid[]): Promise<EntityEdge[]> {
-    if (uuids.length === 0) return [];
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, source_id, target_id, name, fact,
-             fact_embedding::text AS fact_embedding, attributes, episodes,
-             valid_at, invalid_at, expired_at, created_at
-      FROM entity_edges
-      WHERE id = ANY(${uuids}::uuid[])
-    `;
-    return rows.map((r) => this.mapRow(r));
   }
 
   @Span()
@@ -135,22 +103,6 @@ export class EntityEdgeRepository {
   }
 
   @Span()
-  async getByGraphIds(params: GetByGraphIdsParams): Promise<EntityEdge[]> {
-    const { graphIds, limit } = params;
-    if (graphIds.length === 0) return [];
-    const limitSql = limit !== undefined ? Prisma.sql`LIMIT ${limit}` : Prisma.empty;
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, source_id, target_id, name, fact,
-             fact_embedding::text AS fact_embedding, attributes, episodes,
-             valid_at, invalid_at, expired_at, created_at
-      FROM entity_edges
-      WHERE graph_id = ANY(${graphIds}::uuid[])
-      ${limitSql}
-    `;
-    return rows.map((r) => this.mapRow(r));
-  }
-
-  @Span()
   async getBetweenNodes(sourceUuid: Uuid, targetUuid: Uuid): Promise<EntityEdge[]> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       SELECT id, graph_id, source_id, target_id, name, fact,
@@ -158,18 +110,6 @@ export class EntityEdgeRepository {
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
       WHERE source_id = ${sourceUuid}::uuid AND target_id = ${targetUuid}::uuid
-    `;
-    return rows.map((r) => this.mapRow(r));
-  }
-
-  @Span()
-  async getByNodeUuid(nodeUuid: Uuid): Promise<EntityEdge[]> {
-    const rows = await this.prisma.$queryRaw<RawRow[]>`
-      SELECT id, graph_id, source_id, target_id, name, fact,
-             fact_embedding::text AS fact_embedding, attributes, episodes,
-             valid_at, invalid_at, expired_at, created_at
-      FROM entity_edges
-      WHERE source_id = ${nodeUuid}::uuid OR target_id = ${nodeUuid}::uuid
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -249,15 +189,6 @@ export class EntityEdgeRepository {
       LIMIT ${limit}
     `;
     return rows.map((r) => this.mapRow(r));
-  }
-
-  @Span()
-  async hasRelatesEdgesForGraph(graphId: Uuid): Promise<boolean> {
-    const result = await this.prisma.entityEdge.findFirst({
-      where: { graphId },
-      select: { id: true },
-    });
-    return result !== null;
   }
 
   private mapRow(row: RawRow): EntityEdge {

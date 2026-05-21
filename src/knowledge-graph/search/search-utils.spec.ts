@@ -233,10 +233,10 @@ describe('episodeMentionsReranker', () => {
   });
 
   it('places zero-mention nodes after positively-mentioned nodes', async () => {
-    // node-c is absent from DB result → sentinel score 0
     repo.getEpisodeMentionCounts.mockResolvedValue([
       { uuid: u('node-a'), score: 20 },
       { uuid: u('node-b'), score: 5 },
+      { uuid: u('node-c'), score: 0 },
     ]);
 
     const [uuids] = await episodeMentionsReranker(repo, [
@@ -250,6 +250,7 @@ describe('episodeMentionsReranker', () => {
     repo.getEpisodeMentionCounts.mockResolvedValue([
       { uuid: u('node-a'), score: 20 },
       { uuid: u('node-b'), score: 5 },
+      { uuid: u('node-c'), score: 0 },
     ]);
 
     const [uuids] = await episodeMentionsReranker(
@@ -270,7 +271,10 @@ describe('episodeMentionsReranker', () => {
   });
 
   it('returns all nodes with score 0 when none are mentioned', async () => {
-    repo.getEpisodeMentionCounts.mockResolvedValue([]);
+    repo.getEpisodeMentionCounts.mockResolvedValue([
+      { uuid: u('node-a'), score: 0 },
+      { uuid: u('node-b'), score: 0 },
+    ]);
 
     const [uuids, scores] = await episodeMentionsReranker(repo, [
       [u('node-a'), u('node-b')],

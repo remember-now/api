@@ -24,12 +24,12 @@ docker info
 
 ## Stack modes
 
-| Command                                        | What runs                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| `docker compose up -d`                         | Everything except Langfuse observability                            |
-| `docker compose --profile observability up -d` | Everything, including observability                                 |
-| `npm run infra:dev:up`                         | Infra + observability (no app container, since dev runs it on host) |
-| `npm run infra:test:up`                        | App deps only, no observability                                     |
+| Command                                        | What runs                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `docker compose up -d`                         | Everything except Langfuse observability                                 |
+| `docker compose --profile observability up -d` | Everything, including observability                                      |
+| `npm run infra:dev:up`                         | Infra + observability (no app container, since dev runs it on host)      |
+| `npm run infra:test:up`                        | App deps only, no observability, uses `.env.test` (change default ports) |
 
 ## Compile and run the project
 
@@ -93,6 +93,12 @@ Once dev infra is up, the following web UIs are available:
 ### Pre-commit hooks
 
 Installed automatically by `npm install` via Husky. On each commit, `lint-staged` runs ESLint (zero warnings allowed) and Prettier across staged TS/JS files, and Prettier across staged JSON/Markdown/YAML.
+
+### Prisma conventions
+
+The Prisma client runs with the `strictUndefinedChecks` preview feature enabled. This means passing `undefined` to any field in `data`, `where`, `take`, `orderBy`, etc. throws at runtime instead of being silently ignored.
+
+When you have a possibly-undefined value, guard at the call site - either use a conditional spread or `Prisma.skip`.
 
 ### Frontend Type Generation
 
