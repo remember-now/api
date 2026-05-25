@@ -71,15 +71,15 @@ export class AgentController {
     });
 
     return {
-      episodeUuid: result.episode.uuid,
+      episodeId: result.episode.id,
       nodes: result.nodes.map((n) => ({
-        uuid: n.uuid,
+        id: n.id,
         name: n.name,
         summary: n.summary,
         labels: n.labels,
       })),
       edges: result.edges.map((e) => ({
-        uuid: e.uuid,
+        id: e.id,
         name: e.name,
         fact: e.fact,
         validAt: e.validAt?.toISOString() ?? null,
@@ -113,24 +113,24 @@ export class AgentController {
 
     return {
       edges: results.edges.map((e) => ({
-        uuid: e.uuid,
+        id: e.id,
         name: e.name,
         fact: e.fact,
-        score: results.edgeScores.get(e.uuid) ?? 0,
+        score: results.edgeScores.get(e.id) ?? 0,
         validAt: e.validAt?.toISOString() ?? null,
         invalidAt: e.invalidAt?.toISOString() ?? null,
       })),
       nodes: results.nodes.map((n) => ({
-        uuid: n.uuid,
+        id: n.id,
         name: n.name,
         summary: n.summary,
-        score: results.nodeScores.get(n.uuid) ?? 0,
+        score: results.nodeScores.get(n.id) ?? 0,
       })),
       episodes: results.episodes.map((ep) => ({
-        uuid: ep.uuid,
+        id: ep.id,
         content: ep.content,
         validAt: ep.validAt?.toISOString() ?? null,
-        score: results.episodeScores.get(ep.uuid) ?? 0,
+        score: results.episodeScores.get(ep.id) ?? 0,
       })),
     };
   }

@@ -59,10 +59,10 @@ export class NodeResolutionService {
     customInstructions?: string,
     ctx?: LlmContext,
   ): Promise<NodeResolutionResult & { metrics: SpanMetrics }> {
-    const uuidMap = new Map<Uuid, Uuid>();
+    const idMap = new Map<Uuid, Uuid>();
     const duplicatePairs: Array<{
-      extractedUuid: Uuid;
-      canonicalUuid: Uuid;
+      extractedId: Uuid;
+      canonicalId: Uuid;
     }> = [];
     const llmCandidates = new Map<Uuid, EntityNode[]>();
 
@@ -74,10 +74,10 @@ export class NodeResolutionService {
         (n) => normalizeString(n.name) === normalizedName,
       );
       if (exactMatch) {
-        uuidMap.set(extracted.uuid, exactMatch.uuid);
+        idMap.set(extracted.id, exactMatch.id);
         duplicatePairs.push({
-          extractedUuid: extracted.uuid,
-          canonicalUuid: exactMatch.uuid,
+          extractedId: extracted.id,
+          canonicalId: exactMatch.id,
         });
         continue;
       }
@@ -89,7 +89,7 @@ export class NodeResolutionService {
         shannonEntropy(normalizeNameForEntropy(normalizedName)) < LOW_ENTROPY_THRESHOLD &&
         existingNodes.length > 0
       ) {
-        llmCandidates.set(extracted.uuid, existingNodes);
+        llmCandidates.set(extracted.id, existingNodes);
         continue;
       }
 
@@ -108,7 +108,7 @@ export class NodeResolutionService {
 
         if (scored.length >= 1) {
           llmCandidates.set(
-            extracted.uuid,
+            extracted.id,
             scored.map((s) => s.node),
           );
           continue;
@@ -120,16 +120,16 @@ export class NodeResolutionService {
     // Batch LLM call for all ambiguous nodes
     if (llmCandidates.size > 0) {
       const llmExtractedWithIdx = extractedNodes
-        .filter((n) => llmCandidates.has(n.uuid))
-        .map((n, idx) => ({ id: idx, name: n.name, uuid: n.uuid }));
+        .filter((n) => llmCandidates.has(n.id))
+        .map((n, idx) => ({ id: idx, name: n.name, entityId: n.id }));
 
-      const idxToUuid = new Map(llmExtractedWithIdx.map((e) => [e.id, e.uuid]));
+      const idxToEntityId = new Map(llmExtractedWithIdx.map((e) => [e.id, e.entityId]));
 
       // Collect unique candidate nodes across all batches
       const candidateSet = new Map<Uuid, EntityNode>();
       for (const candidates of llmCandidates.values()) {
         for (const c of candidates) {
-          candidateSet.set(c.uuid, c);
+          candidateSet.set(c.id, c);
         }
       }
       const allCandidates = Array.from(candidateSet.values()).map((n) => ({
@@ -160,16 +160,16 @@ export class NodeResolutionService {
       const resolutions = raw.entity_resolutions;
 
       for (const resolution of resolutions) {
-        const extractedUuid = idxToUuid.get(resolution.id);
-        if (!extractedUuid) continue;
+        const extractedId = idxToEntityId.get(resolution.id);
+        if (!extractedId) continue;
 
         if (resolution.duplicate_name && resolution.duplicate_name !== '') {
           const canonical = existingByName.get(resolution.duplicate_name);
           if (canonical) {
-            uuidMap.set(extractedUuid, canonical.uuid);
+            idMap.set(extractedId, canonical.id);
             duplicatePairs.push({
-              extractedUuid,
-              canonicalUuid: canonical.uuid,
+              extractedId,
+              canonicalId: canonical.id,
             });
             continue;
           }
@@ -179,7 +179,7 @@ export class NodeResolutionService {
         // nameEmbedding is cleared because it was computed for the old name -
         // persisting a stale embedding would corrupt vector search results.
         if (resolution.name) {
-          const node = extractedNodes.find((n) => n.uuid === extractedUuid);
+          const node = extractedNodes.find((n) => n.id === extractedId);
           if (node && resolution.name !== node.name) {
             node.name = resolution.name;
             node.nameEmbedding = null;
@@ -188,14 +188,14 @@ export class NodeResolutionService {
       }
     }
 
-    const resolvedNodes = extractedNodes.filter((n) => !uuidMap.has(n.uuid));
+    const resolvedNodes = extractedNodes.filter((n) => !idMap.has(n.id));
 
     return {
       resolvedNodes,
-      uuidMap,
+      idMap,
       duplicatePairs,
       metrics: {
-        'episode.uuid': episode.uuid,
+        'episode.id': episode.id,
         'extracted.count': extractedNodes.length,
         'existing.count': existingNodes.length,
         'resolved.count': resolvedNodes.length,

@@ -45,7 +45,7 @@ export const SearchBySimilarityParamsSchema = z.object({
 });
 
 export const SearchByBfsParamsSchema = z.object({
-  originNodeUuids: z.array(UuidSchema),
+  originNodeIds: z.array(UuidSchema),
   graphIds: z.array(UuidSchema),
   limit: z.number().int().positive(),
   maxDepth: z.number().int().positive().optional(),
@@ -56,7 +56,7 @@ export const RetrieveEpisodesParamsSchema = z.object({
   referenceTime: z.date().default(() => new Date()),
   lastN: z.number().int().positive().default(10),
   source: EpisodeTypeSchema.optional(),
-  sagaUuid: UuidSchema.optional(),
+  sagaId: UuidSchema.optional(),
 });
 
 export type NodeLabel = z.infer<typeof NodeLabelSchema>;

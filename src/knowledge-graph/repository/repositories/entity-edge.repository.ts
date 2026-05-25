@@ -45,10 +45,10 @@ export class EntityEdgeRepository {
         id, graph_id, source_id, target_id, name, fact,
         fact_embedding, attributes, episodes, valid_at, invalid_at, expired_at, created_at
       ) VALUES (
-        ${edge.uuid}::uuid,
+        ${edge.id}::uuid,
         ${edge.graphId}::uuid,
-        ${edge.sourceNodeUuid}::uuid,
-        ${edge.targetNodeUuid}::uuid,
+        ${edge.sourceNodeId}::uuid,
+        ${edge.targetNodeId}::uuid,
         ${edge.name},
         ${edge.fact},
         ${toPgVector(edge.factEmbedding)}::vector,
@@ -72,7 +72,7 @@ export class EntityEdgeRepository {
         invalid_at     = EXCLUDED.invalid_at,
         expired_at     = EXCLUDED.expired_at
     `;
-    return edge.uuid;
+    return edge.id;
   }
 
   @Span()
@@ -84,32 +84,32 @@ export class EntityEdgeRepository {
   }
 
   @Span()
-  async deleteByUuids(uuids: Uuid[]): Promise<void> {
-    if (uuids.length === 0) return;
-    await this.prisma.entityEdge.deleteMany({ where: { id: { in: uuids } } });
+  async deleteByIds(ids: Uuid[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.prisma.entityEdge.deleteMany({ where: { id: { in: ids } } });
   }
 
   @Span()
-  async getUuidsForEpisodeDeletion(episodeUuid: Uuid): Promise<Uuid[]> {
+  async getIdsForEpisodeDeletion(episodeId: Uuid): Promise<Uuid[]> {
     // Only edges whose FIRST episode in the
     // ordered `episodes` array matches are considered. Edges that merely
     // accumulated this episode as a later contributor are intentionally kept.
     const rows = await this.prisma.$queryRaw<{ id: Uuid }[]>`
       SELECT id
       FROM entity_edges
-      WHERE episodes[1] = ${episodeUuid}::uuid
+      WHERE episodes[1] = ${episodeId}::uuid
     `;
     return rows.map((r) => r.id);
   }
 
   @Span()
-  async getBetweenNodes(sourceUuid: Uuid, targetUuid: Uuid): Promise<EntityEdge[]> {
+  async getBetweenNodes(sourceId: Uuid, targetId: Uuid): Promise<EntityEdge[]> {
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       SELECT id, graph_id, source_id, target_id, name, fact,
              fact_embedding::text AS fact_embedding, attributes, episodes,
              valid_at, invalid_at, expired_at, created_at
       FROM entity_edges
-      WHERE source_id = ${sourceUuid}::uuid AND target_id = ${targetUuid}::uuid
+      WHERE source_id = ${sourceId}::uuid AND target_id = ${targetId}::uuid
     `;
     return rows.map((r) => this.mapRow(r));
   }
@@ -144,8 +144,8 @@ export class EntityEdgeRepository {
     const filterSql = buildEdgeFilterClause(filters, 'e');
 
     // See comment in ./entity-node.repository.ts
-    const labelArray = Prisma.sql`ARRAY[${Prisma.join(
-      graphIds.map((g) => Prisma.sql`graph_label_for(${g}::uuid)`),
+    const bucketArray = Prisma.sql`ARRAY[${Prisma.join(
+      graphIds.map((g) => Prisma.sql`graph_diskann_bucket_for(${g}::uuid)`),
     )}]::smallint[]`;
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
@@ -154,7 +154,7 @@ export class EntityEdgeRepository {
              e.valid_at, e.invalid_at, e.expired_at, e.created_at,
              1 - (e.fact_embedding <=> ${vec}) AS score
       FROM entity_edges e
-      WHERE e.graph_label && ${labelArray}
+      WHERE e.graph_diskann_bucket && ${bucketArray}
         AND e.graph_id = ANY(${graphIds}::uuid[])
         AND e.fact_embedding IS NOT NULL
         AND 1 - (e.fact_embedding <=> ${vec}) >= ${minScore}
@@ -170,12 +170,12 @@ export class EntityEdgeRepository {
     params: SearchByBfsParams,
     filters?: SearchFilters,
   ): Promise<EntityEdge[]> {
-    const { originNodeUuids, graphIds, limit, maxDepth } = params;
-    if (originNodeUuids.length === 0) return [];
+    const { originNodeIds, graphIds, limit, maxDepth } = params;
+    if (originNodeIds.length === 0) return [];
     const depth = maxDepth ?? MAX_SEARCH_DEPTH;
     const filterSql = buildEdgeFilterClause(filters, 'e');
 
-    const cte = buildBfsCte(originNodeUuids, graphIds, depth);
+    const cte = buildBfsCte(originNodeIds, graphIds, depth);
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       ${cte}
       SELECT DISTINCT e.id, e.graph_id, e.source_id, e.target_id, e.name, e.fact,
@@ -193,10 +193,10 @@ export class EntityEdgeRepository {
 
   private mapRow(row: RawRow): EntityEdge {
     return {
-      uuid: row.id as Uuid,
+      id: row.id as Uuid,
       graphId: row.graph_id as Uuid,
-      sourceNodeUuid: row.source_id as Uuid,
-      targetNodeUuid: row.target_id as Uuid,
+      sourceNodeId: row.source_id as Uuid,
+      targetNodeId: row.target_id as Uuid,
       name: row.name as RelationshipType,
       fact: row.fact,
       factEmbedding: fromPgVector(row.fact_embedding),

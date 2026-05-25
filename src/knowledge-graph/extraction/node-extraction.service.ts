@@ -98,7 +98,7 @@ export class NodeExtractionService {
     return {
       nodes,
       metrics: {
-        'episode.uuid': episode.uuid,
+        'episode.id': episode.id,
         'entityTypes.count': entityTypes ? Object.keys(entityTypes).length : 0,
         'nodes.extracted.count': nodes.length,
       },

@@ -2,8 +2,8 @@ import { Uuid } from '@/common/schemas';
 
 import { RelationshipTypeSchema } from '../types';
 import {
-  buildDirectedUuidMap,
-  compressUuidMap,
+  buildDirectedIdMap,
+  compressIdMap,
   resolveEdgePointers,
   UnionFind,
   withConcurrency,
@@ -67,7 +67,7 @@ describe('UnionFind', () => {
     expect(uf.find('a')).toBe(uf.find('b'));
   });
 
-  it('lex-smaller uuid wins as root', () => {
+  it('lex-smaller id wins as root', () => {
     const uf = new UnionFind(['b', 'a']);
     uf.union('b', 'a');
     expect(uf.find('b')).toBe('a');
@@ -93,16 +93,16 @@ describe('UnionFind', () => {
   });
 });
 
-describe('compressUuidMap', () => {
-  it('single pair: smaller uuid is canonical', () => {
-    const map = compressUuidMap([['b', 'a']]);
+describe('compressIdMap', () => {
+  it('single pair: smaller id is canonical', () => {
+    const map = compressIdMap([['b', 'a']]);
     expect(map.get('a')).toBe('a');
     expect(map.get('b')).toBe('a');
   });
 
   it('chain a→b→c collapses to lex-min', () => {
     // All three end up in the same cluster; lex-min is 'a'
-    const map = compressUuidMap([
+    const map = compressIdMap([
       ['b', 'a'],
       ['c', 'b'],
     ]);
@@ -112,7 +112,7 @@ describe('compressUuidMap', () => {
   });
 
   it('disjoint pairs stay separate', () => {
-    const map = compressUuidMap([
+    const map = compressIdMap([
       ['b', 'a'],
       ['d', 'c'],
     ]);
@@ -123,15 +123,15 @@ describe('compressUuidMap', () => {
   });
 });
 
-describe('buildDirectedUuidMap', () => {
+describe('buildDirectedIdMap', () => {
   it('directed pair b→a maps b to a', () => {
-    const map = buildDirectedUuidMap([['b', 'a']]);
+    const map = buildDirectedIdMap([['b', 'a']]);
     expect(map.get('b')).toBe('a');
     expect(map.get('a')).toBe('a');
   });
 
   it('chain b→a, c→b collapses to a', () => {
-    const map = buildDirectedUuidMap([
+    const map = buildDirectedIdMap([
       ['b', 'a'],
       ['c', 'b'],
     ]);
@@ -140,7 +140,7 @@ describe('buildDirectedUuidMap', () => {
   });
 
   it('independent pairs stay separate', () => {
-    const map = buildDirectedUuidMap([
+    const map = buildDirectedIdMap([
       ['b', 'a'],
       ['d', 'c'],
     ]);
@@ -149,10 +149,10 @@ describe('buildDirectedUuidMap', () => {
   });
 });
 
-const makeEdge = (uuid: string, sourceNodeUuid: string, targetNodeUuid: string) => ({
-  uuid: u(uuid),
-  sourceNodeUuid: u(sourceNodeUuid),
-  targetNodeUuid: u(targetNodeUuid),
+const makeEdge = (id: string, sourceNodeId: string, targetNodeId: string) => ({
+  id: u(id),
+  sourceNodeId: u(sourceNodeId),
+  targetNodeId: u(targetNodeId),
   name: RelationshipTypeSchema.parse('RELATES_TO'),
   fact: 'test',
   graphId: 'g' as Uuid,
@@ -166,29 +166,29 @@ const makeEdge = (uuid: string, sourceNodeUuid: string, targetNodeUuid: string) 
 });
 
 describe('resolveEdgePointers', () => {
-  it('remaps sourceNodeUuid and targetNodeUuid via map', () => {
+  it('remaps sourceNodeId and targetNodeId via map', () => {
     const edge = makeEdge('e1', 'old-src', 'old-tgt');
-    const uuidMap = new Map<Uuid, Uuid>([
+    const idMap = new Map<Uuid, Uuid>([
       [u('old-src'), u('new-src')],
       [u('old-tgt'), u('new-tgt')],
     ]);
-    const [result] = resolveEdgePointers([edge], uuidMap);
-    expect(result.sourceNodeUuid).toBe('new-src');
-    expect(result.targetNodeUuid).toBe('new-tgt');
+    const [result] = resolveEdgePointers([edge], idMap);
+    expect(result.sourceNodeId).toBe('new-src');
+    expect(result.targetNodeId).toBe('new-tgt');
   });
 
-  it('unmapped uuids are unchanged', () => {
+  it('unmapped ids are unchanged', () => {
     const edge = makeEdge('e1', 'src', 'tgt');
-    const uuidMap = new Map<Uuid, Uuid>();
-    const [result] = resolveEdgePointers([edge], uuidMap);
-    expect(result.sourceNodeUuid).toBe('src');
-    expect(result.targetNodeUuid).toBe('tgt');
+    const idMap = new Map<Uuid, Uuid>();
+    const [result] = resolveEdgePointers([edge], idMap);
+    expect(result.sourceNodeId).toBe('src');
+    expect(result.targetNodeId).toBe('tgt');
   });
 
   it('does not mutate input edge', () => {
     const edge = makeEdge('e1', 'old-src', 'old-tgt');
-    const uuidMap = new Map<Uuid, Uuid>([[u('old-src'), u('new-src')]]);
-    resolveEdgePointers([edge], uuidMap);
-    expect(edge.sourceNodeUuid).toBe('old-src');
+    const idMap = new Map<Uuid, Uuid>([[u('old-src'), u('new-src')]]);
+    resolveEdgePointers([edge], idMap);
+    expect(edge.sourceNodeId).toBe('old-src');
   });
 });

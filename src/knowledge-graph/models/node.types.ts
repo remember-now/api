@@ -9,7 +9,7 @@ import { EpisodeType, NodeLabelSchema, NodeName, NodeNameSchema } from '../types
 // Schemas
 
 export const NodeBaseSchema = z.object({
-  uuid: UuidSchema,
+  id: UuidSchema,
   name: NodeNameSchema,
   graphId: UuidSchema,
   labels: z.array(NodeLabelSchema),
@@ -61,7 +61,7 @@ export type SagaNode = z.infer<typeof SagaNodeSchema>;
 
 export function createNodeDefaults(): Omit<NodeBase, 'name' | 'graphId'> {
   return {
-    uuid: UuidSchema.parse(randomUUID()),
+    id: UuidSchema.parse(randomUUID()),
     labels: [],
     createdAt: new Date(),
   };

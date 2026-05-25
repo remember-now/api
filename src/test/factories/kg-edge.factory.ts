@@ -10,7 +10,7 @@ import {
 } from '@/knowledge-graph/models';
 import { RelationshipTypeSchema } from '@/knowledge-graph/types';
 
-import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgUuid } from './kg-constants';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgId } from './kg-constants';
 
 type WithStringName<T> = Omit<Partial<T>, 'name'> & { name?: string };
 
@@ -21,8 +21,8 @@ export class KgEdgeFactory {
       name: RelationshipTypeSchema.parse(name ?? 'RELATED_TO'),
       fact: 'A is related to B',
       graphId: KG_TEST_GRAPH_ID,
-      sourceNodeUuid: kgUuid(),
-      targetNodeUuid: kgUuid(),
+      sourceNodeId: kgId(),
+      targetNodeId: kgId(),
       validAt: KG_REFERENCE_TIME,
       ...rest,
     });
@@ -31,8 +31,8 @@ export class KgEdgeFactory {
   static createEpisodicEdge(opts: Partial<EpisodicEdge> = {}): EpisodicEdge {
     return createEpisodicEdge({
       graphId: KG_TEST_GRAPH_ID,
-      sourceNodeUuid: kgUuid(),
-      targetNodeUuid: kgUuid(),
+      sourceNodeId: kgId(),
+      targetNodeId: kgId(),
       ...opts,
     });
   }
@@ -40,8 +40,8 @@ export class KgEdgeFactory {
   static createHasEpisodeEdge(opts: Partial<HasEpisodeEdge> = {}): HasEpisodeEdge {
     return createHasEpisodeEdge({
       graphId: KG_TEST_GRAPH_ID,
-      sourceNodeUuid: kgUuid(),
-      targetNodeUuid: kgUuid(),
+      sourceNodeId: kgId(),
+      targetNodeId: kgId(),
       ...opts,
     });
   }
@@ -49,8 +49,8 @@ export class KgEdgeFactory {
   static createCommunityEdge(opts: Partial<CommunityEdge> = {}): CommunityEdge {
     return createCommunityEdge({
       graphId: KG_TEST_GRAPH_ID,
-      sourceNodeUuid: kgUuid(),
-      targetNodeUuid: kgUuid(),
+      sourceNodeId: kgId(),
+      targetNodeId: kgId(),
       ...opts,
     });
   }

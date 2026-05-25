@@ -91,9 +91,9 @@ export class EdgeExtractionService {
           name: e.name,
           fact: e.description,
           graphId: episode.graphId,
-          sourceNodeUuid: sourceNode.uuid,
-          targetNodeUuid: targetNode.uuid,
-          episodes: [episode.uuid],
+          sourceNodeId: sourceNode.id,
+          targetNodeId: targetNode.id,
+          episodes: [episode.id],
           validAt: typeof e.validAt === 'string' ? new Date(e.validAt) : null,
           invalidAt: typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,
         });
@@ -102,7 +102,7 @@ export class EdgeExtractionService {
     return {
       edges,
       metrics: {
-        'episode.uuid': episode.uuid,
+        'episode.id': episode.id,
         'nodes.input.count': nodes.length,
         'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
         'edges.llm_returned.count': result.edges.length,

@@ -18,7 +18,7 @@ export function buildNodeSummaryMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   nodes: Array<{
-    uuid: string;
+    id: string;
     name: string;
     summary: string;
     facts: string[];
@@ -31,7 +31,7 @@ export function buildNodeSummaryMessages(ctx: {
   const entitiesText = nodes
     .map((n) => {
       const factsText = n.facts.length > 0 ? JSON.stringify(n.facts) : '[]';
-      return `- uuid: ${n.uuid}, name: "${n.name}", existing_summary: "${n.summary}", facts: ${factsText}`;
+      return `- id: ${n.id}, name: "${n.name}", existing_summary: "${n.summary}", facts: ${factsText}`;
     })
     .join('\n');
 

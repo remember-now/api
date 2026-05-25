@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { UuidSchema } from '@/common/schemas';
-import { kgUuid as _kgUuid, KG_REFERENCE_TIME, KG_TEST_GRAPH_ID } from '@/test/factories';
+import { kgId as _kgId, KG_REFERENCE_TIME, KG_TEST_GRAPH_ID } from '@/test/factories';
 
 import { EpisodeType, NodeNameSchema } from '../types';
 import {
@@ -21,10 +21,10 @@ const n = (s: string) => NodeNameSchema.parse(s);
 
 describe('node.types', () => {
   describe('createNodeDefaults', () => {
-    it('should create defaults with a valid uuid', () => {
+    it('should create defaults with a valid id', () => {
       const defaults = createNodeDefaults();
-      expect(defaults.uuid).toBeDefined();
-      expect(defaults.uuid).toMatch(
+      expect(defaults.id).toBeDefined();
+      expect(defaults.id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
     });
@@ -43,7 +43,7 @@ describe('node.types', () => {
   describe('NodeBaseSchema', () => {
     it('should accept a valid node base', () => {
       const node = {
-        uuid: randomUUID(),
+        id: randomUUID(),
         name: 'Test',
         graphId: KG_TEST_GRAPH_ID,
         labels: [],
@@ -54,7 +54,7 @@ describe('node.types', () => {
 
     it('should reject empty name', () => {
       const node = {
-        uuid: randomUUID(),
+        id: randomUUID(),
         name: '',
         graphId: 'group-1',
         createdAt: new Date(),
@@ -62,9 +62,9 @@ describe('node.types', () => {
       expect(() => NodeBaseSchema.parse(node)).toThrow();
     });
 
-    it('should reject invalid uuid', () => {
+    it('should reject invalid id', () => {
       const node = {
-        uuid: 'not-a-uuid',
+        id: 'not-a-uuid',
         name: 'Test',
         graphId: 'group-1',
         createdAt: new Date(),
@@ -74,7 +74,7 @@ describe('node.types', () => {
 
     it('should reject empty graphId', () => {
       const node = {
-        uuid: randomUUID(),
+        id: randomUUID(),
         name: 'Test',
         graphId: '',
         createdAt: new Date(),
@@ -104,7 +104,7 @@ describe('EntityNode', () => {
       expect(node.labels).toEqual(['Entity']);
       expect(node.summary).toBe('');
       expect(node.attributes).toEqual({});
-      expect(node.uuid).toBeDefined();
+      expect(node.id).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -143,7 +143,7 @@ describe('EntityNode', () => {
       expect(node.graphId).toBe('00000000-0000-4000-8000-000000000123');
     });
 
-    it('should generate unique uuids', () => {
+    it('should generate unique ids', () => {
       const node1 = createEntityNode({
         name: n('Test1'),
         graphId: KG_TEST_GRAPH_ID,
@@ -152,7 +152,7 @@ describe('EntityNode', () => {
         name: n('Test2'),
         graphId: KG_TEST_GRAPH_ID,
       });
-      expect(node1.uuid).not.toBe(node2.uuid);
+      expect(node1.id).not.toBe(node2.id);
     });
   });
 
@@ -168,7 +168,7 @@ describe('EntityNode', () => {
     it('should reject missing name', () => {
       expect(() =>
         EntityNodeSchema.parse({
-          uuid: randomUUID(),
+          id: randomUUID(),
           graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
           labels: ['Entity'],
@@ -232,7 +232,7 @@ describe('EpisodicNode', () => {
       expect(node.source).toBe(EpisodeType.text);
       expect(node.sourceDescription).toBe('');
       expect(node.labels).toEqual(['Episodic']);
-      expect(node.uuid).toBeDefined();
+      expect(node.id).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -306,7 +306,7 @@ describe('CommunityNode', () => {
       expect(node.nameEmbedding).toBeNull();
       expect(node.summary).toBe('');
       expect(node.labels).toEqual(['Community']);
-      expect(node.uuid).toBeDefined();
+      expect(node.id).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -342,7 +342,7 @@ describe('CommunityNode', () => {
     it('should reject missing name', () => {
       expect(() =>
         CommunityNodeSchema.parse({
-          uuid: randomUUID(),
+          id: randomUUID(),
           graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
           nameEmbedding: null,
@@ -379,7 +379,7 @@ describe('SagaNode', () => {
       });
       expect(node.name).toBe('Saga 1');
       expect(node.labels).toEqual(['Saga']);
-      expect(node.uuid).toBeDefined();
+      expect(node.id).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -390,7 +390,7 @@ describe('SagaNode', () => {
       expect(node.graphId).toBe('00000000-0000-4000-8000-000000000001');
     });
 
-    it('should generate unique uuids', () => {
+    it('should generate unique ids', () => {
       const node1 = createSagaNode({
         name: n('Saga1'),
         graphId: KG_TEST_GRAPH_ID,
@@ -399,7 +399,7 @@ describe('SagaNode', () => {
         name: n('Saga2'),
         graphId: KG_TEST_GRAPH_ID,
       });
-      expect(node1.uuid).not.toBe(node2.uuid);
+      expect(node1.id).not.toBe(node2.id);
     });
   });
 
@@ -415,7 +415,7 @@ describe('SagaNode', () => {
     it('should reject missing name', () => {
       expect(() =>
         SagaNodeSchema.parse({
-          uuid: randomUUID(),
+          id: randomUUID(),
           graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
         }),
@@ -430,12 +430,12 @@ describe('SagaNode', () => {
       expect(() => SagaNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });
 
-    it('should reject invalid uuid', () => {
+    it('should reject invalid id', () => {
       const node = createSagaNode({
         name: n('Saga'),
         graphId: KG_TEST_GRAPH_ID,
       });
-      expect(() => SagaNodeSchema.parse({ ...node, uuid: 'not-a-uuid' })).toThrow();
+      expect(() => SagaNodeSchema.parse({ ...node, id: 'not-a-uuid' })).toThrow();
     });
   });
 });

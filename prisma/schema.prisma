@@ -87,21 +87,21 @@ model LlmConfig {
 // Postgres-backed replacement for the old Neo4j layer.
 // all vector I/O goes through $queryRaw / $executeRaw with ::vector casts
 // See migrations/20260517000000_knowledge_graph/migration.sql for:
-// vectorscale extension, graph_label_for fn, graph_label SMALLINT[] column +
+// vectorscale extension, graph_diskann_bucket_for fn, graph_diskann_bucket SMALLINT[] column +
 // trigger, diskann + GIN indexes.
 
 model EntityNode {
-  id            String                      @id @db.Uuid
-  graphId       String                      @map("graph_id") @db.Uuid
-  name          String
-  summary       String                      @default("")
-  attributes    Json                        @default("{}")
-  labels        String[]
-  nameEmbedding Unsupported("vector(768)")? @map("name_embedding")
+  id                 String                      @id @db.Uuid
+  graphId            String                      @map("graph_id") @db.Uuid
+  name               String
+  summary            String                      @default("")
+  attributes         Json                        @default("{}")
+  labels             String[]
+  nameEmbedding      Unsupported("vector(768)")? @map("name_embedding")
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
   // Declared here so Prisma's shadow-DB diff sees the column. Never written by app code.
-  graphLabel    Int[]                       @map("graph_label") @db.SmallInt
-  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  graphDiskannBucket Int[]                       @map("graph_diskann_bucket") @db.SmallInt
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph       Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
   sourceEdges EntityEdge[]   @relation("EntityEdgeSource")
@@ -110,27 +110,27 @@ model EntityNode {
 
   @@index([graphId])
   // Declared so Prisma's diff sees the index by name and stops proposing a drop.
-  // Actual index is created as `USING diskann (name_embedding vector_cosine_ops, graph_label)` in the migration.
-  @@index([nameEmbedding, graphLabel], map: "entity_nodes_embedding_idx")
+  // Actual index is created as `USING diskann (name_embedding vector_cosine_ops, graph_diskann_bucket)` in the migration.
+  @@index([nameEmbedding, graphDiskannBucket], map: "entity_nodes_embedding_idx")
   @@map("entity_nodes")
 }
 
 model EntityEdge {
-  id            String                      @id @db.Uuid
-  graphId       String                      @map("graph_id") @db.Uuid
-  sourceId      String                      @map("source_id") @db.Uuid
-  targetId      String                      @map("target_id") @db.Uuid
-  name          String
-  fact          String
-  factEmbedding Unsupported("vector(768)")? @map("fact_embedding")
+  id                 String                      @id @db.Uuid
+  graphId            String                      @map("graph_id") @db.Uuid
+  sourceId           String                      @map("source_id") @db.Uuid
+  targetId           String                      @map("target_id") @db.Uuid
+  name               String
+  fact               String
+  factEmbedding      Unsupported("vector(768)")? @map("fact_embedding")
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
-  graphLabel    Int[]                       @map("graph_label") @db.SmallInt
-  attributes    Json                        @default("{}")
-  episodes      String[]                    @db.Uuid
-  validAt       DateTime?                   @map("valid_at") @db.Timestamptz(3)
-  invalidAt     DateTime?                   @map("invalid_at") @db.Timestamptz(3)
-  expiredAt     DateTime?                   @map("expired_at") @db.Timestamptz(3)
-  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  graphDiskannBucket Int[]                       @map("graph_diskann_bucket") @db.SmallInt
+  attributes         Json                        @default("{}")
+  episodes           String[]                    @db.Uuid
+  validAt            DateTime?                   @map("valid_at") @db.Timestamptz(3)
+  invalidAt          DateTime?                   @map("invalid_at") @db.Timestamptz(3)
+  expiredAt          DateTime?                   @map("expired_at") @db.Timestamptz(3)
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph      Graph      @relation(fields: [graphId], references: [id], onDelete: Cascade)
   sourceNode EntityNode @relation("EntityEdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
@@ -140,7 +140,7 @@ model EntityEdge {
   @@index([sourceId])
   @@index([targetId])
   // See EntityNode for rationale
-  @@index([factEmbedding, graphLabel], map: "entity_edges_embedding_idx")
+  @@index([factEmbedding, graphDiskannBucket], map: "entity_edges_embedding_idx")
   @@map("entity_edges")
 }
 

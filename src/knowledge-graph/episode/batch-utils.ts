@@ -114,39 +114,38 @@ export class UnionFind<T extends string = string> {
 }
 
 /**
- * Maps each UUID to the lexicographically smallest canonical UUID in its
+ * Maps each ID to the lexicographically smallest canonical ID in its
  * duplicate cluster. Used for within-batch bidirectional deduplication.
  */
-export function compressUuidMap<T extends string = string>(pairs: [T, T][]): Map<T, T> {
-  const allUuids = new Set<T>();
+export function compressIdMap<T extends string = string>(pairs: [T, T][]): Map<T, T> {
+  const allIds = new Set<T>();
   for (const [a, b] of pairs) {
-    allUuids.add(a);
-    allUuids.add(b);
+    allIds.add(a);
+    allIds.add(b);
   }
 
-  const uf = new UnionFind<T>(allUuids);
+  const uf = new UnionFind<T>(allIds);
   for (const [a, b] of pairs) {
     uf.union(a, b);
   }
-
-  return new Map([...allUuids].map((uuid) => [uuid, uf.find(uuid)]));
+  return new Map([...allIds].map((id) => [id, uf.find(id)]));
 }
 
 /**
- * Builds a directed alias → canonical map from (extractedUuid, canonicalUuid)
+ * Builds a directed alias → canonical map from (extractedId, canonicalId)
  * pairs returned by node resolution. Uses union-find with path compression so
  * chains of aliases collapse to their ultimate canonical target.
  */
-export function buildDirectedUuidMap<T extends string = string>(
+export function buildDirectedIdMap<T extends string = string>(
   pairs: [T, T][],
 ): Map<T, T> {
   const parent = new Map<T, T>();
 
-  const find = (uuid: T): T => {
-    if (!parent.has(uuid)) parent.set(uuid, uuid);
-    let root = uuid;
+  const find = (id: T): T => {
+    if (!parent.has(id)) parent.set(id, id);
+    let root = id;
     while (parent.get(root) !== root) root = parent.get(root)!;
-    let cur = uuid;
+    let cur = id;
     while (cur !== root) {
       const next = parent.get(cur)!;
       parent.set(cur, root);
@@ -160,21 +159,20 @@ export function buildDirectedUuidMap<T extends string = string>(
     if (!parent.has(tgt)) parent.set(tgt, tgt);
     parent.set(find(src), find(tgt));
   }
-
-  return new Map([...parent.keys()].map((uuid) => [uuid, find(uuid)]));
+  return new Map([...parent.keys()].map((id) => [id, find(id)]));
 }
 
 /**
- * Remaps edge source/target node UUIDs through a deduplication map.
+ * Remaps edge source/target node IDs through a deduplication map.
  * Returns new edge objects; does not mutate input.
  */
 export function resolveEdgePointers(
   edges: EntityEdge[],
-  uuidMap: Map<Uuid, Uuid>,
+  idMap: Map<Uuid, Uuid>,
 ): EntityEdge[] {
   return edges.map((e) => ({
     ...e,
-    sourceNodeUuid: uuidMap.get(e.sourceNodeUuid) ?? e.sourceNodeUuid,
-    targetNodeUuid: uuidMap.get(e.targetNodeUuid) ?? e.targetNodeUuid,
+    sourceNodeId: idMap.get(e.sourceNodeId) ?? e.sourceNodeId,
+    targetNodeId: idMap.get(e.targetNodeId) ?? e.targetNodeId,
   }));
 }

@@ -31,15 +31,15 @@ export const EpisodeSchema = z
     source: EpisodeTypeSchema,
     sourceDescription: z.string().optional(),
     referenceTime: z.date().default(() => new Date()),
-    uuid: UuidSchema.optional(),
-    sagaUuid: UuidSchema.optional(),
+    id: UuidSchema.optional(),
+    sagaId: UuidSchema.optional(),
   })
   .brand<'Episode'>();
 
 export const NodeSummarySchema = z.object({
   summaries: z.array(
     z.object({
-      uuid: UuidSchema,
+      id: UuidSchema,
       summary: z.string(),
     }),
   ),

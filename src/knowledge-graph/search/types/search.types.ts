@@ -30,10 +30,10 @@ export const SearchOptionsSchema = z.object({
   graphIds: z.array(UuidSchema),
   config: SearchConfigSchema,
   filters: SearchFiltersSchema.optional(),
-  /** UUID of the node to use as the graph-distance anchor for node_distance reranking. */
-  centerNodeUuid: UuidSchema.optional(),
-  /** UUIDs of nodes to start BFS traversal from. */
-  originNodeUuids: z.array(UuidSchema).optional(),
+  /** ID of the node to use as the graph-distance anchor for node_distance reranking. */
+  centerNodeId: UuidSchema.optional(),
+  /** IDs of nodes to start BFS traversal from. */
+  originNodeIds: z.array(UuidSchema).optional(),
 });
 
 export const CrossEncoderScoreSchema = z.object({
@@ -73,27 +73,27 @@ export function emptySearchResults(): SearchResults {
 export function searchResultsToContextString(results: SearchResults): string {
   const facts = results.edges.map((e) => ({
     fact: e.fact,
-    uuid: e.uuid,
+    id: e.id,
     validAt: e.validAt?.toISOString() ?? null,
     invalidAt: e.invalidAt?.toISOString() ?? null,
   }));
 
   const entities = results.nodes.map((n) => ({
     name: n.name,
-    uuid: n.uuid,
+    id: n.id,
     summary: n.summary,
   }));
 
   const episodes = results.episodes.map((ep) => ({
     content: ep.content,
-    uuid: ep.uuid,
+    id: ep.id,
     sourceDescription: ep.sourceDescription,
     validAt: ep.validAt?.toISOString() ?? null,
   }));
 
   const communities = results.communities.map((c) => ({
     name: c.name,
-    uuid: c.uuid,
+    id: c.id,
     summary: c.summary,
   }));
 

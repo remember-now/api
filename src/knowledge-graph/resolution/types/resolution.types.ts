@@ -33,10 +33,8 @@ export const EdgeResolutionResultSchema = z.object({
 
 export const NodeResolutionResultSchema = z.object({
   resolvedNodes: z.array(EntityNodeSchema),
-  uuidMap: z.map(UuidSchema, UuidSchema),
-  duplicatePairs: z.array(
-    z.object({ extractedUuid: UuidSchema, canonicalUuid: UuidSchema }),
-  ),
+  idMap: z.map(UuidSchema, UuidSchema),
+  duplicatePairs: z.array(z.object({ extractedId: UuidSchema, canonicalId: UuidSchema })),
 });
 
 // Types

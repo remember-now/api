@@ -18,10 +18,10 @@ import { EntityEdge } from '../models';
 import { EntityEdgeRepository } from '../repository/repositories';
 import { EdgeResolutionService } from './edge-resolution.service';
 
-// Stable test UUIDs so intra-batch dedup and endpoint matching reliably fire
+// Stable test IDs so intra-batch dedup and endpoint matching reliably fire
 // across edges constructed by `makeEdge` without explicit overrides.
-const DEFAULT_SRC = u('src-uuid');
-const DEFAULT_TGT = u('tgt-uuid');
+const DEFAULT_SRC = u('src-id');
+const DEFAULT_TGT = u('tgt-id');
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
   name: 'Test Episode',
@@ -33,8 +33,8 @@ function makeEdge(
   overrides: { name: string; fact: string } & Omit<Partial<EntityEdge>, 'name'>,
 ): EntityEdge {
   return KgEdgeFactory.createEntityEdge({
-    sourceNodeUuid: DEFAULT_SRC,
-    targetNodeUuid: DEFAULT_TGT,
+    sourceNodeId: DEFAULT_SRC,
+    targetNodeId: DEFAULT_TGT,
     ...overrides,
   });
 }
@@ -93,18 +93,18 @@ describe('EdgeResolutionService', () => {
     expect(result.resolvedEdges[0].episodes).toContain(u('ep-2'));
   });
 
-  it('should remap source/target uuids via uuidMap', async () => {
+  it('should remap source/target ids via idMap', async () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
       factEmbedding: KG_HIGH_SIM_EMBEDDING,
-      sourceNodeUuid: u('old-src-uuid'),
-      targetNodeUuid: u('old-tgt-uuid'),
+      sourceNodeId: u('old-src-id'),
+      targetNodeId: u('old-tgt-id'),
     });
 
-    const uuidMap = new Map<Uuid, Uuid>([
-      [u('old-src-uuid'), u('new-src-uuid')],
-      [u('old-tgt-uuid'), u('new-tgt-uuid')],
+    const idMap = new Map<Uuid, Uuid>([
+      [u('old-src-id'), u('new-src-id')],
+      [u('old-tgt-id'), u('new-tgt-id')],
     ]);
 
     const result = await service.resolveEdges(
@@ -112,12 +112,12 @@ describe('EdgeResolutionService', () => {
       baseEpisode,
       [edge],
       [],
-      uuidMap,
+      idMap,
       KG_REFERENCE_TIME,
     );
 
-    expect(result.resolvedEdges[0].sourceNodeUuid).toBe(u('new-src-uuid'));
-    expect(result.resolvedEdges[0].targetNodeUuid).toBe(u('new-tgt-uuid'));
+    expect(result.resolvedEdges[0].sourceNodeId).toBe(u('new-src-id'));
+    expect(result.resolvedEdges[0].targetNodeId).toBe(u('new-tgt-id'));
   });
 
   it('should add edge to resolvedEdges when no candidates exist', async () => {
@@ -151,7 +151,7 @@ describe('EdgeResolutionService', () => {
       fact: 'Alice works at Acme Corp',
       factEmbedding: KG_NEAR_SAME_EMBEDDING,
     });
-    existingEdge.uuid = u('exist-edge-uuid');
+    existingEdge.id = u('exist-edge-id');
 
     // idx 0 is in endpoint range (1 endpoint edge)
     mockRunnable.invoke.mockResolvedValue({
@@ -168,11 +168,11 @@ describe('EdgeResolutionService', () => {
       KG_REFERENCE_TIME,
     );
 
-    // The existing edge is returned in resolvedEdges with the episode UUID appended
+    // The existing edge is returned in resolvedEdges with the episode ID appended
     // so it can be re-persisted with the updated episodes array.
     expect(result.resolvedEdges).toHaveLength(1);
-    expect(result.resolvedEdges[0].uuid).toBe(u('exist-edge-uuid'));
-    expect(result.resolvedEdges[0].episodes).toContain(baseEpisode.uuid);
+    expect(result.resolvedEdges[0].id).toBe(u('exist-edge-id'));
+    expect(result.resolvedEdges[0].episodes).toContain(baseEpisode.id);
     expect(result.invalidatedEdges).toHaveLength(0);
   });
 
@@ -189,7 +189,7 @@ describe('EdgeResolutionService', () => {
       fact: 'Alice was an engineer at Acme',
       factEmbedding: KG_NEAR_SAME_EMBEDDING,
     });
-    existingEdge.uuid = u('old-edge-uuid');
+    existingEdge.id = u('old-edge-id');
 
     mockRunnable.invoke.mockResolvedValue({
       duplicate_facts: [],
@@ -223,7 +223,7 @@ describe('EdgeResolutionService', () => {
       factEmbedding: KG_NEAR_SAME_EMBEDDING,
       validAt: new Date('2023-01-01'),
     });
-    existingEdge.uuid = u('old-edge-uuid');
+    existingEdge.id = u('old-edge-id');
 
     mockRunnable.invoke.mockResolvedValue({
       duplicate_facts: [],
@@ -241,7 +241,7 @@ describe('EdgeResolutionService', () => {
 
     expect(result.resolvedEdges).toHaveLength(1);
     expect(result.invalidatedEdges).toHaveLength(1);
-    expect(result.invalidatedEdges[0].uuid).toBe(u('old-edge-uuid'));
+    expect(result.invalidatedEdges[0].id).toBe(u('old-edge-id'));
     expect(result.invalidatedEdges[0].invalidAt).toEqual(new Date('2024-06-01'));
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });
@@ -256,18 +256,18 @@ describe('EdgeResolutionService', () => {
       name: 'WORKS_AT',
       fact: 'Alice is employed at Acme Corp',
       factEmbedding: KG_HIGH_SIM_EMBEDDING,
-      sourceNodeUuid: u('src-uuid'),
-      targetNodeUuid: u('tgt-uuid'),
+      sourceNodeId: u('src-id'),
+      targetNodeId: u('tgt-id'),
     });
-    endpointEdge.uuid = u('endpoint-uuid');
+    endpointEdge.id = u('endpoint-id');
     const similarEdge = makeEdge({
       name: 'EMPLOYED_AT',
       fact: 'Alice has a job at Acme',
       factEmbedding: KG_NEAR_SAME_EMBEDDING,
-      sourceNodeUuid: u('other-src'),
-      targetNodeUuid: u('other-tgt'),
+      sourceNodeId: u('other-src'),
+      targetNodeId: u('other-tgt'),
     });
-    similarEdge.uuid = u('similar-uuid');
+    similarEdge.id = u('similar-id');
 
     // idx 0 = endpoint edge, idx 1 = similar edge
     // duplicate_facts = [1] (similar range idx) → should NOT trigger isDuplicate
@@ -315,10 +315,10 @@ describe('EdgeResolutionService', () => {
       name: 'WORKS_AT',
       fact: 'Alice is employed at Acme',
       factEmbedding: null,
-      sourceNodeUuid: u('other-src'),
-      targetNodeUuid: u('other-tgt'),
+      sourceNodeId: u('other-src'),
+      targetNodeId: u('other-tgt'),
     });
-    keywordEdge.uuid = u('keyword-uuid');
+    keywordEdge.id = u('keyword-id');
 
     mockEdgeRepo.searchByFact.mockResolvedValue([keywordEdge]);
     mockRunnable.invoke.mockResolvedValue({
@@ -350,7 +350,7 @@ describe('EdgeResolutionService', () => {
       fact: 'Alice is at Acme',
       factEmbedding: null,
     });
-    endpointEdge.uuid = u('endpoint-uuid');
+    endpointEdge.id = u('endpoint-id');
 
     // keyword search returns the endpoint edge - should be excluded from similarEdges
     mockEdgeRepo.searchByFact.mockResolvedValue([endpointEdge]);

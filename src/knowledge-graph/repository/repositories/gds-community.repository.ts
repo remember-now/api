@@ -11,7 +11,7 @@ export class GdsCommunityRepository {
   }
 
   @Span()
-  runLeiden(_graphName: string): Promise<{ uuid: Uuid; communityId: number }[]> {
+  runLeiden(_graphName: string): Promise<{ id: Uuid; communityId: number }[]> {
     return Promise.resolve([]);
   }
 

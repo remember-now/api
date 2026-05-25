@@ -35,9 +35,9 @@ export class EpisodicNodeRepository {
   @Span()
   async save(node: EpisodicNode): Promise<string> {
     await this.prisma.episodicNode.upsert({
-      where: { id: node.uuid },
+      where: { id: node.id },
       create: {
-        id: node.uuid,
+        id: node.id,
         graphId: node.graphId,
         name: node.name,
         labels: node.labels,
@@ -57,7 +57,7 @@ export class EpisodicNodeRepository {
         validAt: node.validAt,
       },
     });
-    return node.uuid;
+    return node.id;
   }
 
   @Span()
@@ -67,25 +67,25 @@ export class EpisodicNodeRepository {
   }
 
   @Span()
-  async delete(uuid: Uuid): Promise<void> {
-    await this.prisma.episodicNode.delete({ where: { id: uuid } });
+  async delete(id: Uuid): Promise<void> {
+    await this.prisma.episodicNode.delete({ where: { id: id } });
   }
 
   @Span()
-  async getByUuid(uuid: Uuid): Promise<EpisodicNode | null> {
-    const row = await this.prisma.episodicNode.findUnique({ where: { id: uuid } });
+  async getById(id: Uuid): Promise<EpisodicNode | null> {
+    const row = await this.prisma.episodicNode.findUnique({ where: { id: id } });
     return row ? this.mapRow(row) : null;
   }
 
   @Span()
   async retrieveEpisodes(params: RetrieveEpisodesParams): Promise<EpisodicNode[]> {
-    const { referenceTime, graphIds, source, sagaUuid, lastN } = params;
+    const { referenceTime, graphIds, source, sagaId, lastN } = params;
     const rows = await this.prisma.episodicNode.findMany({
       where: {
         validAt: { lte: referenceTime },
         graphId: { in: graphIds },
         ...(source ? { source } : {}),
-        ...(sagaUuid ? { hasEpisodeEdges: { some: { sagaId: sagaUuid } } } : {}),
+        ...(sagaId ? { hasEpisodeEdges: { some: { sagaId: sagaId } } } : {}),
       },
       orderBy: [{ validAt: 'desc' }, { createdAt: 'desc' }],
       take: lastN,
@@ -94,9 +94,9 @@ export class EpisodicNodeRepository {
   }
 
   @Span()
-  async getMentionedEntityUuids(episodeUuid: Uuid): Promise<Uuid[]> {
+  async getMentionedEntityIds(episodeId: Uuid): Promise<Uuid[]> {
     const rows = await this.prisma.episodicEdge.findMany({
-      where: { episodicId: episodeUuid },
+      where: { episodicId: episodeId },
       select: { entityId: true },
     });
     return rows.map((r) => r.entityId as Uuid);
@@ -129,7 +129,7 @@ export class EpisodicNodeRepository {
 
   private mapRow(row: Row): EpisodicNode {
     return {
-      uuid: row.id as Uuid,
+      id: row.id as Uuid,
       name: row.name as NodeName,
       graphId: row.graphId as Uuid,
       labels: (row.labels ?? []) as NodeLabels,

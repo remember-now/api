@@ -3,12 +3,12 @@
 -- ─── Extensions ───────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS vectorscale CASCADE;
 
--- ─── graph_label helper ───────────────────────────────────────────────────────
+-- ─── graph_diskann_bucket helper ───────────────────────────────────────────────────────
 -- Generated columns reject STABLE functions like hashtext(). uuid_send and
 -- get_byte are both IMMUTABLE. UUID v4's first 2 bytes are uniformly random,
 -- giving even SMALLINT distribution across -32768..32767 - perfect for
 -- pgvectorscale's filtered-DiskANN label bucketing.
-CREATE OR REPLACE FUNCTION graph_label_for(g uuid)
+CREATE OR REPLACE FUNCTION graph_diskann_bucket_for(g uuid)
 RETURNS smallint
 LANGUAGE sql
 IMMUTABLE
@@ -114,31 +114,31 @@ CREATE TABLE "episode_sequences" (
     CONSTRAINT "episode_sequences_pkey" PRIMARY KEY ("uuid")
 );
 
--- ─── graph_label columns + trigger (pgvectorscale filtered DiskANN bucket) ───
+-- ─── graph_diskann_bucket columns + trigger (pgvectorscale filtered DiskANN bucket) ───
 -- Prisma's diff engine doesn't understand `GENERATED ALWAYS AS … STORED`
 -- columns: it reads the generation clause as a "default" and proposes
 -- `ALTER COLUMN … DROP DEFAULT` on every subsequent `migrate dev`. We use a
 -- BEFORE INSERT/UPDATE trigger instead - same effect, invisible to Prisma.
-ALTER TABLE "entity_nodes" ADD COLUMN "graph_label" SMALLINT[];
-ALTER TABLE "entity_edges" ADD COLUMN "graph_label" SMALLINT[];
+ALTER TABLE "entity_nodes" ADD COLUMN "graph_diskann_bucket" SMALLINT[];
+ALTER TABLE "entity_edges" ADD COLUMN "graph_diskann_bucket" SMALLINT[];
 
-CREATE OR REPLACE FUNCTION set_graph_label()
+CREATE OR REPLACE FUNCTION set_graph_diskann_bucket()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  NEW.graph_label := ARRAY[graph_label_for(NEW.graph_id)];
+  NEW.graph_diskann_bucket := ARRAY[graph_diskann_bucket_for(NEW.graph_id)];
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER entity_nodes_set_graph_label
+CREATE TRIGGER entity_nodes_set_graph_diskann_bucket
   BEFORE INSERT OR UPDATE OF graph_id ON entity_nodes
-  FOR EACH ROW EXECUTE FUNCTION set_graph_label();
+  FOR EACH ROW EXECUTE FUNCTION set_graph_diskann_bucket();
 
-CREATE TRIGGER entity_edges_set_graph_label
+CREATE TRIGGER entity_edges_set_graph_diskann_bucket
   BEFORE INSERT OR UPDATE OF graph_id ON entity_edges
-  FOR EACH ROW EXECUTE FUNCTION set_graph_label();
+  FOR EACH ROW EXECUTE FUNCTION set_graph_diskann_bucket();
 
 -- ─── Indexes ─────────────────────────────────────────────────────────────────
 
@@ -187,12 +187,12 @@ CREATE INDEX "episode_sequences_graph_id_idx" ON "episode_sequences"("graph_id")
 -- CreateIndex
 CREATE INDEX "episode_sequences_episode_uuid_idx" ON "episode_sequences"("episode_uuid");
 
--- ─── Vector indexes (StreamingDiskANN, filtered by graph_label) ──────────────
+-- ─── Vector indexes (StreamingDiskANN, filtered by graph_diskann_bucket) ──────────────
 CREATE INDEX "entity_nodes_embedding_idx"
-  ON "entity_nodes" USING diskann ("name_embedding" vector_cosine_ops, "graph_label");
+  ON "entity_nodes" USING diskann ("name_embedding" vector_cosine_ops, "graph_diskann_bucket");
 
 CREATE INDEX "entity_edges_embedding_idx"
-  ON "entity_edges" USING diskann ("fact_embedding" vector_cosine_ops, "graph_label");
+  ON "entity_edges" USING diskann ("fact_embedding" vector_cosine_ops, "graph_diskann_bucket");
 
 -- ─── Fulltext (GIN) indexes ──────────────────────────────────────────────────
 CREATE INDEX "entity_nodes_fts_idx"

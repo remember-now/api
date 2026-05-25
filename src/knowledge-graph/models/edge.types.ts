@@ -9,10 +9,10 @@ import { RelationshipType, RelationshipTypeSchema } from '../types';
 // Schemas
 
 export const EdgeBaseSchema = z.object({
-  uuid: UuidSchema,
+  id: UuidSchema,
   graphId: UuidSchema,
-  sourceNodeUuid: UuidSchema,
-  targetNodeUuid: UuidSchema,
+  sourceNodeId: UuidSchema,
+  targetNodeId: UuidSchema,
   createdAt: z.date(),
 });
 
@@ -46,10 +46,10 @@ export type HasEpisodeEdge = z.infer<typeof HasEpisodeEdgeSchema>;
 
 export function createEdgeDefaults(): Omit<
   EdgeBase,
-  'graphId' | 'sourceNodeUuid' | 'targetNodeUuid'
+  'graphId' | 'sourceNodeId' | 'targetNodeId'
 > {
   return {
-    uuid: UuidSchema.parse(randomUUID()),
+    id: UuidSchema.parse(randomUUID()),
     createdAt: new Date(),
   };
 }
@@ -59,8 +59,8 @@ export function createEntityEdge(
     name: RelationshipType;
     fact: string;
     graphId: Uuid;
-    sourceNodeUuid: Uuid;
-    targetNodeUuid: Uuid;
+    sourceNodeId: Uuid;
+    targetNodeId: Uuid;
   },
 ): EntityEdge {
   return EntityEdgeSchema.parse({
@@ -72,8 +72,8 @@ export function createEntityEdge(
 export function createEpisodicEdge(
   partial: Partial<EpisodicEdge> & {
     graphId: Uuid;
-    sourceNodeUuid: Uuid;
-    targetNodeUuid: Uuid;
+    sourceNodeId: Uuid;
+    targetNodeId: Uuid;
   },
 ): EpisodicEdge {
   return EpisodicEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });
@@ -82,8 +82,8 @@ export function createEpisodicEdge(
 export function createCommunityEdge(
   partial: Partial<CommunityEdge> & {
     graphId: Uuid;
-    sourceNodeUuid: Uuid;
-    targetNodeUuid: Uuid;
+    sourceNodeId: Uuid;
+    targetNodeId: Uuid;
   },
 ): CommunityEdge {
   return CommunityEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });
@@ -92,8 +92,8 @@ export function createCommunityEdge(
 export function createHasEpisodeEdge(
   partial: Partial<HasEpisodeEdge> & {
     graphId: Uuid;
-    sourceNodeUuid: Uuid;
-    targetNodeUuid: Uuid;
+    sourceNodeId: Uuid;
+    targetNodeId: Uuid;
   },
 ): HasEpisodeEdge {
   return HasEpisodeEdgeSchema.parse({ ...createEdgeDefaults(), ...partial });

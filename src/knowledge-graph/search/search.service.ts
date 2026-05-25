@@ -69,7 +69,7 @@ export class SearchService {
   ) {}
 
   async searchFromNodes(options: {
-    nodeUuids: Uuid[];
+    nodeIds: Uuid[];
     query: string;
     graphIds: Uuid[];
     config: SearchConfigInput;
@@ -82,8 +82,8 @@ export class SearchService {
       config: options.config,
       userId: options.userId,
       filters: options.filters,
-      originNodeUuids: options.nodeUuids,
-      centerNodeUuid: options.nodeUuids[0],
+      originNodeIds: options.nodeIds,
+      centerNodeId: options.nodeIds[0],
     });
   }
 
@@ -110,7 +110,7 @@ export class SearchService {
       },
     };
 
-    const { query, graphIds, config, filters, centerNodeUuid, originNodeUuids, userId } =
+    const { query, graphIds, config, filters, centerNodeId, originNodeIds, userId } =
       parsed;
 
     const baseMetrics: SpanMetrics = {
@@ -179,8 +179,8 @@ export class SearchService {
             limit,
             minScore,
             model,
-            centerNodeUuid,
-            originNodeUuids,
+            centerNodeId,
+            originNodeIds,
             ctx,
           )
         : Promise.resolve([[], []] as [EntityEdge[], number[]]),
@@ -194,8 +194,8 @@ export class SearchService {
             limit,
             minScore,
             model,
-            centerNodeUuid,
-            originNodeUuids,
+            centerNodeId,
+            originNodeIds,
             ctx,
           )
         : Promise.resolve([[], []] as [EntityNode[], number[]]),
@@ -231,13 +231,13 @@ export class SearchService {
 
     return {
       edges,
-      edgeScores: new Map(edges.map((e, i) => [e.uuid, edgeScoreArr[i]])),
+      edgeScores: new Map(edges.map((e, i) => [e.id, edgeScoreArr[i]])),
       nodes,
-      nodeScores: new Map(nodes.map((n, i) => [n.uuid, nodeScoreArr[i]])),
+      nodeScores: new Map(nodes.map((n, i) => [n.id, nodeScoreArr[i]])),
       episodes,
-      episodeScores: new Map(episodes.map((ep, i) => [ep.uuid, episodeScoreArr[i]])),
+      episodeScores: new Map(episodes.map((ep, i) => [ep.id, episodeScoreArr[i]])),
       communities,
-      communityScores: new Map(communities.map((c, i) => [c.uuid, communityScoreArr[i]])),
+      communityScores: new Map(communities.map((c, i) => [c.id, communityScoreArr[i]])),
       metrics: {
         ...baseMetrics,
         'results.edges': edges.length,
@@ -259,8 +259,8 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: Uuid,
-    originNodeUuids?: Uuid[],
+    centerNodeId?: Uuid,
+    originNodeIds?: Uuid[],
     ctx?: LlmContext,
   ): Promise<[EntityEdge[], number[]]> {
     const { edges, scores } = await this.edgeSearchImpl(
@@ -272,8 +272,8 @@ export class SearchService {
       limit,
       minScore,
       model,
-      centerNodeUuid,
-      originNodeUuids,
+      centerNodeId,
+      originNodeIds,
       ctx,
     );
     return [edges, scores];
@@ -289,16 +289,16 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: Uuid,
-    originNodeUuids?: Uuid[],
+    centerNodeId?: Uuid,
+    originNodeIds?: Uuid[],
     ctx?: LlmContext,
   ): Promise<{ edges: EntityEdge[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const edgeMap = new Map<Uuid, EntityEdge>();
 
-    const bm25Uuids: Uuid[] = [];
-    const cosineUuids: Uuid[] = [];
-    let bfsUuids: Uuid[] = [];
+    const bm25Ids: Uuid[] = [];
+    const cosineIds: Uuid[] = [];
+    let bfsIds: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -307,8 +307,8 @@ export class SearchService {
         this.entityEdgeRepository
           .searchByFact(SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }))
           .then((edges) => {
-            for (const e of edges) edgeMap.set(e.uuid, e);
-            bm25Uuids.push(...edges.map((e) => e.uuid));
+            for (const e of edges) edgeMap.set(e.id, e);
+            bm25Ids.push(...edges.map((e) => e.id));
           }),
       );
     }
@@ -329,8 +329,8 @@ export class SearchService {
             filters,
           )
           .then((edges) => {
-            for (const e of edges) edgeMap.set(e.uuid, e);
-            cosineUuids.push(...edges.map((e) => e.uuid));
+            for (const e of edges) edgeMap.set(e.id, e);
+            cosineIds.push(...edges.map((e) => e.id));
           }),
       );
     }
@@ -339,42 +339,42 @@ export class SearchService {
 
     if (config.searchMethods.includes(EdgeSearchMethod.bfs)) {
       const origins =
-        originNodeUuids && originNodeUuids.length > 0
-          ? originNodeUuids
-          : [...edgeMap.values()].map((e) => e.sourceNodeUuid);
+        originNodeIds && originNodeIds.length > 0
+          ? originNodeIds
+          : [...edgeMap.values()].map((e) => e.sourceNodeId);
 
       if (origins.length > 0) {
         const bfsEdges = await this.entityEdgeRepository.searchByBfs(
           SearchByBfsParamsSchema.parse({
-            originNodeUuids: origins,
+            originNodeIds: origins,
             graphIds,
             limit: fetch,
             maxDepth: config.maxDepth,
           }),
           filters,
         );
-        for (const e of bfsEdges) edgeMap.set(e.uuid, e);
-        bfsUuids = bfsEdges.map((e) => e.uuid);
+        for (const e of bfsEdges) edgeMap.set(e.id, e);
+        bfsIds = bfsEdges.map((e) => e.id);
       }
     }
 
     const reranker = config.reranker;
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    let rankedUuids: Uuid[];
+    let rankedIds: Uuid[];
     let rankedScores: number[];
 
     if (reranker === EdgeReranker.rrf) {
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     } else if (reranker === EdgeReranker.mmr && queryVector) {
       const vectorPairs = new Map<Uuid, number[]>();
-      for (const [uuid, edge] of edgeMap) {
-        if (edge.factEmbedding) vectorPairs.set(uuid, edge.factEmbedding);
+      for (const [id, edge] of edgeMap) {
+        if (edge.factEmbedding) vectorPairs.set(id, edge.factEmbedding);
       }
-      [rankedUuids, rankedScores] = mmr(
+      [rankedIds, rankedScores] = mmr(
         queryVector,
         vectorPairs,
         config.mmrLambda,
@@ -382,64 +382,60 @@ export class SearchService {
       );
     } else if (reranker === EdgeReranker.cross_encoder && model) {
       const candidates = [...edgeMap.values()].slice(0, limit);
-      [rankedUuids, rankedScores] = await crossEncoderReranker(
+      [rankedIds, rankedScores] = await crossEncoderReranker(
         model,
         query,
-        candidates.map((e) => ({ uuid: e.uuid, text: e.fact })),
+        candidates.map((e) => ({ id: e.id, text: e.fact })),
         rerankerMin,
         { llmTracer: this.llmTracer, ctx },
       );
     } else if (reranker === EdgeReranker.node_distance) {
-      if (!centerNodeUuid) {
-        throw new Error('centerNodeUuid is required for node_distance reranker');
+      if (!centerNodeId) {
+        throw new Error('centerNodeId is required for node_distance reranker');
       }
-      const sourceUuids = [
-        ...new Set([...edgeMap.values()].map((e) => e.sourceNodeUuid)),
-      ];
-      const [rankedSourceUuids, sourceScores] = await nodeDistanceReranker(
+      const sourceIds = [...new Set([...edgeMap.values()].map((e) => e.sourceNodeId))];
+      const [rankedSourceIds, sourceScores] = await nodeDistanceReranker(
         this.entityNodeRepository,
-        sourceUuids,
-        centerNodeUuid,
+        sourceIds,
+        centerNodeId,
         rerankerMin,
       );
-      // Map source UUIDs back to edge UUIDs (preserving order)
-      const sourceScoreMap = new Map(
-        rankedSourceUuids.map((u, i) => [u, sourceScores[i]]),
-      );
+      // Map source IDs back to edge IDs (preserving order)
+      const sourceScoreMap = new Map(rankedSourceIds.map((u, i) => [u, sourceScores[i]]));
       const edgeEntries: [Uuid, number][] = [];
-      for (const [uuid, edge] of edgeMap) {
-        const score = sourceScoreMap.get(edge.sourceNodeUuid);
-        if (score !== undefined) edgeEntries.push([uuid, score]);
+      for (const [id, edge] of edgeMap) {
+        const score = sourceScoreMap.get(edge.sourceNodeId);
+        if (score !== undefined) edgeEntries.push([id, score]);
       }
       edgeEntries.sort((a, b) => b[1] - a[1]);
-      rankedUuids = edgeEntries.map(([u]) => u);
+      rankedIds = edgeEntries.map(([u]) => u);
       rankedScores = edgeEntries.map(([, s]) => s);
     } else if (reranker === EdgeReranker.episode_mentions) {
       // RRF preliminary ranking, then sort by episode count descending.
       // Matches Python search.py:256-305: rrf runs first for both EdgeReranker.rrf
       // and EdgeReranker.episode_mentions, then episode_mentions applies the sort.
-      const [rrfUuids, rrfScores] = rrf(
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+      const [rrfIds, rrfScores] = rrf(
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
-      const rrfScoreMap = new Map(rrfUuids.map((u, i) => [u, rrfScores[i]]));
-      const rrfEdges = rrfUuids
-        .map((uuid) => edgeMap.get(uuid))
+      const rrfScoreMap = new Map(rrfIds.map((u, i) => [u, rrfScores[i]]));
+      const rrfEdges = rrfIds
+        .map((id) => edgeMap.get(id))
         .filter((e): e is EntityEdge => e !== undefined);
       rrfEdges.sort((a, b) => b.episodes.length - a.episodes.length);
-      rankedUuids = rrfEdges.map((e) => e.uuid);
-      rankedScores = rankedUuids.map((u) => rrfScoreMap.get(u) ?? 0);
+      rankedIds = rrfEdges.map((e) => e.id);
+      rankedScores = rankedIds.map((u) => rrfScoreMap.get(u) ?? 0);
     } else {
       // Fallback: RRF
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     }
 
-    const resultEdges = rankedUuids
+    const resultEdges = rankedIds
       .slice(0, limit)
-      .map((uuid) => edgeMap.get(uuid))
+      .map((id) => edgeMap.get(id))
       .filter((e): e is EntityEdge => e !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultEdges.length);
 
@@ -468,8 +464,8 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: Uuid,
-    originNodeUuids?: Uuid[],
+    centerNodeId?: Uuid,
+    originNodeIds?: Uuid[],
     ctx?: LlmContext,
   ): Promise<[EntityNode[], number[]]> {
     const { nodes, scores } = await this.nodeSearchImpl(
@@ -481,8 +477,8 @@ export class SearchService {
       limit,
       minScore,
       model,
-      centerNodeUuid,
-      originNodeUuids,
+      centerNodeId,
+      originNodeIds,
       ctx,
     );
     return [nodes, scores];
@@ -498,16 +494,16 @@ export class SearchService {
     limit: number,
     minScore: number,
     model: BaseChatModel | null,
-    centerNodeUuid?: Uuid,
-    originNodeUuids?: Uuid[],
+    centerNodeId?: Uuid,
+    originNodeIds?: Uuid[],
     ctx?: LlmContext,
   ): Promise<{ nodes: EntityNode[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
     const nodeMap = new Map<Uuid, EntityNode>();
 
-    const bm25Uuids: Uuid[] = [];
-    const cosineUuids: Uuid[] = [];
-    let bfsUuids: Uuid[] = [];
+    const bm25Ids: Uuid[] = [];
+    const cosineIds: Uuid[] = [];
+    let bfsIds: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -519,8 +515,8 @@ export class SearchService {
             filters,
           )
           .then((nodes) => {
-            for (const n of nodes) nodeMap.set(n.uuid, n);
-            bm25Uuids.push(...nodes.map((n) => n.uuid));
+            for (const n of nodes) nodeMap.set(n.id, n);
+            bm25Ids.push(...nodes.map((n) => n.id));
           }),
       );
     }
@@ -541,8 +537,8 @@ export class SearchService {
             filters,
           )
           .then((nodes) => {
-            for (const n of nodes) nodeMap.set(n.uuid, n);
-            cosineUuids.push(...nodes.map((n) => n.uuid));
+            for (const n of nodes) nodeMap.set(n.id, n);
+            cosineIds.push(...nodes.map((n) => n.id));
           }),
       );
     }
@@ -551,42 +547,40 @@ export class SearchService {
 
     if (config.searchMethods.includes(NodeSearchMethod.bfs)) {
       const origins =
-        originNodeUuids && originNodeUuids.length > 0
-          ? originNodeUuids
-          : [...nodeMap.keys()];
+        originNodeIds && originNodeIds.length > 0 ? originNodeIds : [...nodeMap.keys()];
 
       if (origins.length > 0) {
         const bfsNodes = await this.entityNodeRepository.searchByBfs(
           SearchByBfsParamsSchema.parse({
-            originNodeUuids: origins,
+            originNodeIds: origins,
             graphIds,
             limit: fetch,
             maxDepth: config.maxDepth,
           }),
           filters,
         );
-        for (const n of bfsNodes) nodeMap.set(n.uuid, n);
-        bfsUuids = bfsNodes.map((n) => n.uuid);
+        for (const n of bfsNodes) nodeMap.set(n.id, n);
+        bfsIds = bfsNodes.map((n) => n.id);
       }
     }
 
     const reranker = config.reranker;
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    let rankedUuids: Uuid[];
+    let rankedIds: Uuid[];
     let rankedScores: number[];
 
     if (reranker === NodeReranker.rrf) {
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     } else if (reranker === NodeReranker.mmr && queryVector) {
       const vectorPairs = new Map<Uuid, number[]>();
-      for (const [uuid, node] of nodeMap) {
-        if (node.nameEmbedding) vectorPairs.set(uuid, node.nameEmbedding);
+      for (const [id, node] of nodeMap) {
+        if (node.nameEmbedding) vectorPairs.set(id, node.nameEmbedding);
       }
-      [rankedUuids, rankedScores] = mmr(
+      [rankedIds, rankedScores] = mmr(
         queryVector,
         vectorPairs,
         config.mmrLambda,
@@ -594,39 +588,39 @@ export class SearchService {
       );
     } else if (reranker === NodeReranker.cross_encoder && model) {
       const candidates = [...nodeMap.values()].slice(0, limit);
-      [rankedUuids, rankedScores] = await crossEncoderReranker(
+      [rankedIds, rankedScores] = await crossEncoderReranker(
         model,
         query,
-        candidates.map((n) => ({ uuid: n.uuid, text: n.name })),
+        candidates.map((n) => ({ id: n.id, text: n.name })),
         rerankerMin,
         { llmTracer: this.llmTracer, ctx },
       );
     } else if (reranker === NodeReranker.node_distance) {
-      if (!centerNodeUuid) {
-        throw new Error('centerNodeUuid is required for node_distance reranker');
+      if (!centerNodeId) {
+        throw new Error('centerNodeId is required for node_distance reranker');
       }
-      [rankedUuids, rankedScores] = await nodeDistanceReranker(
+      [rankedIds, rankedScores] = await nodeDistanceReranker(
         this.entityNodeRepository,
         [...nodeMap.keys()],
-        centerNodeUuid,
+        centerNodeId,
         rerankerMin,
       );
     } else if (reranker === NodeReranker.episode_mentions) {
-      [rankedUuids, rankedScores] = await episodeMentionsReranker(
+      [rankedIds, rankedScores] = await episodeMentionsReranker(
         this.entityNodeRepository,
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     } else {
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids, bfsUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds, bfsIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     }
 
-    const resultNodes = rankedUuids
+    const resultNodes = rankedIds
       .slice(0, limit)
-      .map((uuid) => nodeMap.get(uuid))
+      .map((id) => nodeMap.get(id))
       .filter((n): n is EntityNode => n !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultNodes.length);
 
@@ -686,27 +680,27 @@ export class SearchService {
         )
       : [];
 
-    const episodeMap = new Map(bm25Episodes.map((ep) => [ep.uuid, ep]));
-    const bm25Uuids = bm25Episodes.map((ep) => ep.uuid);
+    const episodeMap = new Map(bm25Episodes.map((ep) => [ep.id, ep]));
+    const bm25Ids = bm25Episodes.map((ep) => ep.id);
 
-    let rankedUuids: Uuid[];
+    let rankedIds: Uuid[];
     let rankedScores: number[];
 
     if (config.reranker === EpisodeReranker.cross_encoder && model) {
-      [rankedUuids, rankedScores] = await crossEncoderReranker(
+      [rankedIds, rankedScores] = await crossEncoderReranker(
         model,
         query,
-        bm25Episodes.slice(0, limit).map((ep) => ({ uuid: ep.uuid, text: ep.content })),
+        bm25Episodes.slice(0, limit).map((ep) => ({ id: ep.id, text: ep.content })),
         rerankerMin,
         { llmTracer: this.llmTracer, ctx },
       );
     } else {
-      [rankedUuids, rankedScores] = rrf([bm25Uuids], rerankerMin);
+      [rankedIds, rankedScores] = rrf([bm25Ids], rerankerMin);
     }
 
-    const resultEpisodes = rankedUuids
+    const resultEpisodes = rankedIds
       .slice(0, limit)
-      .map((uuid) => episodeMap.get(uuid))
+      .map((id) => episodeMap.get(id))
       .filter((ep): ep is EpisodicNode => ep !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultEpisodes.length);
 
@@ -762,8 +756,8 @@ export class SearchService {
     const communityMap = new Map<Uuid, CommunityNode>();
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
-    const bm25Uuids: Uuid[] = [];
-    const cosineUuids: Uuid[] = [];
+    const bm25Ids: Uuid[] = [];
+    const cosineIds: Uuid[] = [];
 
     const tasks: Promise<void>[] = [];
 
@@ -772,8 +766,8 @@ export class SearchService {
         this.communityNodeRepository
           .searchByName(SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }))
           .then((nodes) => {
-            for (const n of nodes) communityMap.set(n.uuid, n);
-            bm25Uuids.push(...nodes.map((n) => n.uuid));
+            for (const n of nodes) communityMap.set(n.id, n);
+            bm25Ids.push(...nodes.map((n) => n.id));
           }),
       );
     }
@@ -793,28 +787,28 @@ export class SearchService {
             }),
           )
           .then((nodes) => {
-            for (const n of nodes) communityMap.set(n.uuid, n);
-            cosineUuids.push(...nodes.map((n) => n.uuid));
+            for (const n of nodes) communityMap.set(n.id, n);
+            cosineIds.push(...nodes.map((n) => n.id));
           }),
       );
     }
 
     await Promise.all(tasks);
 
-    let rankedUuids: Uuid[];
+    let rankedIds: Uuid[];
     let rankedScores: number[];
 
     if (config.reranker === CommunityReranker.rrf) {
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     } else if (config.reranker === CommunityReranker.mmr && queryVector) {
       const vectorPairs = new Map<Uuid, number[]>();
-      for (const [uuid, community] of communityMap) {
-        if (community.nameEmbedding) vectorPairs.set(uuid, community.nameEmbedding);
+      for (const [id, community] of communityMap) {
+        if (community.nameEmbedding) vectorPairs.set(id, community.nameEmbedding);
       }
-      [rankedUuids, rankedScores] = mmr(
+      [rankedIds, rankedScores] = mmr(
         queryVector,
         vectorPairs,
         config.mmrLambda,
@@ -822,23 +816,23 @@ export class SearchService {
       );
     } else if (config.reranker === CommunityReranker.cross_encoder && model) {
       const candidates = [...communityMap.values()].slice(0, limit);
-      [rankedUuids, rankedScores] = await crossEncoderReranker(
+      [rankedIds, rankedScores] = await crossEncoderReranker(
         model,
         query,
-        candidates.map((c) => ({ uuid: c.uuid, text: c.name })),
+        candidates.map((c) => ({ id: c.id, text: c.name })),
         rerankerMin,
         { llmTracer: this.llmTracer, ctx },
       );
     } else {
-      [rankedUuids, rankedScores] = rrf(
-        [bm25Uuids, cosineUuids].filter((l) => l.length > 0),
+      [rankedIds, rankedScores] = rrf(
+        [bm25Ids, cosineIds].filter((l) => l.length > 0),
         rerankerMin,
       );
     }
 
-    const resultCommunities = rankedUuids
+    const resultCommunities = rankedIds
       .slice(0, limit)
-      .map((uuid) => communityMap.get(uuid))
+      .map((id) => communityMap.get(id))
       .filter((c): c is CommunityNode => c !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultCommunities.length);
 

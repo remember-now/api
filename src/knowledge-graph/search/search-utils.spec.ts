@@ -12,46 +12,46 @@ import {
   rrf,
 } from './search-utils';
 
-// Branded test sentinels - narrow string aliases for branded uuids in mocks.
+// Branded test sentinels - narrow string aliases for branded ids in mocks.
 const u = (s: string) => s as Uuid;
 
 // ─── rrf ─────────────────────────────────────────────────────────────────────
 
 describe('rrf', () => {
   it('ranks a single list in input order with correct scores', () => {
-    const [uuids, scores] = rrf([['a', 'b', 'c']]);
-    expect(uuids).toEqual(['a', 'b', 'c']);
+    const [ids, scores] = rrf([['a', 'b', 'c']]);
+    expect(ids).toEqual(['a', 'b', 'c']);
     expect(scores[0]).toBeCloseTo(1 / 1);
     expect(scores[1]).toBeCloseTo(1 / 2);
     expect(scores[2]).toBeCloseTo(1 / 3);
   });
 
   it('accumulates scores from two disjoint lists', () => {
-    const [uuids, scores] = rrf([['a'], ['b']]);
+    const [ids, scores] = rrf([['a'], ['b']]);
     // Both rank 0 in their respective lists → score = 1
     expect(scores[0]).toBeCloseTo(1);
     expect(scores[1]).toBeCloseTo(1);
-    expect(uuids).toHaveLength(2);
+    expect(ids).toHaveLength(2);
   });
 
-  it('adds scores for a UUID that appears in multiple lists', () => {
+  it('adds scores for an ID that appears in multiple lists', () => {
     // 'a' is rank 0 in both lists → 1/1 + 1/1 = 2
     // 'b' is rank 1 in list 1    → 1/2
     // 'c' is rank 1 in list 2    → 1/2
-    const [uuids, scores] = rrf([
+    const [ids, scores] = rrf([
       ['a', 'b'],
       ['a', 'c'],
     ]);
-    expect(uuids[0]).toBe('a');
+    expect(ids[0]).toBe('a');
     expect(scores[0]).toBeCloseTo(2);
     expect(scores[1]).toBeCloseTo(0.5);
     expect(scores[2]).toBeCloseTo(0.5);
   });
 
-  it('filters UUIDs whose score is below minScore', () => {
+  it('filters IDs whose score is below minScore', () => {
     // 'a' score = 1/1 = 1, 'b' score = 1/2 = 0.5
-    const [uuids] = rrf([['a', 'b']], 0.6);
-    expect(uuids).toEqual(['a']);
+    const [ids] = rrf([['a', 'b']], 0.6);
+    expect(ids).toEqual(['a']);
   });
 
   it('returns empty arrays for an empty input', () => {
@@ -59,8 +59,8 @@ describe('rrf', () => {
   });
 
   it('ignores empty inner lists', () => {
-    const [uuids, scores] = rrf([[], ['a']]);
-    expect(uuids).toEqual(['a']);
+    const [ids, scores] = rrf([[], ['a']]);
+    expect(ids).toEqual(['a']);
     expect(scores[0]).toBeCloseTo(1);
   });
 });
@@ -73,8 +73,8 @@ describe('mmr', () => {
   });
 
   it('returns a single candidate with a computed score', () => {
-    const [uuids, scores] = mmr([1, 0], new Map([['a', [1, 0]]]), 1, -1);
-    expect(uuids).toEqual(['a']);
+    const [ids, scores] = mmr([1, 0], new Map([['a', [1, 0]]]), 1, -1);
+    expect(ids).toEqual(['a']);
     expect(scores[0]).toBeCloseTo(1); // lambda=1: dot([1,0],[1,0]) = 1
   });
 
@@ -82,7 +82,7 @@ describe('mmr', () => {
     // query = [1, 0]
     // 'a' = [1, 0] → cos = 1  (most similar)
     // 'b' = [0, 1] → cos = 0
-    const [uuids] = mmr(
+    const [ids] = mmr(
       [1, 0],
       new Map([
         ['a', [1, 0]],
@@ -91,7 +91,7 @@ describe('mmr', () => {
       1,
       -1,
     );
-    expect(uuids[0]).toBe('a');
+    expect(ids[0]).toBe('a');
   });
 
   it('with lambda=0 (pure diversity) ranks least correlated candidate first', () => {
@@ -102,7 +102,7 @@ describe('mmr', () => {
     // With lambda=0: mmr = -maxPairwiseSim
     // maxSim(b) ≈ 0.1  → mmr(b) ≈ -0.1  (highest / least penalised)
     // maxSim(a) ≈ 0.99 → mmr(a) ≈ -0.99 (most penalised)
-    const [uuids] = mmr(
+    const [ids] = mmr(
       [1, 0, 0],
       new Map([
         ['a', [1, 0, 0]],
@@ -112,12 +112,12 @@ describe('mmr', () => {
       0,
       -1,
     );
-    expect(uuids[0]).toBe('b');
+    expect(ids[0]).toBe('b');
   });
 
   it('filters candidates below minScore', () => {
     // lambda=1, query=[1,0]: 'a' score≈1, 'b' score≈0
-    const [uuids] = mmr(
+    const [ids] = mmr(
       [1, 0],
       new Map([
         ['a', [1, 0]],
@@ -126,12 +126,12 @@ describe('mmr', () => {
       1,
       0.5,
     );
-    expect(uuids).toEqual(['a']);
+    expect(ids).toEqual(['a']);
   });
 
   it('handles a zero-vector candidate without producing NaN', () => {
-    const [uuids, scores] = mmr([1, 0], new Map([['a', [0, 0]]]), 1, -1);
-    expect(uuids).toEqual(['a']);
+    const [ids, scores] = mmr([1, 0], new Map([['a', [0, 0]]]), 1, -1);
+    expect(ids).toEqual(['a']);
     expect(Number.isNaN(scores[0])).toBe(false);
   });
 });
@@ -149,58 +149,54 @@ describe('nodeDistanceReranker', () => {
 
   it('places a directly connected node above an unconnected node', async () => {
     // 'b' is connected (DB returns score=1), 'c' is not (absent from DB)
-    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ id: u('b'), score: 1 }]);
 
-    const [uuids, scores] = await nodeDistanceReranker(
-      repo,
-      [u('b'), u('c')],
-      u('center'),
-    );
-    expect(uuids[0]).toBe('b');
+    const [ids, scores] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'));
+    expect(ids[0]).toBe('b');
     expect(scores[0]).toBeCloseTo(1); // 1/1
-    expect(uuids[1]).toBe('c');
+    expect(ids[1]).toBe('c');
     expect(scores[1]).toBeCloseTo(0); // 1/Infinity → 0
   });
 
   it('prepends the center node at rank 1 when it is in the input list', async () => {
-    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ id: u('b'), score: 1 }]);
 
-    const [uuids, scores] = await nodeDistanceReranker(
+    const [ids, scores] = await nodeDistanceReranker(
       repo,
       [u('center'), u('b'), u('c')],
       u('center'),
     );
-    expect(uuids[0]).toBe('center');
+    expect(ids[0]).toBe('center');
     expect(scores[0]).toBeCloseTo(10); // 1 / 0.1
   });
 
   it('does not prepend the center node when it is absent from the input list', async () => {
-    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ id: u('b'), score: 1 }]);
 
-    const [uuids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'));
-    expect(uuids[0]).toBe('b');
-    expect(uuids).not.toContain('center');
+    const [ids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'));
+    expect(ids[0]).toBe('b');
+    expect(ids).not.toContain('center');
   });
 
   it('filters unconnected nodes when minScore > 0', async () => {
-    repo.getNodeDistanceScores.mockResolvedValue([{ uuid: u('b'), score: 1 }]);
+    repo.getNodeDistanceScores.mockResolvedValue([{ id: u('b'), score: 1 }]);
 
     // unconnected 'c' gets score 0, which is below minScore=0.5
-    const [uuids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'), 0.5);
-    expect(uuids).not.toContain('c');
-    expect(uuids).toContain('b');
+    const [ids] = await nodeDistanceReranker(repo, [u('b'), u('c')], u('center'), 0.5);
+    expect(ids).not.toContain('c');
+    expect(ids).toContain('b');
   });
 
-  it('returns empty and makes no DB call when nodeUuids is empty', async () => {
-    const [uuids, scores] = await nodeDistanceReranker(repo, [], u('center'));
-    expect(uuids).toEqual([]);
+  it('returns empty and makes no DB call when nodeIds is empty', async () => {
+    const [ids, scores] = await nodeDistanceReranker(repo, [], u('center'));
+    expect(ids).toEqual([]);
     expect(scores).toEqual([]);
     expect(repo.getNodeDistanceScores).not.toHaveBeenCalled();
   });
 
   it('returns only the center node and makes no DB call when it is the only input', async () => {
-    const [uuids, scores] = await nodeDistanceReranker(repo, [u('center')], u('center'));
-    expect(uuids).toEqual(['center']);
+    const [ids, scores] = await nodeDistanceReranker(repo, [u('center')], u('center'));
+    expect(ids).toEqual(['center']);
     expect(scores[0]).toBeCloseTo(10); // 1 / 0.1
     expect(repo.getNodeDistanceScores).not.toHaveBeenCalled();
   });
@@ -219,67 +215,67 @@ describe('episodeMentionsReranker', () => {
 
   it('ranks the most-mentioned node first', async () => {
     repo.getEpisodeMentionCounts.mockResolvedValue([
-      { uuid: u('node-a'), score: 20 },
-      { uuid: u('node-b'), score: 5 },
+      { id: u('node-a'), score: 20 },
+      { id: u('node-b'), score: 5 },
     ]);
 
-    const [uuids, scores] = await episodeMentionsReranker(repo, [
+    const [ids, scores] = await episodeMentionsReranker(repo, [
       [u('node-a'), u('node-b')],
     ]);
-    expect(uuids[0]).toBe('node-a');
+    expect(ids[0]).toBe('node-a');
     expect(scores[0]).toBe(20);
-    expect(uuids[1]).toBe('node-b');
+    expect(ids[1]).toBe('node-b');
     expect(scores[1]).toBe(5);
   });
 
   it('places zero-mention nodes after positively-mentioned nodes', async () => {
     repo.getEpisodeMentionCounts.mockResolvedValue([
-      { uuid: u('node-a'), score: 20 },
-      { uuid: u('node-b'), score: 5 },
-      { uuid: u('node-c'), score: 0 },
+      { id: u('node-a'), score: 20 },
+      { id: u('node-b'), score: 5 },
+      { id: u('node-c'), score: 0 },
     ]);
 
-    const [uuids] = await episodeMentionsReranker(repo, [
+    const [ids] = await episodeMentionsReranker(repo, [
       [u('node-a'), u('node-b'), u('node-c')],
     ]);
-    expect(uuids.indexOf(u('node-a'))).toBeLessThan(uuids.indexOf(u('node-c')));
-    expect(uuids.indexOf(u('node-b'))).toBeLessThan(uuids.indexOf(u('node-c')));
+    expect(ids.indexOf(u('node-a'))).toBeLessThan(ids.indexOf(u('node-c')));
+    expect(ids.indexOf(u('node-b'))).toBeLessThan(ids.indexOf(u('node-c')));
   });
 
   it('excludes zero-mention nodes when minScore = 1', async () => {
     repo.getEpisodeMentionCounts.mockResolvedValue([
-      { uuid: u('node-a'), score: 20 },
-      { uuid: u('node-b'), score: 5 },
-      { uuid: u('node-c'), score: 0 },
+      { id: u('node-a'), score: 20 },
+      { id: u('node-b'), score: 5 },
+      { id: u('node-c'), score: 0 },
     ]);
 
-    const [uuids] = await episodeMentionsReranker(
+    const [ids] = await episodeMentionsReranker(
       repo,
       [[u('node-a'), u('node-b'), u('node-c')]],
       1,
     );
-    expect(uuids).not.toContain('node-c');
-    expect(uuids).toContain('node-a');
-    expect(uuids).toContain('node-b');
+    expect(ids).not.toContain('node-c');
+    expect(ids).toContain('node-a');
+    expect(ids).toContain('node-b');
   });
 
   it('returns empty and makes no DB call for empty input', async () => {
-    const [uuids, scores] = await episodeMentionsReranker(repo, [[]]);
-    expect(uuids).toEqual([]);
+    const [ids, scores] = await episodeMentionsReranker(repo, [[]]);
+    expect(ids).toEqual([]);
     expect(scores).toEqual([]);
     expect(repo.getEpisodeMentionCounts).not.toHaveBeenCalled();
   });
 
   it('returns all nodes with score 0 when none are mentioned', async () => {
     repo.getEpisodeMentionCounts.mockResolvedValue([
-      { uuid: u('node-a'), score: 0 },
-      { uuid: u('node-b'), score: 0 },
+      { id: u('node-a'), score: 0 },
+      { id: u('node-b'), score: 0 },
     ]);
 
-    const [uuids, scores] = await episodeMentionsReranker(repo, [
+    const [ids, scores] = await episodeMentionsReranker(repo, [
       [u('node-a'), u('node-b')],
     ]);
-    expect(uuids).toHaveLength(2);
+    expect(ids).toHaveLength(2);
     expect(scores.every((s) => s === 0)).toBe(true);
   });
 });
@@ -299,8 +295,8 @@ describe('crossEncoderReranker', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('returns empty immediately for empty items without calling the model', async () => {
-    const [uuids, scores] = await crossEncoderReranker(model, 'query', []);
-    expect(uuids).toEqual([]);
+    const [ids, scores] = await crossEncoderReranker(model, 'query', []);
+    expect(ids).toEqual([]);
     expect(scores).toEqual([]);
     expect(model.withStructuredOutput).not.toHaveBeenCalled();
   });
@@ -309,7 +305,7 @@ describe('crossEncoderReranker', () => {
     mockRunnable.invoke.mockResolvedValue({ score: 80 });
 
     const [, scores] = await crossEncoderReranker(model, 'query', [
-      { uuid: u('a'), text: 'foo' },
+      { id: u('a'), text: 'foo' },
     ]);
     expect(scores[0]).toBeCloseTo(0.8);
   });
@@ -319,12 +315,12 @@ describe('crossEncoderReranker', () => {
       .mockResolvedValueOnce({ score: 40 }) // item 'a'
       .mockResolvedValueOnce({ score: 80 }); // item 'b'
 
-    const [uuids] = await crossEncoderReranker(model, 'query', [
-      { uuid: u('a'), text: 'less relevant' },
-      { uuid: u('b'), text: 'more relevant' },
+    const [ids] = await crossEncoderReranker(model, 'query', [
+      { id: u('a'), text: 'less relevant' },
+      { id: u('b'), text: 'more relevant' },
     ]);
-    expect(uuids[0]).toBe('b');
-    expect(uuids[1]).toBe('a');
+    expect(ids[0]).toBe('b');
+    expect(ids[1]).toBe('a');
   });
 
   it('filters items whose normalised score is below minScore', async () => {
@@ -332,25 +328,25 @@ describe('crossEncoderReranker', () => {
       .mockResolvedValueOnce({ score: 80 }) // 0.8 - passes
       .mockResolvedValueOnce({ score: 40 }); // 0.4 - filtered
 
-    const [uuids] = await crossEncoderReranker(
+    const [ids] = await crossEncoderReranker(
       model,
       'query',
       [
-        { uuid: u('a'), text: 'high relevance' },
-        { uuid: u('b'), text: 'low relevance' },
+        { id: u('a'), text: 'high relevance' },
+        { id: u('b'), text: 'low relevance' },
       ],
       0.5,
     );
-    expect(uuids).toEqual(['a']);
+    expect(ids).toEqual(['a']);
   });
 
   it('invokes the model once per item', async () => {
     mockRunnable.invoke.mockResolvedValue({ score: 50 });
 
     await crossEncoderReranker(model, 'query', [
-      { uuid: u('a'), text: 'one' },
-      { uuid: u('b'), text: 'two' },
-      { uuid: u('c'), text: 'three' },
+      { id: u('a'), text: 'one' },
+      { id: u('b'), text: 'two' },
+      { id: u('c'), text: 'three' },
     ]);
     expect(mockRunnable.invoke).toHaveBeenCalledTimes(3);
   });

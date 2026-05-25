@@ -49,8 +49,8 @@ export const SearchFiltersSchema = z.object({
    * produces: `((e.valid_at >= $p AND e.valid_at < $p2) OR (e.valid_at IS NULL))`
    */
   temporalFilters: z.array(z.array(TemporalFilterSchema)).optional(),
-  /** Only return edges whose UUID is in this list. */
-  edgeUuids: z.array(UuidSchema).optional(),
+  /** Only return edges whose ID is in this list. */
+  edgeIds: z.array(UuidSchema).optional(),
 });
 
 // Types

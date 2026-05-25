@@ -94,15 +94,15 @@ describe('NodeExtractionService', () => {
     expect(nodes[0].labels).toEqual(['Entity']);
   });
 
-  it('should assign uuid to each returned node', async () => {
+  it('should assign id to each returned node', async () => {
     mockRunnable.invoke.mockResolvedValue({
       extractedEntities: [{ name: 'Alice' }, { name: 'Bob' }],
     });
 
     const nodes = await service.extractNodes(mockModel, baseEpisode, []);
 
-    nodes.forEach((n) => expect(n.uuid).toBeTruthy());
-    expect(nodes[0].uuid).not.toBe(nodes[1].uuid);
+    nodes.forEach((n) => expect(n.id).toBeTruthy());
+    expect(nodes[0].id).not.toBe(nodes[1].id);
   });
 
   it('should return empty array when no entities extracted', async () => {

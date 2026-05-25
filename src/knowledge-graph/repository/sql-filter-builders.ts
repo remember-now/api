@@ -74,9 +74,9 @@ export function buildEdgeFilterClause(
   if (!filters) return empty;
   const parts: Prisma.Sql[] = [];
 
-  if (filters.edgeUuids && filters.edgeUuids.length > 0) {
+  if (filters.edgeIds && filters.edgeIds.length > 0) {
     const col = Prisma.raw(`"${alias}"."id"`);
-    parts.push(Prisma.sql`${col} = ANY(${filters.edgeUuids}::uuid[])`);
+    parts.push(Prisma.sql`${col} = ANY(${filters.edgeIds}::uuid[])`);
   }
   if (filters.edgeTypes && filters.edgeTypes.length > 0) {
     const col = Prisma.raw(`"${alias}"."name"`);

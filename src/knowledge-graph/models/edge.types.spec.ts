@@ -1,4 +1,4 @@
-import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgUuid } from '@/test/factories';
+import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgId } from '@/test/factories';
 
 import { RelationshipTypeSchema } from '../types';
 import {
@@ -16,19 +16,19 @@ import {
 
 describe('edge.types', () => {
   describe('createEdgeDefaults', () => {
-    it('should create defaults with a valid uuid', () => {
+    it('should create defaults with a valid id', () => {
       const defaults = createEdgeDefaults();
-      expect(defaults.uuid).toBeDefined();
-      expect(defaults.uuid).toMatch(
+      expect(defaults.id).toBeDefined();
+      expect(defaults.id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
     });
 
-    it('should not include graphId or node uuids in defaults', () => {
+    it('should not include graphId or node ids in defaults', () => {
       const defaults = createEdgeDefaults();
       expect('graphId' in defaults).toBe(false);
-      expect('sourceNodeUuid' in defaults).toBe(false);
-      expect('targetNodeUuid' in defaults).toBe(false);
+      expect('sourceNodeId' in defaults).toBe(false);
+      expect('targetNodeId' in defaults).toBe(false);
     });
 
     it('should create defaults with a Date for createdAt', () => {
@@ -40,32 +40,32 @@ describe('edge.types', () => {
   describe('EdgeBaseSchema', () => {
     it('should accept a valid edge base', () => {
       const edge = {
-        uuid: kgUuid(),
+        id: kgId(),
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid: kgUuid(),
-        targetNodeUuid: kgUuid(),
+        sourceNodeId: kgId(),
+        targetNodeId: kgId(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).not.toThrow();
     });
 
-    it('should reject invalid source uuid', () => {
+    it('should reject invalid source id', () => {
       const edge = {
-        uuid: kgUuid(),
+        id: kgId(),
         graphId: 'group-1',
-        sourceNodeUuid: 'not-a-uuid',
-        targetNodeUuid: kgUuid(),
+        sourceNodeId: 'not-a-uuid',
+        targetNodeId: kgId(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();
     });
 
-    it('should reject invalid target uuid', () => {
+    it('should reject invalid target id', () => {
       const edge = {
-        uuid: kgUuid(),
+        id: kgId(),
         graphId: 'group-1',
-        sourceNodeUuid: kgUuid(),
-        targetNodeUuid: 'not-a-uuid',
+        sourceNodeId: kgId(),
+        targetNodeId: 'not-a-uuid',
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();
@@ -73,10 +73,10 @@ describe('edge.types', () => {
 
     it('should reject empty graphId', () => {
       const edge = {
-        uuid: kgUuid(),
+        id: kgId(),
         graphId: '',
-        sourceNodeUuid: kgUuid(),
-        targetNodeUuid: kgUuid(),
+        sourceNodeId: kgId(),
+        targetNodeId: kgId(),
         createdAt: new Date(),
       };
       expect(() => EdgeBaseSchema.parse(edge)).toThrow();
@@ -85,8 +85,8 @@ describe('edge.types', () => {
 });
 
 describe('EntityEdge', () => {
-  const sourceNodeUuid = kgUuid();
-  const targetNodeUuid = kgUuid();
+  const sourceNodeId = kgId();
+  const targetNodeId = kgId();
 
   describe('createEntityEdge', () => {
     it('should create with correct defaults', () => {
@@ -94,12 +94,12 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(edge.name).toBe('KNOWS');
-      expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
-      expect(edge.targetNodeUuid).toBe(targetNodeUuid);
+      expect(edge.sourceNodeId).toBe(sourceNodeId);
+      expect(edge.targetNodeId).toBe(targetNodeId);
       expect(edge.fact).toBe('A knows B');
       expect(edge.factEmbedding).toBeNull();
       expect(edge.episodes).toEqual([]);
@@ -107,7 +107,7 @@ describe('EntityEdge', () => {
       expect(edge.validAt).toBeNull();
       expect(edge.invalidAt).toBeNull();
       expect(edge.attributes).toEqual({});
-      expect(edge.uuid).toBeDefined();
+      expect(edge.id).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
     });
 
@@ -116,8 +116,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'Person A knows Person B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(edge.fact).toBe('Person A knows Person B');
     });
@@ -127,8 +127,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
         factEmbedding: [0.1, 0.2, 0.3],
       });
       expect(edge.factEmbedding).toEqual([0.1, 0.2, 0.3]);
@@ -140,8 +140,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
         validAt: date,
         expiredAt: date,
         invalidAt: date,
@@ -158,8 +158,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => EntityEdgeSchema.parse(edge)).not.toThrow();
     });
@@ -169,8 +169,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => EntityEdgeSchema.parse({ ...edge, name: '' })).toThrow();
     });
@@ -180,8 +180,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => EntityEdgeSchema.parse({ ...edge, graphId: '' })).toThrow();
     });
@@ -191,8 +191,8 @@ describe('EntityEdge', () => {
         name: RelationshipTypeSchema.parse('KNOWS'),
         fact: 'A knows B',
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
         validAt: null,
         expiredAt: null,
         invalidAt: null,
@@ -203,35 +203,35 @@ describe('EntityEdge', () => {
 });
 
 describe('EpisodicEdge', () => {
-  const sourceNodeUuid = kgUuid();
-  const targetNodeUuid = kgUuid();
+  const sourceNodeId = kgId();
+  const targetNodeId = kgId();
 
   describe('createEpisodicEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
-      expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
-      expect(edge.targetNodeUuid).toBe(targetNodeUuid);
-      expect(edge.uuid).toBeDefined();
+      expect(edge.sourceNodeId).toBe(sourceNodeId);
+      expect(edge.targetNodeId).toBe(targetNodeId);
+      expect(edge.id).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
       expect(edge.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
-    it('should generate unique uuids', () => {
+    it('should generate unique ids', () => {
       const edge1 = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       const edge2 = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
-      expect(edge1.uuid).not.toBe(edge2.uuid);
+      expect(edge1.id).not.toBe(edge2.id);
     });
   });
 
@@ -239,8 +239,8 @@ describe('EpisodicEdge', () => {
     it('should accept valid episodic edge', () => {
       const edge = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => EpisodicEdgeSchema.parse(edge)).not.toThrow();
     });
@@ -248,39 +248,39 @@ describe('EpisodicEdge', () => {
     it('should reject empty graphId', () => {
       const edge = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => EpisodicEdgeSchema.parse({ ...edge, graphId: '' })).toThrow();
     });
 
-    it('should reject invalid source uuid', () => {
+    it('should reject invalid source id', () => {
       const edge = createEpisodicEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() =>
-        EpisodicEdgeSchema.parse({ ...edge, sourceNodeUuid: 'not-a-uuid' }),
+        EpisodicEdgeSchema.parse({ ...edge, sourceNodeId: 'not-a-uuid' }),
       ).toThrow();
     });
   });
 });
 
 describe('CommunityEdge', () => {
-  const sourceNodeUuid = kgUuid();
-  const targetNodeUuid = kgUuid();
+  const sourceNodeId = kgId();
+  const targetNodeId = kgId();
 
   describe('createCommunityEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createCommunityEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
-      expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
-      expect(edge.targetNodeUuid).toBe(targetNodeUuid);
-      expect(edge.uuid).toBeDefined();
+      expect(edge.sourceNodeId).toBe(sourceNodeId);
+      expect(edge.targetNodeId).toBe(targetNodeId);
+      expect(edge.id).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
       expect(edge.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -290,8 +290,8 @@ describe('CommunityEdge', () => {
     it('should accept valid community edge', () => {
       const edge = createCommunityEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => CommunityEdgeSchema.parse(edge)).not.toThrow();
     });
@@ -299,37 +299,37 @@ describe('CommunityEdge', () => {
     it('should reject empty graphId', () => {
       const edge = createCommunityEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => CommunityEdgeSchema.parse({ ...edge, graphId: '' })).toThrow();
     });
 
-    it('should reject invalid uuid', () => {
+    it('should reject invalid id', () => {
       const edge = createCommunityEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
-      expect(() => CommunityEdgeSchema.parse({ ...edge, uuid: 'not-a-uuid' })).toThrow();
+      expect(() => CommunityEdgeSchema.parse({ ...edge, id: 'not-a-uuid' })).toThrow();
     });
   });
 });
 
 describe('HasEpisodeEdge', () => {
-  const sourceNodeUuid = kgUuid();
-  const targetNodeUuid = kgUuid();
+  const sourceNodeId = kgId();
+  const targetNodeId = kgId();
 
   describe('createHasEpisodeEdge', () => {
     it('should create with correct defaults', () => {
       const edge = createHasEpisodeEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
-      expect(edge.sourceNodeUuid).toBe(sourceNodeUuid);
-      expect(edge.targetNodeUuid).toBe(targetNodeUuid);
-      expect(edge.uuid).toBeDefined();
+      expect(edge.sourceNodeId).toBe(sourceNodeId);
+      expect(edge.targetNodeId).toBe(targetNodeId);
+      expect(edge.id).toBeDefined();
       expect(edge.createdAt).toBeInstanceOf(Date);
       expect(edge.graphId).toBe(KG_TEST_GRAPH_ID);
     });
@@ -339,8 +339,8 @@ describe('HasEpisodeEdge', () => {
     it('should accept valid has-episode edge', () => {
       const edge = createHasEpisodeEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => HasEpisodeEdgeSchema.parse(edge)).not.toThrow();
     });
@@ -348,20 +348,20 @@ describe('HasEpisodeEdge', () => {
     it('should reject empty graphId', () => {
       const edge = createHasEpisodeEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() => HasEpisodeEdgeSchema.parse({ ...edge, graphId: '' })).toThrow();
     });
 
-    it('should reject invalid target uuid', () => {
+    it('should reject invalid target id', () => {
       const edge = createHasEpisodeEdge({
         graphId: KG_TEST_GRAPH_ID,
-        sourceNodeUuid,
-        targetNodeUuid,
+        sourceNodeId,
+        targetNodeId,
       });
       expect(() =>
-        HasEpisodeEdgeSchema.parse({ ...edge, targetNodeUuid: 'not-a-uuid' }),
+        HasEpisodeEdgeSchema.parse({ ...edge, targetNodeId: 'not-a-uuid' }),
       ).toThrow();
     });
   });

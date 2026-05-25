@@ -8,7 +8,7 @@ import { LLM_TRACER, NoOpLlmTracer } from '@/observability';
 import {
   KG_REFERENCE_TIME,
   KG_TEST_GRAPH_ID,
-  KG_TEST_SAGA_UUID,
+  KG_TEST_SAGA_ID,
   KG_TEST_USER_ID,
   KgEdgeFactory,
   KgNodeFactory,
@@ -92,7 +92,7 @@ describe('EpisodeService', () => {
     mockEmbeddingService.embedNodes.mockResolvedValue([]);
     mockNodeResolution.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
-      uuidMap: new Map(),
+      idMap: new Map(),
       duplicatePairs: [],
     });
     mockEdgeExtraction.extractEdges.mockResolvedValue([]);
@@ -210,7 +210,7 @@ describe('EpisodeService', () => {
       const resolved = KgNodeFactory.createEntityNode({ name: 'Alice' });
       const existing = {
         ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
-        uuid: u('existing-bob-uuid'),
+        id: u('existing-bob-id'),
       };
       const alias = KgNodeFactory.createEntityNode({ name: 'Robert' });
 
@@ -222,8 +222,8 @@ describe('EpisodeService', () => {
       mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [resolved],
-        uuidMap: new Map([[alias.uuid, existing.uuid]]),
-        duplicatePairs: [{ extractedUuid: alias.uuid, canonicalUuid: existing.uuid }],
+        idMap: new Map([[alias.id, existing.id]]),
+        duplicatePairs: [{ extractedId: alias.id, canonicalId: existing.id }],
       });
 
       await service.addEpisodes({
@@ -247,14 +247,14 @@ describe('EpisodeService', () => {
     it('embeds extracted edges in a single batched call', async () => {
       const edgeA = KgEdgeFactory.createEntityEdge({
         name: 'WORKS_AT',
-        sourceNodeUuid: u('s1'),
-        targetNodeUuid: u('t1'),
+        sourceNodeId: u('s1'),
+        targetNodeId: u('t1'),
         fact: 'fact 1',
       });
       const edgeB = KgEdgeFactory.createEntityEdge({
         name: 'KNOWS',
-        sourceNodeUuid: u('s2'),
-        targetNodeUuid: u('t2'),
+        sourceNodeId: u('s2'),
+        targetNodeId: u('t2'),
         fact: 'fact 2',
       });
       mockEdgeExtraction.extractEdges
@@ -270,18 +270,18 @@ describe('EpisodeService', () => {
       expect(mockEmbeddingService.embedEdges).toHaveBeenCalledWith([edgeA, edgeB]);
     });
 
-    it('calls resolveEdges with embedded edges, candidates, and finalUuidMap', async () => {
+    it('calls resolveEdges with embedded edges, candidates, and finalIdMap', async () => {
       const edge = KgEdgeFactory.createEntityEdge({
         name: 'WORKS_AT',
-        sourceNodeUuid: u('src'),
-        targetNodeUuid: u('tgt'),
+        sourceNodeId: u('src'),
+        targetNodeId: u('tgt'),
         fact: 'Alice works at Acme Corp',
       });
       const embeddedEdge = { ...edge, factEmbedding: [1, 0, 0] };
       const existingEdge = KgEdgeFactory.createEntityEdge({
         name: 'WORKS_AT',
-        sourceNodeUuid: u('src2'),
-        targetNodeUuid: u('tgt2'),
+        sourceNodeId: u('src2'),
+        targetNodeId: u('tgt2'),
         fact: 'Alice works at Acme Corp',
       });
 
@@ -299,7 +299,7 @@ describe('EpisodeService', () => {
         expect.anything(),
         [embeddedEdge],
         [existingEdge],
-        expect.any(Map), // finalUuidMap
+        expect.any(Map), // finalIdMap
         KG_REFERENCE_TIME,
         [],
         undefined,
@@ -327,7 +327,7 @@ describe('EpisodeService', () => {
       const resolved = KgNodeFactory.createEntityNode({ name: 'Alice' });
       const existing = {
         ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
-        uuid: u('bob-uuid'),
+        id: u('bob-id'),
       };
 
       mockNodeExtraction.extractNodes.mockResolvedValue([resolved]);
@@ -337,8 +337,8 @@ describe('EpisodeService', () => {
       mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [resolved],
-        uuidMap: new Map([[u('some-uuid'), existing.uuid]]),
-        duplicatePairs: [{ extractedUuid: u('some-uuid'), canonicalUuid: existing.uuid }],
+        idMap: new Map([[u('some-id'), existing.id]]),
+        duplicatePairs: [{ extractedId: u('some-id'), canonicalId: existing.id }],
       });
 
       const [entry] = await service.addEpisodes({
@@ -347,8 +347,8 @@ describe('EpisodeService', () => {
       });
 
       expect(entry.episodicEdges).toHaveLength(2);
-      expect(entry.episodicEdges.map((e) => e.targetNodeUuid)).toEqual(
-        expect.arrayContaining([resolved.uuid, existing.uuid]),
+      expect(entry.episodicEdges.map((e) => e.targetNodeId)).toEqual(
+        expect.arrayContaining([resolved.id, existing.id]),
       );
     });
   });
@@ -373,13 +373,13 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [canonical],
-          uuidMap: new Map([[canonical.uuid, canonical.uuid]]),
+          idMap: new Map([[canonical.id, canonical.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [],
-          duplicatePairs: [{ extractedUuid: alias.uuid, canonicalUuid: canonical.uuid }],
-          uuidMap: new Map([[alias.uuid, canonical.uuid]]),
+          duplicatePairs: [{ extractedId: alias.id, canonicalId: canonical.id }],
+          idMap: new Map([[alias.id, canonical.id]]),
         });
 
       const result = await service.addEpisodes({
@@ -388,8 +388,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.uuid === alias.uuid)).toBeUndefined();
-      expect(allNodes.find((n) => n.uuid === canonical.uuid)).toBeDefined();
+      expect(allNodes.find((n) => n.id === alias.id)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === canonical.id)).toBeDefined();
     });
 
     it('existing node referenced as canonical target is pulled into the matching episode entry', async () => {
@@ -407,10 +407,8 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedNodes.mockResolvedValue([alias]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [],
-        duplicatePairs: [
-          { extractedUuid: alias.uuid, canonicalUuid: existingCanonical.uuid },
-        ],
-        uuidMap: new Map([[alias.uuid, existingCanonical.uuid]]),
+        duplicatePairs: [{ extractedId: alias.id, canonicalId: existingCanonical.id }],
+        idMap: new Map([[alias.id, existingCanonical.id]]),
       });
 
       const [entry] = await service.addEpisodes({
@@ -418,8 +416,8 @@ describe('EpisodeService', () => {
         episodes: [makeEpisode('ep1')],
       });
 
-      expect(entry.nodes.find((n) => n.uuid === existingCanonical.uuid)).toBeDefined();
-      expect(entry.nodes.find((n) => n.uuid === alias.uuid)).toBeUndefined();
+      expect(entry.nodes.find((n) => n.id === existingCanonical.id)).toBeDefined();
+      expect(entry.nodes.find((n) => n.id === alias.id)).toBeUndefined();
     });
 
     it('canonical extracted by two episodes is saved exactly once via saveBulk', async () => {
@@ -439,13 +437,13 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [canonical],
-          uuidMap: new Map([[canonical.uuid, canonical.uuid]]),
+          idMap: new Map([[canonical.id, canonical.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [canonical],
-          duplicatePairs: [{ extractedUuid: alias.uuid, canonicalUuid: canonical.uuid }],
-          uuidMap: new Map([[alias.uuid, canonical.uuid]]),
+          duplicatePairs: [{ extractedId: alias.id, canonicalId: canonical.id }],
+          idMap: new Map([[alias.id, canonical.id]]),
         });
 
       await service.addEpisodes({
@@ -454,7 +452,7 @@ describe('EpisodeService', () => {
       });
 
       const savedNodes = mockEntityNodeRepo.saveBulk.mock.calls[0]?.[0];
-      expect(savedNodes.filter((n) => n.uuid === canonical.uuid)).toHaveLength(1);
+      expect(savedNodes.filter((n) => n.id === canonical.id)).toHaveLength(1);
     });
   });
 
@@ -480,12 +478,12 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeB],
-          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          idMap: new Map([[nodeB.id, nodeB.id]]),
           duplicatePairs: [],
         });
 
@@ -495,8 +493,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      const hasA = allNodes.some((n) => n.uuid === nodeA.uuid);
-      const hasB = allNodes.some((n) => n.uuid === nodeB.uuid);
+      const hasA = allNodes.some((n) => n.id === nodeA.id);
+      const hasB = allNodes.some((n) => n.id === nodeB.id);
       expect(hasA || hasB).toBe(true);
       expect(hasA && hasB).toBe(false);
     });
@@ -520,12 +518,12 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeB],
-          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          idMap: new Map([[nodeB.id, nodeB.id]]),
           duplicatePairs: [],
         });
 
@@ -535,8 +533,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
-      expect(allNodes.find((n) => n.uuid === nodeB.uuid)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeB.id)).toBeDefined();
     });
 
     it('identical names with null embeddings → deduplicated by exact match', async () => {
@@ -558,12 +556,12 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeB],
-          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          idMap: new Map([[nodeB.id, nodeB.id]]),
           duplicatePairs: [],
         });
 
@@ -573,8 +571,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
-      expect(allNodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
     });
 
     it('null embedding + same name as an embedded node → deduplicated by exact match', async () => {
@@ -596,12 +594,12 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeB],
-          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          idMap: new Map([[nodeB.id, nodeB.id]]),
           duplicatePairs: [],
         });
 
@@ -611,8 +609,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
-      expect(allNodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
     });
 
     it('different names with null embeddings → both kept', async () => {
@@ -634,12 +632,12 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeB],
-          uuidMap: new Map([[nodeB.uuid, nodeB.uuid]]),
+          idMap: new Map([[nodeB.id, nodeB.id]]),
           duplicatePairs: [],
         });
 
@@ -649,8 +647,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
-      expect(allNodes.find((n) => n.uuid === nodeB.uuid)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeB.id)).toBeDefined();
     });
   });
 
@@ -682,17 +680,17 @@ describe('EpisodeService', () => {
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
           resolvedNodes: [nodeA],
-          uuidMap: new Map([[nodeA.uuid, nodeA.uuid]]),
+          idMap: new Map([[nodeA.id, nodeA.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
           resolvedNodes: [],
-          duplicatePairs: [{ extractedUuid: nodeB.uuid, canonicalUuid: nodeA.uuid }],
-          uuidMap: new Map([[nodeB.uuid, nodeA.uuid]]),
+          duplicatePairs: [{ extractedId: nodeB.id, canonicalId: nodeA.id }],
+          idMap: new Map([[nodeB.id, nodeA.id]]),
         })
         .mockResolvedValueOnce({
           resolvedNodes: [nodeC],
-          uuidMap: new Map([[nodeC.uuid, nodeC.uuid]]),
+          idMap: new Map([[nodeC.id, nodeC.id]]),
           duplicatePairs: [],
         });
 
@@ -703,18 +701,18 @@ describe('EpisodeService', () => {
 
       const allNodes = result.flatMap((r) => r.nodes);
       // nodeB is excluded by pass-1; nodeC is pass-2 alias of nodeA (first-seen wins).
-      expect(allNodes.find((n) => n.uuid === nodeB.uuid)).toBeUndefined();
-      expect(allNodes.find((n) => n.uuid === nodeA.uuid)).toBeDefined();
-      expect(allNodes.find((n) => n.uuid === nodeC.uuid)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === nodeC.id)).toBeUndefined();
     });
   });
 
-  // ─── Saga handling per episode (sagaUuid) ─────────────────────────────────
+  // ─── Saga handling per episode (sagaId) ─────────────────────────────────
 
   describe('addEpisodes - saga handling', () => {
-    it('creates SagaNode and HasEpisodeEdge when sagaUuid is provided', async () => {
+    it('creates SagaNode and HasEpisodeEdge when sagaId is provided', async () => {
       const ep = makeEpisode('ep1');
-      ep.sagaUuid = KG_TEST_SAGA_UUID;
+      ep.sagaId = KG_TEST_SAGA_ID;
 
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -723,19 +721,19 @@ describe('EpisodeService', () => {
 
       expect(mockSagaNodeRepo.createIfNotExists).toHaveBeenCalledWith(
         expect.objectContaining({
-          uuid: KG_TEST_SAGA_UUID,
+          id: KG_TEST_SAGA_ID,
           graphId: KG_TEST_GRAPH_ID,
         }),
       );
       expect(mockHasEpisodeEdgeRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          sourceNodeUuid: KG_TEST_SAGA_UUID,
+          sourceNodeId: KG_TEST_SAGA_ID,
           graphId: KG_TEST_GRAPH_ID,
         }),
       );
     });
 
-    it('skips saga handling when sagaUuid is omitted', async () => {
+    it('skips saga handling when sagaId is omitted', async () => {
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
@@ -746,12 +744,12 @@ describe('EpisodeService', () => {
       expect(mockHasEpisodeEdgeRepo.save).not.toHaveBeenCalled();
     });
 
-    it('processes saga linking for each episode in the batch that has a sagaUuid', async () => {
+    it('processes saga linking for each episode in the batch that has a sagaId', async () => {
       const ep1 = makeEpisode('ep1');
-      ep1.sagaUuid = KG_TEST_SAGA_UUID;
+      ep1.sagaId = KG_TEST_SAGA_ID;
       const ep2 = makeEpisode('ep2'); // no saga
       const ep3 = makeEpisode('ep3');
-      ep3.sagaUuid = KG_TEST_SAGA_UUID;
+      ep3.sagaId = KG_TEST_SAGA_ID;
 
       await service.addEpisodes({
         userId: KG_TEST_USER_ID,
@@ -783,8 +781,8 @@ describe('EpisodeService', () => {
       const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
       const edge = KgEdgeFactory.createEntityEdge({
         name: 'WORKS_AT',
-        sourceNodeUuid: node.uuid,
-        targetNodeUuid: u('target'),
+        sourceNodeId: node.id,
+        targetNodeId: u('target'),
         fact: 'fact',
       });
       mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
@@ -795,7 +793,7 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedNodes.mockResolvedValue([node]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [node],
-        uuidMap: new Map([[node.uuid, node.uuid]]),
+        idMap: new Map([[node.id, node.id]]),
         duplicatePairs: [],
       });
 
@@ -872,11 +870,11 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedNodes.mockResolvedValue([node]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [node],
-        uuidMap: new Map([[node.uuid, node.uuid]]),
+        idMap: new Map([[node.id, node.id]]),
         duplicatePairs: [],
       });
       mockRunnable.invoke.mockResolvedValue({
-        summaries: [{ uuid: node.uuid, summary: 'Alice is an engineer' }],
+        summaries: [{ id: node.id, summary: 'Alice is an engineer' }],
       });
 
       await service.addEpisodes({
@@ -886,7 +884,7 @@ describe('EpisodeService', () => {
 
       expect(mockModel.withStructuredOutput).toHaveBeenCalled();
       const savedNodes = mockEntityNodeRepo.saveBulk.mock.calls[0]?.[0];
-      expect(savedNodes.find((n) => n.uuid === node.uuid)?.summary).toBe(
+      expect(savedNodes.find((n) => n.id === node.id)?.summary).toBe(
         'Alice is an engineer',
       );
     });

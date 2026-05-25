@@ -18,17 +18,17 @@ export class CommunityNodeRepository {
   }
 
   @Span()
-  delete(_uuid: Uuid): Promise<void> {
+  delete(_id: Uuid): Promise<void> {
     return Promise.resolve();
   }
 
   @Span()
-  deleteByUuids(_uuids: Uuid[]): Promise<void> {
+  deleteByIds(_ids: Uuid[]): Promise<void> {
     return Promise.resolve();
   }
 
   @Span()
-  getByUuid(_uuid: Uuid): Promise<CommunityNode | null> {
+  getById(_id: Uuid): Promise<CommunityNode | null> {
     return Promise.resolve(null);
   }
 

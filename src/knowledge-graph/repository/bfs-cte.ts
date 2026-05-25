@@ -6,7 +6,7 @@ import { Uuid } from '@/common/schemas';
  * Builds the `WITH RECURSIVE bfs(id, kind, depth, visited) AS (...)` CTE
  * shared by EntityNodeRepository.searchByBfs and EntityEdgeRepository.searchByBfs.
  *
- * The CTE seeds from `originNodeUuids` resolved against both entity_nodes and
+ * The CTE seeds from `originNodeIds` resolved against both entity_nodes and
  * episodic_nodes (tagging each row's `kind`), then expands one entity-graph
  * hop per step. Episodic seeds expand via episodic_edges (MENTIONS) to entity
  * once at depth 1; from there it's a pure entity-graph traversal.
@@ -14,7 +14,7 @@ import { Uuid } from '@/common/schemas';
  * Returned fragment includes the leading `WITH RECURSIVE`, so it must be the
  * first SQL in the statement. Callers append their outer SELECT after it:
  *
- *   const cte = buildBfsCte(originNodeUuids, graphIds, depth);
+ *   const cte = buildBfsCte(originNodeIds, graphIds, depth);
  *   await prisma.$queryRaw`
  *     ${cte}
  *     SELECT ... FROM bfs b JOIN entity_nodes n ON n.id = b.id WHERE ...
@@ -27,7 +27,7 @@ import { Uuid } from '@/common/schemas';
  * merged through a LATERAL subquery so `bfs` is referenced exactly once.
  */
 export function buildBfsCte(
-  originNodeUuids: Uuid[],
+  originNodeIds: Uuid[],
   graphIds: Uuid[],
   depth: number,
 ): Prisma.Sql {
@@ -42,11 +42,11 @@ export function buildBfsCte(
       FROM (
         SELECT id, 'entity'::text AS kind
         FROM entity_nodes
-        WHERE id = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
+        WHERE id = ANY(${originNodeIds}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
         UNION ALL
         SELECT id, 'episodic'::text AS kind
         FROM episodic_nodes
-        WHERE id = ANY(${originNodeUuids}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
+        WHERE id = ANY(${originNodeIds}::uuid[]) AND graph_id = ANY(${graphIds}::uuid[])
       ) seeds
 
       UNION ALL

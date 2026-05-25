@@ -17,17 +17,17 @@ export class CommunityEdgeRepository {
   }
 
   @Span()
-  delete(_uuid: Uuid): Promise<void> {
+  delete(_id: Uuid): Promise<void> {
     return Promise.resolve();
   }
 
   @Span()
-  deleteByUuids(_uuids: Uuid[]): Promise<void> {
+  deleteByIds(_ids: Uuid[]): Promise<void> {
     return Promise.resolve();
   }
 
   @Span()
-  getByUuid(_uuid: Uuid): Promise<CommunityEdge | null> {
+  getById(_id: Uuid): Promise<CommunityEdge | null> {
     return Promise.resolve(null);
   }
 }

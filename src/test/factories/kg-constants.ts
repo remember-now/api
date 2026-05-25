@@ -12,17 +12,15 @@ export const KG_HIGH_SIM_EMBEDDING = [1, 0, 0];
 export const KG_DIFF_EMBEDDING = [0, 1, 0];
 export const KG_NEAR_SAME_EMBEDDING = [0.9999, 0.001, 0];
 
-export const KG_TEST_UUID_CURSOR = UuidSchema.parse(
-  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-);
-export const KG_TEST_SAGA_UUID = UuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+export const KG_TEST_ID_CURSOR = UuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+export const KG_TEST_SAGA_ID = UuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 
 /** Helper for tests that need a fresh branded UUID. */
-export const kgUuid = () => UuidSchema.parse(randomUUID());
+export const kgId = () => UuidSchema.parse(randomUUID());
 
 /**
  * Deterministic test UUID from an arbitrary label. `u('foo') === u('foo')`
- * — useful for intra-batch dedup, uuidMap, and endpoint-matching tests
+ * — useful for intra-batch dedup, idMap, and endpoint-matching tests
  * where the same logical id must appear across multiple constructions.
  */
 export const u = (s: string) => {

@@ -38,7 +38,7 @@ describe('EdgeExtractionService', () => {
     mockModel.withStructuredOutput.mockReturnValue(mockRunnable as never);
   });
 
-  it('should return EntityEdge[] matching source/target uuids', async () => {
+  it('should return EntityEdge[] matching source/target ids', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
@@ -59,8 +59,8 @@ describe('EdgeExtractionService', () => {
     );
 
     expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
-    expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
+    expect(edges[0].sourceNodeId).toBe(aliceNode.id);
+    expect(edges[0].targetNodeId).toBe(acmeNode.id);
     expect(edges[0].name).toBe('WORKS_AT');
     expect(edges[0].fact).toBe('Alice works at Acme Corp.');
     expect(edges[0].graphId).toBe(KG_TEST_GRAPH_ID);
@@ -143,7 +143,7 @@ describe('EdgeExtractionService', () => {
     );
 
     expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
+    expect(edges[0].sourceNodeId).toBe(aliceNode.id);
   });
 
   it('should filter edges with unrecognized target names', async () => {
@@ -173,8 +173,8 @@ describe('EdgeExtractionService', () => {
     );
 
     expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeUuid).toBe(bobNode.uuid);
-    expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
+    expect(edges[0].sourceNodeId).toBe(bobNode.id);
+    expect(edges[0].targetNodeId).toBe(acmeNode.id);
   });
 
   it('should be case-insensitive for name matching', async () => {
@@ -198,11 +198,11 @@ describe('EdgeExtractionService', () => {
     );
 
     expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeUuid).toBe(aliceNode.uuid);
-    expect(edges[0].targetNodeUuid).toBe(acmeNode.uuid);
+    expect(edges[0].sourceNodeId).toBe(aliceNode.id);
+    expect(edges[0].targetNodeId).toBe(acmeNode.id);
   });
 
-  it('should set episodes to [episode.uuid] on each extracted edge', async () => {
+  it('should set episodes to [episode.id] on each extracted edge', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
@@ -222,7 +222,7 @@ describe('EdgeExtractionService', () => {
       KG_REFERENCE_TIME,
     );
 
-    expect(edges[0].episodes).toEqual([baseEpisode.uuid]);
+    expect(edges[0].episodes).toEqual([baseEpisode.id]);
   });
 
   it('should return empty array when no edges extracted', async () => {
@@ -239,7 +239,7 @@ describe('EdgeExtractionService', () => {
     expect(edges).toEqual([]);
   });
 
-  it('should assign uuid to each returned edge', async () => {
+  it('should assign id to each returned edge', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
@@ -266,7 +266,7 @@ describe('EdgeExtractionService', () => {
     );
 
     expect(edges).toHaveLength(2);
-    edges.forEach((e) => expect(e.uuid).toBeTruthy());
-    expect(edges[0].uuid).not.toBe(edges[1].uuid);
+    edges.forEach((e) => expect(e.id).toBeTruthy());
+    expect(edges[0].id).not.toBe(edges[1].id);
   });
 });

@@ -12,7 +12,7 @@ import {
 } from '@/observability';
 
 import {
-  compressUuidMap,
+  compressIdMap,
   LLM_CONCURRENCY_LIMIT,
   withConcurrency,
 } from '../episode/batch-utils';
@@ -41,7 +41,7 @@ export class EdgeResolutionService {
     episode: EpisodicNode,
     extractedEdges: EntityEdge[],
     existingEdges: EntityEdge[],
-    uuidMap: Map<Uuid, Uuid>,
+    idMap: Map<Uuid, Uuid>,
     referenceTime: Date,
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
@@ -52,7 +52,7 @@ export class EdgeResolutionService {
       episode,
       extractedEdges,
       existingEdges,
-      uuidMap,
+      idMap,
       referenceTime,
       previousEpisodes,
       customInstructions,
@@ -67,17 +67,17 @@ export class EdgeResolutionService {
     episode: EpisodicNode,
     extractedEdges: EntityEdge[],
     existingEdges: EntityEdge[],
-    uuidMap: Map<Uuid, Uuid>,
+    idMap: Map<Uuid, Uuid>,
     referenceTime: Date,
     previousEpisodes: EpisodicNode[] = [],
     customInstructions?: string,
     ctx?: LlmContext,
   ): Promise<EdgeResolutionResult & { metrics: SpanMetrics }> {
-    // Step 1: Remap source/target uuids via uuidMap
+    // Step 1: Remap source/target ids via idMap
     const remapped = extractedEdges.map((e) => ({
       ...e,
-      sourceNodeUuid: uuidMap.get(e.sourceNodeUuid) ?? e.sourceNodeUuid,
-      targetNodeUuid: uuidMap.get(e.targetNodeUuid) ?? e.targetNodeUuid,
+      sourceNodeId: idMap.get(e.sourceNodeId) ?? e.sourceNodeId,
+      targetNodeId: idMap.get(e.targetNodeId) ?? e.targetNodeId,
     }));
 
     // Step 2: Intra-batch dedup - same endpoints + same normalized fact → keep first, merge episodes
@@ -86,8 +86,8 @@ export class EdgeResolutionService {
       const normalizedFact = normalizeString(edge.fact);
       const existing = deduped.find(
         (d) =>
-          d.sourceNodeUuid === edge.sourceNodeUuid &&
-          d.targetNodeUuid === edge.targetNodeUuid &&
+          d.sourceNodeId === edge.sourceNodeId &&
+          d.targetNodeId === edge.targetNodeId &&
           normalizeString(d.fact) === normalizedFact,
       );
       if (existing) {
@@ -104,27 +104,26 @@ export class EdgeResolutionService {
 
     const resolvedEdges: EntityEdge[] = [];
     const newEdges: EntityEdge[] = [];
-    const resolvedExistingUuids = new Set<Uuid>();
+    const resolvedExistingIds = new Set<Uuid>();
     const invalidatedEdgesMap = new Map<Uuid, EntityEdge>();
 
     for (const edge of deduped) {
       // Find same-endpoint existing edges
       const endpointEdges = existingEdges.filter(
         (e) =>
-          (e.sourceNodeUuid === edge.sourceNodeUuid &&
-            e.targetNodeUuid === edge.targetNodeUuid) ||
-          (e.sourceNodeUuid === edge.targetNodeUuid &&
-            e.targetNodeUuid === edge.sourceNodeUuid),
+          (e.sourceNodeId === edge.sourceNodeId &&
+            e.targetNodeId === edge.targetNodeId) ||
+          (e.sourceNodeId === edge.targetNodeId && e.targetNodeId === edge.sourceNodeId),
       );
 
       // Find similar-fact edges (cosine) excluding same-endpoint already found
-      const endpointUuids = new Set(endpointEdges.map((e) => e.uuid));
+      const endpointIds = new Set(endpointEdges.map((e) => e.id));
 
       // Cosine candidates (in-memory)
       const cosineEdges: EntityEdge[] =
         edge.factEmbedding !== null
           ? existingEdges
-              .filter((e) => !endpointUuids.has(e.uuid) && e.factEmbedding !== null)
+              .filter((e) => !endpointIds.has(e.id) && e.factEmbedding !== null)
               .map((e) => ({
                 edge: e,
                 score: cosineSimilarity(edge.factEmbedding!, e.factEmbedding!),
@@ -145,9 +144,9 @@ export class EdgeResolutionService {
       );
 
       // Merge: cosine-first, then keyword-only additions (deduped, endpoint-excluded)
-      const cosineUuids = new Set(cosineEdges.map((e) => e.uuid));
+      const cosineIds = new Set(cosineEdges.map((e) => e.id));
       const keywordOnly = keywordEdges.filter(
-        (e) => !endpointUuids.has(e.uuid) && !cosineUuids.has(e.uuid),
+        (e) => !endpointIds.has(e.id) && !cosineIds.has(e.id),
       );
       const similarEdges: EntityEdge[] = [...cosineEdges, ...keywordOnly];
 
@@ -199,18 +198,18 @@ export class EdgeResolutionService {
         resolvedEdges.push(edge);
         newEdges.push(edge);
       } else {
-        // Append this episode's UUID to the matching existing endpoint edge(s)
+        // Append this episode's ID to the matching existing endpoint edge(s)
         // and include them in resolvedEdges so they are re-saved with updated episodes.
         // Mirrors Python edge_operations.py:523-524 and 581-582.
         for (const idx of dedupe.duplicate_facts) {
           if (idx < endpointEdges.length) {
             const existingEdge = idxToEdge.get(idx);
-            if (existingEdge && !resolvedExistingUuids.has(existingEdge.uuid)) {
-              if (!existingEdge.episodes.includes(episode.uuid)) {
-                existingEdge.episodes.push(episode.uuid);
+            if (existingEdge && !resolvedExistingIds.has(existingEdge.id)) {
+              if (!existingEdge.episodes.includes(episode.id)) {
+                existingEdge.episodes.push(episode.id);
               }
               resolvedEdges.push(existingEdge);
-              resolvedExistingUuids.add(existingEdge.uuid);
+              resolvedExistingIds.add(existingEdge.id);
             }
           }
         }
@@ -221,7 +220,7 @@ export class EdgeResolutionService {
       // (edge_operations.py:425-460).
       for (const idx of dedupe.contradicted_facts) {
         const existing = idxToEdge.get(idx);
-        if (!existing || invalidatedEdgesMap.has(existing.uuid)) continue;
+        if (!existing || invalidatedEdgesMap.has(existing.id)) continue;
 
         const edgeInvalidAt = existing.invalidAt;
         const resolvedValidAt = edge.validAt;
@@ -245,7 +244,7 @@ export class EdgeResolutionService {
           resolvedValidAt !== null &&
           edgeValidAt < resolvedValidAt
         ) {
-          invalidatedEdgesMap.set(existing.uuid, {
+          invalidatedEdgesMap.set(existing.id, {
             ...existing,
             invalidAt: edge.validAt,
             expiredAt: existing.expiredAt ?? new Date(),
@@ -261,7 +260,7 @@ export class EdgeResolutionService {
       invalidatedEdges,
       newEdges,
       metrics: {
-        'episode.uuid': episode.uuid,
+        'episode.id': episode.id,
         'extracted.count': extractedEdges.length,
         'existing.count': existingEdges.length,
         'resolved.count': resolvedEdges.length,
@@ -278,7 +277,7 @@ export class EdgeResolutionService {
   // persist a separate row because per-episode resolution only consults the
   // live graph. Returns deduped per-episode lists where collapsed duplicates
   // are replaced with a single canonical edge whose `episodes` field is the
-  // union of the originating episode UUIDs.
+  // union of the originating episode IDs.
   async dedupeAcrossBatch(
     model: BaseChatModel,
     edgesPerEpisode: EntityEdge[][],
@@ -316,12 +315,12 @@ export class EdgeResolutionService {
       return { deduped: edgesPerEpisode, metrics: { ...baseMetrics, 'pairs.found': 0 } };
     }
 
-    // Owner index: which episode each edge came from. Edge UUIDs are unique
-    // (factory generates randomUUID per extraction), so a Map keyed by uuid
+    // Owner index: which episode each edge came from. Edge IDs are unique
+    // (factory generates randomUUID per extraction), so a Map keyed by id
     // is unambiguous.
     const edgeOwner = new Map<Uuid, number>();
     edgesPerEpisode.forEach((edges, i) => {
-      for (const e of edges) edgeOwner.set(e.uuid, i);
+      for (const e of edges) edgeOwner.set(e.id, i);
     });
 
     type Task = {
@@ -334,12 +333,12 @@ export class EdgeResolutionService {
       const endpointEdges: EntityEdge[] = [];
       const similarEdges: EntityEdge[] = [];
       for (const peer of allEdges) {
-        if (peer.uuid === edge.uuid) continue;
+        if (peer.id === edge.id) continue;
         const sameEndpoints =
-          (peer.sourceNodeUuid === edge.sourceNodeUuid &&
-            peer.targetNodeUuid === edge.targetNodeUuid) ||
-          (peer.sourceNodeUuid === edge.targetNodeUuid &&
-            peer.targetNodeUuid === edge.sourceNodeUuid);
+          (peer.sourceNodeId === edge.sourceNodeId &&
+            peer.targetNodeId === edge.targetNodeId) ||
+          (peer.sourceNodeId === edge.targetNodeId &&
+            peer.targetNodeId === edge.sourceNodeId);
         if (sameEndpoints) {
           endpointEdges.push(peer);
           continue;
@@ -364,7 +363,7 @@ export class EdgeResolutionService {
     const pairResults = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       tasks.map((t) => async (): Promise<[Uuid, Uuid][]> => {
-        const ownerIdx = edgeOwner.get(t.edge.uuid)!;
+        const ownerIdx = edgeOwner.get(t.edge.id)!;
         const { dedupe, idxToEdge } = await this.dedupeEdgeViaLlm(
           model,
           t.edge,
@@ -386,7 +385,7 @@ export class EdgeResolutionService {
         for (const idx of dedupe.duplicate_facts) {
           if (idx >= endpointCount) continue;
           const peer = idxToEdge.get(idx);
-          if (peer) localPairs.push([t.edge.uuid, peer.uuid]);
+          if (peer) localPairs.push([t.edge.id, peer.id]);
         }
         return localPairs;
       }),
@@ -400,22 +399,22 @@ export class EdgeResolutionService {
       };
     }
 
-    // Union-find collapses transitive duplicates and picks lex-smallest UUID
-    // as canonical. Build canonical edge objects with merged episode UUIDs.
-    const uuidMap = compressUuidMap<Uuid>(duplicatePairs);
-    const edgesByUuid = new Map<Uuid, EntityEdge>(allEdges.map((e) => [e.uuid, e]));
-    const canonicalByUuid = new Map<Uuid, EntityEdge>();
+    // Union-find collapses transitive duplicates and picks lex-smallest ID
+    // as canonical. Build canonical edge objects with merged episode IDs.
+    const idMap = compressIdMap<Uuid>(duplicatePairs);
+    const edgesById = new Map<Uuid, EntityEdge>(allEdges.map((e) => [e.id, e]));
+    const canonicalById = new Map<Uuid, EntityEdge>();
 
     for (const edge of allEdges) {
-      const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
-      if (canonicalUuid === edge.uuid) {
-        canonicalByUuid.set(canonicalUuid, edge);
+      const canonicalId = idMap.get(edge.id) ?? edge.id;
+      if (canonicalId === edge.id) {
+        canonicalById.set(canonicalId, edge);
       }
     }
     for (const edge of allEdges) {
-      const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
-      if (canonicalUuid === edge.uuid) continue;
-      const canonical = canonicalByUuid.get(canonicalUuid);
+      const canonicalId = idMap.get(edge.id) ?? edge.id;
+      if (canonicalId === edge.id) continue;
+      const canonical = canonicalById.get(canonicalId);
       if (!canonical) continue;
       for (const ep of edge.episodes) {
         if (!canonical.episodes.includes(ep)) canonical.episodes.push(ep);
@@ -426,12 +425,10 @@ export class EdgeResolutionService {
       const seen = new Set<Uuid>();
       const out: EntityEdge[] = [];
       for (const edge of edges) {
-        const canonicalUuid = uuidMap.get(edge.uuid) ?? edge.uuid;
-        if (seen.has(canonicalUuid)) continue;
-        seen.add(canonicalUuid);
-        out.push(
-          canonicalByUuid.get(canonicalUuid) ?? edgesByUuid.get(canonicalUuid) ?? edge,
-        );
+        const canonicalId = idMap.get(edge.id) ?? edge.id;
+        if (seen.has(canonicalId)) continue;
+        seen.add(canonicalId);
+        out.push(canonicalById.get(canonicalId) ?? edgesById.get(canonicalId) ?? edge);
       }
       return out;
     });
@@ -468,10 +465,10 @@ export class EdgeResolutionService {
     // pairs as duplicates only for symmetric relations. Indices stay
     // continuous: same → reversed → similar.
     const sameDirection = endpointEdges.filter(
-      (e) => e.sourceNodeUuid === edge.sourceNodeUuid,
+      (e) => e.sourceNodeId === edge.sourceNodeId,
     );
     const reversedDirection = endpointEdges.filter(
-      (e) => e.sourceNodeUuid !== edge.sourceNodeUuid,
+      (e) => e.sourceNodeId !== edge.sourceNodeId,
     );
 
     const sameWithIdx = sameDirection.map((e, i) => ({ idx: i, edge: e }));

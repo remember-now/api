@@ -39,7 +39,7 @@ export class EntityNodeRepository {
     await this.prisma.$executeRaw`
       INSERT INTO entity_nodes (id, graph_id, name, summary, attributes, labels, name_embedding, created_at)
       VALUES (
-        ${node.uuid}::uuid,
+        ${node.id}::uuid,
         ${node.graphId}::uuid,
         ${node.name},
         ${node.summary},
@@ -56,7 +56,7 @@ export class EntityNodeRepository {
         labels         = EXCLUDED.labels,
         name_embedding = EXCLUDED.name_embedding
     `;
-    return node.uuid;
+    return node.id;
   }
 
   @Span()
@@ -71,10 +71,10 @@ export class EntityNodeRepository {
   }
 
   @Span()
-  async deleteIfSoleMentioned(nodeUuid: Uuid): Promise<void> {
+  async deleteIfSoleMentioned(nodeId: Uuid): Promise<void> {
     await this.prisma.$executeRaw`
       DELETE FROM entity_nodes en
-      WHERE en.id = ${nodeUuid}::uuid
+      WHERE en.id = ${nodeId}::uuid
         AND (SELECT COUNT(*) FROM episodic_edges ee WHERE ee.entity_id = en.id) = 1
     `;
   }
@@ -113,12 +113,12 @@ export class EntityNodeRepository {
     const vec = Prisma.sql`${toPgVector(embedding)}::vector`;
     const filterSql = buildNodeFilterClause(filters, 'n');
 
-    // graph_label && ARRAY[graph_label_for(id1), graph_label_for(id2), ...]
+    // graph_diskann_bucket && ARRAY[graph_diskann_bucket_for(id1), graph_diskann_bucket_for(id2), ...]
     // narrows the diskann scan to label buckets containing any of our graphs.
     // graph_id = ANY(...) post-filters out bucket-mates from other graphs.
     // https://github.com/timescale/pgvectorscale?tab=readme-ov-file#label-based-filtering-with-diskann
-    const labelArray = Prisma.sql`ARRAY[${Prisma.join(
-      graphIds.map((g) => Prisma.sql`graph_label_for(${g}::uuid)`),
+    const bucketArray = Prisma.sql`ARRAY[${Prisma.join(
+      graphIds.map((g) => Prisma.sql`graph_diskann_bucket_for(${g}::uuid)`),
     )}]::smallint[]`;
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
@@ -126,7 +126,7 @@ export class EntityNodeRepository {
              n.name_embedding::text AS name_embedding, n.created_at,
              1 - (n.name_embedding <=> ${vec}) AS score
       FROM entity_nodes n
-      WHERE n.graph_label && ${labelArray}
+      WHERE n.graph_diskann_bucket && ${bucketArray}
         AND n.graph_id = ANY(${graphIds}::uuid[])
         AND n.name_embedding IS NOT NULL
         AND 1 - (n.name_embedding <=> ${vec}) >= ${minScore}
@@ -142,11 +142,11 @@ export class EntityNodeRepository {
     params: SearchByBfsParams,
     filters?: SearchFilters,
   ): Promise<EntityNode[]> {
-    const { originNodeUuids, graphIds, limit, maxDepth } = params;
-    if (originNodeUuids.length === 0) return [];
+    const { originNodeIds, graphIds, limit, maxDepth } = params;
+    if (originNodeIds.length === 0) return [];
     const depth = maxDepth ?? MAX_SEARCH_DEPTH;
     const filterSql = buildNodeFilterClause(filters, 'reachable');
-    const cte = buildBfsCte(originNodeUuids, graphIds, depth);
+    const cte = buildBfsCte(originNodeIds, graphIds, depth);
     const rows = await this.prisma.$queryRaw<RawRow[]>`
       ${cte}
       SELECT DISTINCT reachable.id, reachable.graph_id, reachable.name, reachable.summary,
@@ -167,28 +167,26 @@ export class EntityNodeRepository {
   // extended to multi-hop via BFS (e.g. buildBfsCte) without changing the caller contract.
   @Span()
   async getNodeDistanceScores(
-    nodeUuids: Uuid[],
-    centerNodeUuid: Uuid,
-  ): Promise<{ uuid: Uuid; score: number }[]> {
-    if (nodeUuids.length === 0) return [];
-    const rows = await this.prisma.$queryRaw<{ uuid: Uuid; score: number }[]>`
-      SELECT DISTINCT n.id AS uuid, 1 AS score
-      FROM UNNEST(${nodeUuids}::uuid[]) AS n(id)
+    nodeIds: Uuid[],
+    centerNodeId: Uuid,
+  ): Promise<{ id: Uuid; score: number }[]> {
+    if (nodeIds.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ id: Uuid; score: number }[]>`
+      SELECT DISTINCT n.id, 1 AS score
+      FROM UNNEST(${nodeIds}::uuid[]) AS n(id)
       JOIN entity_edges ee
-        ON (ee.source_id = ${centerNodeUuid}::uuid AND ee.target_id = n.id)
-        OR (ee.target_id = ${centerNodeUuid}::uuid AND ee.source_id = n.id)
+        ON (ee.source_id = ${centerNodeId}::uuid AND ee.target_id = n.id)
+        OR (ee.target_id = ${centerNodeId}::uuid AND ee.source_id = n.id)
     `;
     return rows;
   }
 
   @Span()
-  async getEpisodeMentionCounts(
-    nodeUuids: Uuid[],
-  ): Promise<{ uuid: Uuid; score: number }[]> {
-    if (nodeUuids.length === 0) return [];
-    const rows = await this.prisma.$queryRaw<{ uuid: Uuid; score: number }[]>`
-      SELECT n.id AS uuid, COUNT(ee.id)::int AS score
-      FROM UNNEST(${nodeUuids}::uuid[]) AS n(id)
+  async getEpisodeMentionCounts(nodeIds: Uuid[]): Promise<{ id: Uuid; score: number }[]> {
+    if (nodeIds.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ id: Uuid; score: number }[]>`
+      SELECT n.id, COUNT(ee.id)::int AS score
+      FROM UNNEST(${nodeIds}::uuid[]) AS n(id)
       LEFT JOIN episodic_edges ee ON ee.entity_id = n.id
       GROUP BY n.id
     `;
@@ -198,7 +196,7 @@ export class EntityNodeRepository {
   private mapRow(row: RawRow): EntityNode {
     const attrs = row.attributes;
     return {
-      uuid: row.id as Uuid,
+      id: row.id as Uuid,
       name: row.name as NodeName,
       graphId: row.graph_id as Uuid,
       createdAt: row.created_at,

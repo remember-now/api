@@ -199,14 +199,14 @@ export class CombinedExtractionService {
         [f.targetEntityName.toLowerCase(), tgtNode],
       ] as [string, EntityNode][]) {
         void nodeName;
-        const existing = nodeEpisodeIndexMap.get(node.uuid) ?? [];
+        const existing = nodeEpisodeIndexMap.get(node.id) ?? [];
         for (const idx of epIndices) {
           if (!existing.includes(idx)) existing.push(idx);
         }
-        nodeEpisodeIndexMap.set(node.uuid, existing);
+        nodeEpisodeIndexMap.set(node.id, existing);
       }
 
-      const episodeUuids = epIndices.map((idx) => episodes[idx].uuid);
+      const episodeIds = epIndices.map((idx) => episodes[idx].id);
 
       const tsOverride = timestampMap.get(i);
       const rawValidAt = tsOverride?.validAt ?? f.validAt;
@@ -217,9 +217,9 @@ export class CombinedExtractionService {
           name: f.relationType,
           fact: f.fact,
           graphId: episodes[0].graphId,
-          sourceNodeUuid: srcNode.uuid,
-          targetNodeUuid: tgtNode.uuid,
-          episodes: episodeUuids,
+          sourceNodeId: srcNode.id,
+          targetNodeId: tgtNode.id,
+          episodes: episodeIds,
           validAt: typeof rawValidAt === 'string' ? new Date(rawValidAt) : null,
           invalidAt: typeof rawInvalidAt === 'string' ? new Date(rawInvalidAt) : null,
         }),

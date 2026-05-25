@@ -58,7 +58,7 @@ import {
   SearchByTextParamsSchema,
 } from '../types';
 import {
-  buildDirectedUuidMap,
+  buildDirectedIdMap,
   LLM_CONCURRENCY_LIMIT,
   reassembleByOffsets,
   resolveEdgePointers,
@@ -115,66 +115,63 @@ export class EpisodeService {
   // on retrieval over an append-only graph, but the trade-offs only become
   // legible against a real graph with real query patterns - revisit once we
   // have one. Design notes: PLAN.md.
-  async deleteEpisode(uuid: Uuid): Promise<void> {
-    await this.deleteEpisodeImpl(uuid);
+  async deleteEpisode(id: Uuid): Promise<void> {
+    await this.deleteEpisodeImpl(id);
   }
 
   @Span('deleteEpisode', { onResult: metricsOnResult })
-  private async deleteEpisodeImpl(uuid: Uuid): Promise<{ metrics: SpanMetrics }> {
-    const episode = await this.episodicNodeRepository.getByUuid(uuid);
+  private async deleteEpisodeImpl(id: Uuid): Promise<{ metrics: SpanMetrics }> {
+    const episode = await this.episodicNodeRepository.getById(id);
     if (!episode) {
-      return { metrics: { 'episode.uuid': uuid, skipped: true } };
+      return { metrics: { 'episode.id': id, skipped: true } };
     }
 
     // Load entity nodes mentioned by this episode
-    const mentionedNodeUuids =
-      await this.episodicNodeRepository.getMentionedEntityUuids(uuid);
+    const mentionedNodeIds = await this.episodicNodeRepository.getMentionedEntityIds(id);
 
     // Delete entity nodes that are only mentioned by this episode
     await Promise.all(
-      mentionedNodeUuids.map((nodeUuid) =>
-        this.entityNodeRepository.deleteIfSoleMentioned(nodeUuid),
+      mentionedNodeIds.map((nodeId) =>
+        this.entityNodeRepository.deleteIfSoleMentioned(nodeId),
       ),
     );
 
     // Load and delete entity edges first created by this episode
-    const edgeUuids = await this.entityEdgeRepository.getUuidsForEpisodeDeletion(uuid);
-    if (edgeUuids.length > 0) {
-      await this.entityEdgeRepository.deleteByUuids(edgeUuids);
+    const edgeIds = await this.entityEdgeRepository.getIdsForEpisodeDeletion(id);
+    if (edgeIds.length > 0) {
+      await this.entityEdgeRepository.deleteByIds(edgeIds);
     }
 
     // Delete MENTIONS edges for this episode
-    await this.episodicEdgeRepository.deleteBySourceUuid(uuid);
+    await this.episodicEdgeRepository.deleteBySourceId(id);
 
     // Delete episode node
-    await this.episodicNodeRepository.delete(uuid);
+    await this.episodicNodeRepository.delete(id);
 
     return {
       metrics: {
-        'episode.uuid': uuid,
-        'nodes.mentioned': mentionedNodeUuids.length,
-        'edges.deleted': edgeUuids.length,
+        'episode.id': id,
+        'nodes.mentioned': mentionedNodeIds.length,
+        'edges.deleted': edgeIds.length,
       },
     };
   }
 
-  // TODO: For very large batches a bulk Cypher variant would be preferred over
-  // sequential per-episode deletion.
-  async deleteEpisodesByUuid(uuids: Uuid[]): Promise<void> {
-    await this.deleteEpisodesByUuidImpl(uuids);
+  // TODO: For very large batches a bulk variant would be preferred over
+  // sequential per-episode deletion. (graph consistency problem though)
+  async deleteEpisodesById(ids: Uuid[]): Promise<void> {
+    await this.deleteEpisodesByIdImpl(ids);
   }
 
-  @Span('deleteEpisodesByUuid', { onResult: metricsOnResult })
-  private async deleteEpisodesByUuidImpl(
-    uuids: Uuid[],
-  ): Promise<{ metrics: SpanMetrics }> {
-    await Promise.all(uuids.map((uuid) => this.deleteEpisode(uuid)));
-    return { metrics: { 'episodes.count': uuids.length } };
+  @Span('deleteEpisodesById', { onResult: metricsOnResult })
+  private async deleteEpisodesByIdImpl(ids: Uuid[]): Promise<{ metrics: SpanMetrics }> {
+    await Promise.all(ids.map((id) => this.deleteEpisode(id)));
+    return { metrics: { 'episodes.count': ids.length } };
   }
 
   async summarizeSaga(options: {
     userId: Uuid;
-    sagaUuid: Uuid;
+    sagaId: Uuid;
     graphId: Uuid;
   }): Promise<string> {
     const { summary } = await this.summarizeSagaImpl(options);
@@ -184,29 +181,29 @@ export class EpisodeService {
   @Span('summarizeSaga', { onResult: metricsOnResult })
   private async summarizeSagaImpl(options: {
     userId: Uuid;
-    sagaUuid: Uuid;
+    sagaId: Uuid;
     graphId: Uuid;
   }): Promise<{ summary: string; metrics: SpanMetrics }> {
-    const { userId, sagaUuid, graphId } = options;
+    const { userId, sagaId, graphId } = options;
     const ctx: LlmContext = {
       userId,
       sessionId: userId,
       tags: ['knowledge-graph', 'saga'],
-      metadata: { sagaUuid, graphId },
+      metadata: { sagaId, graphId },
     };
 
     const baseMetrics: SpanMetrics = {
       'user.id': ctx.userId,
       'session.id': ctx.sessionId ?? ctx.userId,
-      'saga.uuid': sagaUuid,
+      'saga.id': sagaId,
       'graph.id': graphId,
     };
 
     const model = await this.llmService.getActiveModel(userId);
 
-    const saga = await this.sagaNodeRepository.getByUuid(sagaUuid);
+    const saga = await this.sagaNodeRepository.getById(sagaId);
     if (!saga) {
-      throw new Error(`Saga not found: ${sagaUuid}`);
+      throw new Error(`Saga not found: ${sagaId}`);
     }
 
     const referenceTime = saga.lastSummarizedAt ?? new Date(0);
@@ -218,7 +215,7 @@ export class EpisodeService {
           referenceTime: new Date(),
           lastN: 100,
           graphIds: [graphId],
-          sagaUuid,
+          sagaId,
         }),
       )
     ).reverse();
@@ -321,7 +318,7 @@ export class EpisodeService {
       ),
     );
 
-    // 3. Create + save episodic nodes (apply uuid override if provided)
+    // 3. Create + save episodic nodes (apply id override if provided)
     const episodicNodes = episodes.map((raw) => {
       const node = createEpisodicNode({
         name: raw.name,
@@ -331,7 +328,7 @@ export class EpisodeService {
         graphId: raw.graphId,
         validAt: raw.referenceTime,
       });
-      return raw.uuid ? { ...node, uuid: raw.uuid } : node;
+      return raw.id ? { ...node, id: raw.id } : node;
     });
     await this.episodicNodeRepository.saveBulk(episodicNodes);
 
@@ -353,7 +350,7 @@ export class EpisodeService {
           customInstructions,
           excludedEntityTypes,
           useCombinedExtraction,
-          { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
+          { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
         );
         if (useCombinedExtraction) {
           (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill([]))[i] =
@@ -378,7 +375,7 @@ export class EpisodeService {
         this.collectNodeCandidates(nodes, episodicNodes[i].graphId),
       ),
     );
-    const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.uuid, n]));
+    const existingNodesMap = new Map(candidatesPerEpisode.flat().map((n) => [n.id, n]));
 
     // 7. Pass 1 - resolve nodes vs live graph in parallel
     const nodeResolutions = await withConcurrency(
@@ -394,7 +391,7 @@ export class EpisodeService {
             customInstructions,
             {
               ...ctx,
-              metadata: { ...ctx.metadata, episodeUuid: episodicNodes[i].uuid },
+              metadata: { ...ctx.metadata, episodeId: episodicNodes[i].id },
             },
           ),
       ),
@@ -402,7 +399,7 @@ export class EpisodeService {
 
     // 8. Merge duplicate pairs from pass 1
     const pass1Pairs: [Uuid, Uuid][] = nodeResolutions.flatMap((r) =>
-      r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedUuid, p.canonicalUuid]),
+      r.duplicatePairs.map((p): [Uuid, Uuid] => [p.extractedId, p.canonicalId]),
     );
 
     // 9. Pass 2 - within-batch dedup. The canonical pool is seeded with
@@ -413,11 +410,11 @@ export class EpisodeService {
     // `dedupe_nodes_bulk` (bulk_utils.py:414). New-vs-new keeps first-seen
     // as canonical.
     const allNewNodes = nodeResolutions.flatMap((r) => r.resolvedNodes);
-    const matchedExistingUuids = new Set(
-      nodeResolutions.flatMap((r) => r.duplicatePairs.map((p) => p.canonicalUuid)),
+    const matchedExistingIds = new Set(
+      nodeResolutions.flatMap((r) => r.duplicatePairs.map((p) => p.canonicalId)),
     );
-    const matchedExistingNodes = [...matchedExistingUuids]
-      .map((uuid) => existingNodesMap.get(uuid))
+    const matchedExistingNodes = [...matchedExistingIds]
+      .map((id) => existingNodesMap.get(id))
       .filter((n): n is NonNullable<typeof n> => n !== undefined);
 
     const isDuplicateNode = (a: EntityNode, b: EntityNode): boolean => {
@@ -434,36 +431,36 @@ export class EpisodeService {
     for (const newNode of allNewNodes) {
       const match = canonicalPool.find((c) => isDuplicateNode(newNode, c));
       if (match) {
-        pass2Pairs.push([newNode.uuid, match.uuid]);
+        pass2Pairs.push([newNode.id, match.id]);
       } else {
         canonicalPool.push(newNode);
       }
     }
 
-    const finalUuidMap = buildDirectedUuidMap([...pass1Pairs, ...pass2Pairs]);
+    const finalIdMap = buildDirectedIdMap([...pass1Pairs, ...pass2Pairs]);
 
     // 10. Determine canonical nodes per episode
     const canonicalNodesPerEpisode = nodeResolutions.map((resolution) => {
       const ownCanonical = resolution.resolvedNodes.filter(
-        (n) => (finalUuidMap.get(n.uuid) ?? n.uuid) === n.uuid,
+        (n) => (finalIdMap.get(n.id) ?? n.id) === n.id,
       );
       const matchedExisting = resolution.duplicatePairs
         .map((p) => {
-          const canonical = finalUuidMap.get(p.canonicalUuid) ?? p.canonicalUuid;
+          const canonical = finalIdMap.get(p.canonicalId) ?? p.canonicalId;
           return existingNodesMap.get(canonical);
         })
         .filter((n): n is NonNullable<typeof n> => n !== undefined);
 
       const seen = new Set<Uuid>();
       return [...ownCanonical, ...matchedExisting].filter((n) => {
-        if (seen.has(n.uuid)) return false;
-        seen.add(n.uuid);
+        if (seen.has(n.id)) return false;
+        seen.add(n.id);
         return true;
       });
     });
 
     // 11. Extract edges in parallel, then resolve pointers.
-    // Combined path: edges were already extracted in step 4; remap node UUIDs via finalUuidMap.
+    // Combined path: edges were already extracted in step 4; remap node IDs via finalIdMap.
     // Separate path: extract edges using the canonical nodes resolved above.
     const rawEdgesPerEpisode = preExtractedEdgesPerEpisode
       ? preExtractedEdgesPerEpisode
@@ -480,13 +477,13 @@ export class EpisodeService {
                 customInstructions,
                 edgeTypes,
                 effectiveEdgeTypeMappings,
-                { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
+                { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
               ),
           ),
         );
 
     const pointedEdgesPerEpisode = rawEdgesPerEpisode.map((edges) =>
-      resolveEdgePointers(edges, finalUuidMap),
+      resolveEdgePointers(edges, finalIdMap),
     );
 
     // 12. Embed all extracted edges (batch)
@@ -526,11 +523,11 @@ export class EpisodeService {
             ep,
             dedupedEdgesPerEpisode[i],
             edgeCandidatesPerEpisode[i],
-            finalUuidMap,
+            finalIdMap,
             ep.validAt,
             prevEpisodesPerEpisode[i],
             customInstructions,
-            { ...ctx, metadata: { ...ctx.metadata, episodeUuid: ep.uuid } },
+            { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
           ),
       ),
     );
@@ -544,9 +541,9 @@ export class EpisodeService {
 
     // 16. Build per-node and per-edge episode context for the helpers below
     const allCanonicalNodes = [
-      ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.uuid, n])).values(),
+      ...new Map(canonicalNodesPerEpisode.flat().map((n) => [n.id, n])).values(),
     ];
-    const newNodesOnly = allCanonicalNodes.filter((n) => !existingNodesMap.has(n.uuid));
+    const newNodesOnly = allCanonicalNodes.filter((n) => !existingNodesMap.has(n.id));
 
     const nodeContext = new Map<
       Uuid,
@@ -554,8 +551,8 @@ export class EpisodeService {
     >();
     canonicalNodesPerEpisode.forEach((nodes, i) => {
       for (const n of nodes) {
-        if (!nodeContext.has(n.uuid)) {
-          nodeContext.set(n.uuid, {
+        if (!nodeContext.has(n.id)) {
+          nodeContext.set(n.id, {
             episode: episodicNodes[i],
             previousEpisodes: prevEpisodesPerEpisode[i],
           });
@@ -566,7 +563,7 @@ export class EpisodeService {
     const edgeContext = new Map<Uuid, { referenceTime: Date }>();
     edgeResolutions.forEach((res, epIndex) => {
       for (const edge of res.resolvedEdges) {
-        edgeContext.set(edge.uuid, { referenceTime: episodicNodes[epIndex].validAt });
+        edgeContext.set(edge.id, { referenceTime: episodicNodes[epIndex].validAt });
       }
     });
 
@@ -612,10 +609,10 @@ export class EpisodeService {
     const renamedNodes = allCanonicalNodes.filter((n) => n.nameEmbedding === null);
     if (renamedNodes.length > 0) {
       const reembedded = await this.embeddingService.embedNodes(renamedNodes);
-      const byUuid = new Map(reembedded.map((n) => [n.uuid, n]));
+      const byId = new Map(reembedded.map((n) => [n.id, n]));
 
       for (let i = 0; i < allCanonicalNodes.length; i++) {
-        const fresh = byUuid.get(allCanonicalNodes[i].uuid);
+        const fresh = byId.get(allCanonicalNodes[i].id);
         if (fresh) allCanonicalNodes[i] = fresh;
       }
     }
@@ -624,8 +621,8 @@ export class EpisodeService {
     const episodicEdgesPerEpisode = episodicNodes.map((ep, i) =>
       canonicalNodesPerEpisode[i].map((node) =>
         createEpisodicEdge({
-          sourceNodeUuid: ep.uuid,
-          targetNodeUuid: node.uuid,
+          sourceNodeId: ep.id,
+          targetNodeId: node.id,
           graphId: ep.graphId,
         }),
       ),
@@ -651,23 +648,23 @@ export class EpisodeService {
     // chain is needed - saga walks ORDER BY valid_at via retrieveEpisodes.
     const sagaGroups = new Map<Uuid, number[]>();
     for (let i = 0; i < episodes.length; i++) {
-      const sagaUuid = episodes[i].sagaUuid;
-      if (!sagaUuid) continue;
-      sagaGroups.set(sagaUuid, [...(sagaGroups.get(sagaUuid) ?? []), i]);
+      const sagaId = episodes[i].sagaId;
+      if (!sagaId) continue;
+      sagaGroups.set(sagaId, [...(sagaGroups.get(sagaId) ?? []), i]);
     }
 
-    for (const [sagaUuid, indices] of sagaGroups) {
+    for (const [sagaId, indices] of sagaGroups) {
       const graphId = episodes[indices[0]].graphId;
 
-      // TODO: saga name defaults to the UUID string. Plan: accept an optional
+      // TODO: saga name defaults to the ID string. Plan: accept an optional
       // caller-provided name on AddEpisodeOptions, and otherwise let
       // summarizeSaga generate one alongside the summary (extend
       // sagaSummaryJsonSchema to return { name, summary }). Free naming pass
       // since summarizeSaga already runs an LLM call over saga episodes.
       await this.sagaNodeRepository.createIfNotExists(
         createSagaNode({
-          uuid: sagaUuid,
-          name: NodeNameSchema.parse(sagaUuid),
+          id: sagaId,
+          name: NodeNameSchema.parse(sagaId),
           graphId,
         }),
       );
@@ -676,8 +673,8 @@ export class EpisodeService {
         indices.map((i) =>
           this.hasEpisodeEdgeRepository.save(
             createHasEpisodeEdge({
-              sourceNodeUuid: sagaUuid,
-              targetNodeUuid: episodicNodes[i].uuid,
+              sourceNodeId: sagaId,
+              targetNodeId: episodicNodes[i].id,
               graphId: episodicNodes[i].graphId,
             }),
           ),
@@ -699,7 +696,7 @@ export class EpisodeService {
     // TODO: per-entry `nodes` includes both newly-resolved canonical nodes AND
     // existing nodes matched via cross-batch dedup. The same canonical EntityNode
     // may therefore appear in multiple entries' `nodes` arrays - callers must
-    // dedupe by uuid if they want a unique set across the batch
+    // dedupe by id if they want a unique set across the batch
     // (`result.flatMap(r => r.nodes)` will overcount). Consider returning a
     // separate top-level deduped `nodes` field if a unique-view is needed.
     const results = episodicNodes.map(
@@ -718,7 +715,7 @@ export class EpisodeService {
         'user.id': ctx.userId,
         'session.id': ctx.sessionId ?? ctx.userId,
         'episode.count': episodes.length,
-        'episode.uuids': episodicNodes.map((e) => e.uuid).join(','),
+        'episode.ids': episodicNodes.map((e) => e.id).join(','),
         'graph.ids': graphIds.join(','),
         'node.count.extracted': allExtractedNodes.length,
         'node.count.canonical': allCanonicalNodes.length,
@@ -786,7 +783,7 @@ export class EpisodeService {
     metrics: SpanMetrics;
   }> {
     const baseMetrics: SpanMetrics = {
-      'episode.uuid': episode.uuid,
+      'episode.id': episode.id,
       useCombinedExtraction: useCombinedExtraction,
     };
 
@@ -894,8 +891,8 @@ export class EpisodeService {
     );
     const seen = new Set<Uuid>();
     const candidates = results.flat().filter((n) => {
-      if (seen.has(n.uuid)) return false;
-      seen.add(n.uuid);
+      if (seen.has(n.id)) return false;
+      seen.add(n.id);
       return true;
     });
     return {
@@ -947,13 +944,13 @@ export class EpisodeService {
               }),
             )
           : Promise.resolve([] as EntityEdge[]),
-        this.entityEdgeRepository.getBetweenNodes(e.sourceNodeUuid, e.targetNodeUuid),
+        this.entityEdgeRepository.getBetweenNodes(e.sourceNodeId, e.targetNodeId),
       ]),
     );
     const seen = new Set<Uuid>();
     const candidates = results.flat().filter((e) => {
-      if (seen.has(e.uuid)) return false;
-      seen.add(e.uuid);
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
       return true;
     });
     return {
@@ -995,13 +992,13 @@ export class EpisodeService {
     >();
 
     for (const node of nodes) {
-      const nodeCtx = nodeContext.get(node.uuid);
+      const nodeCtx = nodeContext.get(node.id);
       if (!nodeCtx) continue;
-      const entry = nodesByEpisode.get(nodeCtx.episode.uuid);
+      const entry = nodesByEpisode.get(nodeCtx.episode.id);
       if (entry) {
         entry.nodes.push(node);
       } else {
-        nodesByEpisode.set(nodeCtx.episode.uuid, {
+        nodesByEpisode.set(nodeCtx.episode.id, {
           episode: nodeCtx.episode,
           previousEpisodes: nodeCtx.previousEpisodes,
           nodes: [node],
@@ -1016,11 +1013,11 @@ export class EpisodeService {
       nodes: groupNodes,
     } of nodesByEpisode.values()) {
       const summaryInput = groupNodes.map((n) => ({
-        uuid: n.uuid,
+        id: n.id,
         name: n.name,
         summary: n.summary,
         facts: allEdges
-          .filter((e) => e.sourceNodeUuid === n.uuid || e.targetNodeUuid === n.uuid)
+          .filter((e) => e.sourceNodeId === n.id || e.targetNodeId === n.id)
           .map((e) => e.fact),
       }));
 
@@ -1039,13 +1036,13 @@ export class EpisodeService {
             tags: ['knowledge-graph', 'node.summary'],
           });
         for (const s of summaryResult.summaries) {
-          summaryMap.set(s.uuid, s.summary);
+          summaryMap.set(s.id, s.summary);
         }
       }
     }
 
     for (const node of nodes) {
-      const summary = summaryMap.get(node.uuid);
+      const summary = summaryMap.get(node.id);
       if (summary !== undefined) node.summary = summary;
     }
 
@@ -1095,10 +1092,10 @@ export class EpisodeService {
       const label = node.labels.find((l) => l !== 'Entity');
       const entityType = label ? entityTypes[label] : undefined;
       if (!entityType) continue;
-      const nodeCtx = nodeContext.get(node.uuid);
+      const nodeCtx = nodeContext.get(node.id);
       if (!nodeCtx) continue;
       const nodeEdges = allEdges.filter(
-        (e) => e.sourceNodeUuid === node.uuid || e.targetNodeUuid === node.uuid,
+        (e) => e.sourceNodeId === node.id || e.targetNodeId === node.id,
       );
       const attrMessages = buildExtractEntityAttributesMessages({
         episodeContent: nodeCtx.episode.content,
@@ -1158,7 +1155,7 @@ export class EpisodeService {
     if (!edgeTypes || !edgeTypeMappings) {
       return { metrics: { ...baseMetrics, 'extracted.count': 0 } };
     }
-    const uuidToNode = new Map<Uuid, EntityNode>(canonicalNodes.map((n) => [n.uuid, n]));
+    const idToNode = new Map<Uuid, EntityNode>(canonicalNodes.map((n) => [n.id, n]));
 
     type EdgeAttrTask = {
       edge: EntityEdge;
@@ -1167,8 +1164,8 @@ export class EpisodeService {
     };
     const tasks: EdgeAttrTask[] = [];
     for (const edge of resolvedEdges) {
-      const src = uuidToNode.get(edge.sourceNodeUuid);
-      const tgt = uuidToNode.get(edge.targetNodeUuid);
+      const src = idToNode.get(edge.sourceNodeId);
+      const tgt = idToNode.get(edge.targetNodeId);
       if (!src || !tgt) continue;
       const applicable = getApplicableEdgeTypes(
         src.labels,
@@ -1182,7 +1179,7 @@ export class EpisodeService {
         properties?: Record<string, unknown>;
       };
       if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
-      const edgeCtx = edgeContext.get(edge.uuid);
+      const edgeCtx = edgeContext.get(edge.id);
       if (!edgeCtx) continue;
       tasks.push({ edge, jsonSchema, referenceTime: edgeCtx.referenceTime });
     }

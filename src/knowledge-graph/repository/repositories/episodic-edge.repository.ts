@@ -12,21 +12,21 @@ export class EpisodicEdgeRepository {
   @Span()
   async save(edge: EpisodicEdge): Promise<string> {
     await this.prisma.episodicEdge.upsert({
-      where: { id: edge.uuid },
+      where: { id: edge.id },
       create: {
-        id: edge.uuid,
+        id: edge.id,
         graphId: edge.graphId,
-        episodicId: edge.sourceNodeUuid,
-        entityId: edge.targetNodeUuid,
+        episodicId: edge.sourceNodeId,
+        entityId: edge.targetNodeId,
         createdAt: edge.createdAt,
       },
       update: {
         graphId: edge.graphId,
-        episodicId: edge.sourceNodeUuid,
-        entityId: edge.targetNodeUuid,
+        episodicId: edge.sourceNodeId,
+        entityId: edge.targetNodeId,
       },
     });
-    return edge.uuid;
+    return edge.id;
   }
 
   @Span()
@@ -36,7 +36,7 @@ export class EpisodicEdgeRepository {
   }
 
   @Span()
-  async deleteBySourceUuid(episodeUuid: Uuid): Promise<void> {
-    await this.prisma.episodicEdge.deleteMany({ where: { episodicId: episodeUuid } });
+  async deleteBySourceId(episodeId: Uuid): Promise<void> {
+    await this.prisma.episodicEdge.deleteMany({ where: { episodicId: episodeId } });
   }
 }

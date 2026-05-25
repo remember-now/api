@@ -16,9 +16,9 @@ export class SagaNodeRepository {
   @Span()
   async save(node: SagaNode): Promise<string> {
     await this.prisma.sagaNode.upsert({
-      where: { id: node.uuid },
+      where: { id: node.id },
       create: {
-        id: node.uuid,
+        id: node.id,
         graphId: node.graphId,
         name: node.name,
         labels: node.labels,
@@ -34,14 +34,14 @@ export class SagaNodeRepository {
         lastSummarizedAt: node.lastSummarizedAt,
       },
     });
-    return node.uuid;
+    return node.id;
   }
 
   @Span()
   async createIfNotExists(node: SagaNode): Promise<void> {
     await this.prisma.sagaNode.createMany({
       data: {
-        id: node.uuid,
+        id: node.id,
         graphId: node.graphId,
         name: node.name,
         labels: node.labels,
@@ -54,14 +54,14 @@ export class SagaNodeRepository {
   }
 
   @Span()
-  async getByUuid(uuid: Uuid): Promise<SagaNode | null> {
-    const row = await this.prisma.sagaNode.findUnique({ where: { id: uuid } });
+  async getById(id: Uuid): Promise<SagaNode | null> {
+    const row = await this.prisma.sagaNode.findUnique({ where: { id: id } });
     return row ? this.mapRow(row) : null;
   }
 
   private mapRow(row: PrismaSagaNode): SagaNode {
     return {
-      uuid: row.id as Uuid,
+      id: row.id as Uuid,
       graphId: row.graphId as Uuid,
       name: row.name as NodeName,
       labels: (row.labels ?? []) as NodeLabels,

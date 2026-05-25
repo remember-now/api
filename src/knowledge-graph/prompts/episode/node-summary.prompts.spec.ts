@@ -10,13 +10,13 @@ const baseEpisode = KgNodeFactory.createEpisodicNode({
 
 const baseNodes = [
   {
-    uuid: 'uuid-alice',
+    id: 'id-alice',
     name: 'Alice',
     summary: '',
     facts: ['Alice manages the engineering team'],
   },
   {
-    uuid: 'uuid-acme',
+    id: 'id-acme',
     name: 'Acme Corp',
     summary: 'A company',
     facts: [],
@@ -45,16 +45,16 @@ describe('buildNodeSummaryMessages', () => {
     expect(human?.content).toContain(baseEpisode.content);
   });
 
-  it('should include entity uuid and name in human message', () => {
+  it('should include entity id and name in human message', () => {
     const messages = buildNodeSummaryMessages({
       episode: baseEpisode,
       previousEpisodes: [],
       nodes: baseNodes,
     });
     const human = messages.find((m) => m.getType() === 'human');
-    expect(human?.content).toContain('uuid-alice');
+    expect(human?.content).toContain('id-alice');
     expect(human?.content).toContain('"Alice"');
-    expect(human?.content).toContain('uuid-acme');
+    expect(human?.content).toContain('id-acme');
     expect(human?.content).toContain('"Acme Corp"');
   });
 

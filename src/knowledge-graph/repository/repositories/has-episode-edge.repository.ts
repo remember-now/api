@@ -11,20 +11,20 @@ export class HasEpisodeEdgeRepository {
   @Span()
   async save(edge: HasEpisodeEdge): Promise<string> {
     await this.prisma.hasEpisodeEdge.upsert({
-      where: { id: edge.uuid },
+      where: { id: edge.id },
       create: {
-        id: edge.uuid,
+        id: edge.id,
         graphId: edge.graphId,
-        sagaId: edge.sourceNodeUuid,
-        episodicId: edge.targetNodeUuid,
+        sagaId: edge.sourceNodeId,
+        episodicId: edge.targetNodeId,
         createdAt: edge.createdAt,
       },
       update: {
         graphId: edge.graphId,
-        sagaId: edge.sourceNodeUuid,
-        episodicId: edge.targetNodeUuid,
+        sagaId: edge.sourceNodeId,
+        episodicId: edge.targetNodeId,
       },
     });
-    return edge.uuid;
+    return edge.id;
   }
 }
