@@ -84,7 +84,7 @@ describe('NodeResolutionService', () => {
     existing[0].id = u('cosine-id');
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_name: 'Alice J.' }],
+      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_candidate_id: 0 }],
     });
 
     const result = await service.resolveNodes(
@@ -105,7 +105,7 @@ describe('NodeResolutionService', () => {
     existing[0].id = u('cosine-id');
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_name: '' }],
+      entity_resolutions: [{ id: 0, name: 'Alice Johnson', duplicate_candidate_id: -1 }],
     });
 
     const result = await service.resolveNodes(
@@ -134,7 +134,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_candidate_id: 0 }],
     });
 
     const result = await service.resolveNodes(
@@ -162,7 +162,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_candidate_id: 0 }],
     });
 
     const result = await service.resolveNodes(
@@ -193,7 +193,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: '' }],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_candidate_id: -1 }],
     });
 
     const result = await service.resolveNodes(
@@ -224,7 +224,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: 'Alice Smith' }],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_candidate_id: 0 }],
     });
 
     const result = await service.resolveNodes(
@@ -251,7 +251,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_name: '' }],
+      entity_resolutions: [{ id: 0, name: 'Alice', duplicate_candidate_id: -1 }],
     });
 
     const result = await service.resolveNodes(
@@ -275,7 +275,7 @@ describe('NodeResolutionService', () => {
     ];
 
     mockRunnable.invoke.mockResolvedValue({
-      entity_resolutions: [{ id: 0, name: 'bob', duplicate_name: 'Bobby' }],
+      entity_resolutions: [{ id: 0, name: 'bob', duplicate_candidate_id: 0 }],
     });
 
     const result = await service.resolveNodes(

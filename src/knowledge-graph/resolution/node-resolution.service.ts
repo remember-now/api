@@ -125,18 +125,24 @@ export class NodeResolutionService {
 
       const idxToEntityId = new Map(llmExtractedWithIdx.map((e) => [e.id, e.entityId]));
 
-      // Collect unique candidate nodes across all batches
+      // Collect unique candidate nodes across all batches, assigning a stable
+      // integer candidate_id so the LLM can reference them unambiguously.
+      // String-name references are hallucination-prone; integer ids cannot be
+      // invented (the LLM either picks one we sent or -1 for "no match").
       const candidateSet = new Map<Uuid, EntityNode>();
       for (const candidates of llmCandidates.values()) {
         for (const c of candidates) {
           candidateSet.set(c.id, c);
         }
       }
-      const allCandidates = Array.from(candidateSet.values()).map((n) => ({
+      const candidatesList = Array.from(candidateSet.values());
+      const candidateIdToEntity = new Map<number, EntityNode>(
+        candidatesList.map((n, idx) => [idx, n]),
+      );
+      const allCandidates = candidatesList.map((n, idx) => ({
+        candidateId: idx,
         name: n.name,
       }));
-
-      const existingByName = new Map(existingNodes.map((n) => [n.name, n]));
 
       const messages = buildDedupeNodesMessages({
         episode,
@@ -163,8 +169,8 @@ export class NodeResolutionService {
         const extractedId = idxToEntityId.get(resolution.id);
         if (!extractedId) continue;
 
-        if (resolution.duplicate_name && resolution.duplicate_name !== '') {
-          const canonical = existingByName.get(resolution.duplicate_name);
+        if (resolution.duplicate_candidate_id >= 0) {
+          const canonical = candidateIdToEntity.get(resolution.duplicate_candidate_id);
           if (canonical) {
             idMap.set(extractedId, canonical.id);
             duplicatePairs.push({

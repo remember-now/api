@@ -17,7 +17,7 @@ export const ExtractedEdgeSchema = z.object({
   source: z.string(),
   target: z.string(),
   name: RelationshipTypeSchema,
-  description: z.string(),
+  fact: z.string(),
   validAt: z.string().nullable().optional(),
   invalidAt: z.string().nullable().optional(),
   episodeIndices: z.array(z.number()).optional(),

@@ -89,7 +89,7 @@ export class EdgeExtractionService {
         const targetNode = nameToNode.get(e.target.toLowerCase())!;
         return createEntityEdge({
           name: e.name,
-          fact: e.description,
+          fact: e.fact,
           graphId: episode.graphId,
           sourceNodeId: sourceNode.id,
           targetNodeId: targetNode.id,

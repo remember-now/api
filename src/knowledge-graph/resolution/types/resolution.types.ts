@@ -10,7 +10,7 @@ import { NodeNameSchema } from '../../types';
 export const NodeResolutionSchema = z.object({
   id: z.number(),
   name: NodeNameSchema,
-  duplicate_name: NodeNameSchema,
+  duplicate_candidate_id: z.number().int(),
 });
 
 export const NodeResolutionsSchema = z.object({

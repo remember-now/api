@@ -45,7 +45,7 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
       ],
     });
@@ -73,7 +73,7 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
           validAt: '2024-01-01T00:00:00.000Z',
           invalidAt: '2024-06-01T00:00:00.000Z',
         },
@@ -99,7 +99,7 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
       ],
     });
@@ -123,13 +123,13 @@ describe('EdgeExtractionService', () => {
           source: 'Unknown Person',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Someone works at Acme.',
+          fact: 'Someone works at Acme.',
         },
         {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
       ],
     });
@@ -153,13 +153,13 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Unknown Corp',
           name: 'WORKS_AT',
-          description: 'Alice works somewhere.',
+          fact: 'Alice works somewhere.',
         },
         {
           source: 'Bob',
           target: 'Acme Corp',
           name: 'CEO_OF',
-          description: 'Bob is the CEO of Acme Corp.',
+          fact: 'Bob is the CEO of Acme Corp.',
         },
       ],
     });
@@ -184,7 +184,7 @@ describe('EdgeExtractionService', () => {
           source: 'alice',
           target: 'acme corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
       ],
     });
@@ -209,7 +209,7 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
       ],
     });
@@ -246,13 +246,13 @@ describe('EdgeExtractionService', () => {
           source: 'Alice',
           target: 'Acme Corp',
           name: 'WORKS_AT',
-          description: 'Alice works at Acme Corp.',
+          fact: 'Alice works at Acme Corp.',
         },
         {
           source: 'Bob',
           target: 'Acme Corp',
           name: 'CEO_OF',
-          description: 'Bob is CEO of Acme Corp.',
+          fact: 'Bob is CEO of Acme Corp.',
         },
       ],
     });

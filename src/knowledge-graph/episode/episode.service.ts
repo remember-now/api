@@ -230,6 +230,7 @@ export class EpisodeService {
     }
 
     const messages = buildSummarizeSagaMessages({
+      sagaName: saga.name,
       existingSummary: saga.summary,
       newEpisodes: unsummarized,
     });

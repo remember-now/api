@@ -10,21 +10,30 @@ const SYSTEM_PROMPT = `You are an expert at extracting relationships between ent
 Your task is to identify meaningful relationships between the provided entities and express them as edges in a knowledge graph.
 
 Rules:
-- Only use entity names from the provided entities list
+- Only use entity names from the provided entities list — the "source" and "target" fields must match the entity name exactly (a source/target not in the list causes the edge to be rejected)
 - Extract one fact per edge — a complete sentence describing the relationship
 - Only extract relationships clearly supported by the episode content
 - Do not infer or hallucinate relationships not present in the text
 - Skip semantically redundant facts already captured by other edges in this batch
 - Self-referencing facts (source entity = target entity) are allowed when clearly justified, but two-entity facts are preferred
-- Resolve temporal expressions ("last year", "recently") against REFERENCE_TIME; use precise ISO 8601 datetimes
+- Resolve temporal expressions ("last year", "recently") against REFERENCE_TIME
+
+DETAIL PRESERVATION:
+- The "fact" MUST preserve every specific detail from the source text: proper nouns, brand names, product names, model numbers, quantities, counts, colours, materials, physical descriptors, named locations, and named activities
+- NEVER generalise: "Gamecube" → "gaming console", "Ford Mustang" → "car", "wool coat" → "coat", "red and purple lighting" → "lighting", "cracked windshield" → "car damage", "three screenplays" → "several screenplays"
+- Paraphrase sentence structure but every concrete noun, number, and descriptor in the source must survive into the fact
 
 RELATION TYPE RULES:
 - If FACT_TYPES are provided and the relationship matches one of the types (considering the entity type signature), use that fact_type_name as the relation type
 - Otherwise, derive a relation type in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, MARRIED_TO, FOUNDED_BY)
 
 DATETIME RULES:
-- validAt: the ISO 8601 datetime when the fact became true; set to the reference time if the fact appears ongoing; leave null if no temporal information is present
-- invalidAt: the ISO 8601 datetime when the fact stopped being true; set only when a change or termination is explicitly expressed; leave null otherwise
+- Use ISO 8601 with a "Z" suffix (UTC), e.g. 2025-04-30T00:00:00Z
+- If only a date is mentioned (no time), assume 00:00:00
+- If only a year is mentioned, use January 1st at 00:00:00
+- validAt: when the fact became true; if the fact appears ongoing, set to REFERENCE_TIME; null if no temporal information is present
+- invalidAt: when the fact stopped being true; set only when a change or termination is explicitly expressed; null otherwise
+- Never hallucinate or infer dates from unrelated events
 
 EPISODE INDICES:
 - If multiple episodes are provided (indexed 0, 1, 2, …), populate episodeIndices with the 0-based indices of the episodes that directly support each fact`;

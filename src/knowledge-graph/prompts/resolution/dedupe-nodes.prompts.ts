@@ -12,24 +12,28 @@ Rules:
 - Two entities are duplicates only if they refer to the same real-world entity
 - Never merge merely-similar or related but distinct entities
 - Every extracted entity must appear in entity_resolutions exactly once
-- For each entity, return its integer id, the best canonical name, and the name of the matching existing entity (duplicate_name) or an empty string if it is not a duplicate
-- Only use names from the provided existing candidate list for duplicate_name`;
+- For each entity, return: its integer id, the best canonical name, and duplicate_candidate_id — the integer candidate_id of the matching EXISTING CANDIDATE ENTITY, or -1 when it is not a duplicate
+- duplicate_candidate_id must reference a candidate_id from the EXISTING CANDIDATE ENTITIES list — never invent ids`;
 
 function formatExtractedEntities(entities: Array<{ id: number; name: string }>): string {
   if (entities.length === 0) return 'None';
   return entities.map((e) => `- id: ${e.id}, name: "${e.name}"`).join('\n');
 }
 
-function formatCandidateEntities(entities: Array<{ name: string }>): string {
+function formatCandidateEntities(
+  entities: Array<{ candidateId: number; name: string }>,
+): string {
   if (entities.length === 0) return 'None';
-  return entities.map((e) => `- name: "${e.name}"`).join('\n');
+  return entities
+    .map((e) => `- candidate_id: ${e.candidateId}, name: "${e.name}"`)
+    .join('\n');
 }
 
 export function buildDedupeNodesMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   extractedNodes: Array<{ id: number; name: string }>;
-  candidateNodes: Array<{ name: string }>;
+  candidateNodes: Array<{ candidateId: number; name: string }>;
   customInstructions?: string;
 }): BaseMessage[] {
   const {

@@ -35,10 +35,11 @@ BAD example:
 "Alice mentioned that she works at Acme Corp. She talked about learning Spanish and noted that her dog's name is Max."`;
 
 export function buildSummarizeSagaMessages(ctx: {
+  sagaName: string;
   existingSummary: string;
   newEpisodes: EpisodicNode[];
 }): BaseMessage[] {
-  const { existingSummary, newEpisodes } = ctx;
+  const { sagaName, existingSummary, newEpisodes } = ctx;
 
   const episodesText = newEpisodes
     .map((ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`)
@@ -48,7 +49,10 @@ export function buildSummarizeSagaMessages(ctx: {
     ? truncateAtSentence(existingSummary, MAX_SUMMARY_CHARS)
     : 'None';
 
-  const humanContent = `EXISTING SUMMARY:\n${existingText}\n\nNEW EPISODES:\n${episodesText}`;
+  const humanContent =
+    `SAGA: ${sagaName}\n\n` +
+    `Produce a factual knowledge brief for the saga above using EXISTING SUMMARY plus NEW EPISODES.\n\n` +
+    `EXISTING SUMMARY:\n${existingText}\n\nNEW EPISODES:\n${episodesText}`;
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
 }
