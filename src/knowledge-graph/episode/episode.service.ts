@@ -34,6 +34,7 @@ import {
   buildExtractEntityAttributesMessages,
   buildNodeSummaryMessages,
   buildSummarizeSagaMessages,
+  nodeSummaryJsonSchema,
   sagaSummaryJsonSchema,
 } from '../prompts';
 import {
@@ -76,7 +77,6 @@ import {
   EdgeTypeMappings,
   EntityTypeMap,
   MAX_NODES_PER_SUMMARY_BATCH,
-  nodeSummaryJsonSchema,
   PREVIOUS_EPISODES_WINDOW,
 } from './types';
 
@@ -1106,7 +1106,7 @@ export class EpisodeService {
         existingAttributes: node.attributes ?? {},
       });
       const attrs = (await model
-        .withStructuredOutput(z.toJSONSchema(entityType.schema))
+        .withStructuredOutput(z.toJSONSchema(entityType.schema, { io: 'input' }))
         .invoke(attrMessages, {
           callbacks: this.llmTracer.getCallbacks(ctx),
           runName: 'extract-entity-attributes',
@@ -1176,7 +1176,7 @@ export class EpisodeService {
       );
       const typeDef = applicable[edge.name];
       if (!typeDef) continue;
-      const jsonSchema = z.toJSONSchema(typeDef.schema) as {
+      const jsonSchema = z.toJSONSchema(typeDef.schema, { io: 'input' }) as {
         properties?: Record<string, unknown>;
       };
       if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;

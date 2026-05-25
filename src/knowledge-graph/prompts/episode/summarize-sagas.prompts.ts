@@ -8,12 +8,14 @@ import { MAX_SUMMARY_CHARS, truncateAtSentence } from '../text-utils';
 // Schema
 
 export const SagaSummarySchema = z.object({
-  summary: z.string(),
+  summary: z
+    .string()
+    .describe(`Factual knowledge brief. Under ${MAX_SUMMARY_CHARS} characters.`),
 });
 
 export type SagaSummary = z.infer<typeof SagaSummarySchema>;
 
-export const sagaSummaryJsonSchema = z.toJSONSchema(SagaSummarySchema);
+export const sagaSummaryJsonSchema = z.toJSONSchema(SagaSummarySchema, { io: 'input' });
 
 // Prompt builder
 

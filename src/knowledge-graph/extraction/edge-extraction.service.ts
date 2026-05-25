@@ -12,8 +12,7 @@ import {
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import { buildExtractEdgesMessages } from '../prompts';
-import { extractedEdgesJsonSchema } from './types';
+import { buildExtractEdgesMessages, extractedEdgesJsonSchema } from '../prompts';
 
 @Injectable()
 export class EdgeExtractionService {
@@ -80,15 +79,15 @@ export class EdgeExtractionService {
 
     const edges = result.edges
       .filter((e) => {
-        const hasSource = nameToNode.has(e.source.toLowerCase());
-        const hasTarget = nameToNode.has(e.target.toLowerCase());
+        const hasSource = nameToNode.has(e.sourceEntityName.toLowerCase());
+        const hasTarget = nameToNode.has(e.targetEntityName.toLowerCase());
         return hasSource && hasTarget;
       })
       .map((e) => {
-        const sourceNode = nameToNode.get(e.source.toLowerCase())!;
-        const targetNode = nameToNode.get(e.target.toLowerCase())!;
+        const sourceNode = nameToNode.get(e.sourceEntityName.toLowerCase())!;
+        const targetNode = nameToNode.get(e.targetEntityName.toLowerCase())!;
         return createEntityEdge({
-          name: e.name,
+          name: e.relationType,
           fact: e.fact,
           graphId: episode.graphId,
           sourceNodeId: sourceNode.id,

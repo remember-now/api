@@ -12,9 +12,8 @@ import {
 
 import { EntityTypeMap } from '../episode/types';
 import { createEntityNode, EntityNode, EpisodicNode } from '../models';
-import { buildExtractNodesMessages } from '../prompts';
+import { buildExtractNodesMessages, extractedEntitiesJsonSchema } from '../prompts';
 import { NodeLabel, NodeLabels, NodeLabelSchema } from '../types';
-import { extractedEntitiesJsonSchema } from './types';
 
 function resolveLabels(
   entityTypeId: number | undefined,

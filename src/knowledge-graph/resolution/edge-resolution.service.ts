@@ -17,7 +17,7 @@ import {
   withConcurrency,
 } from '../episode/batch-utils';
 import { EntityEdge, EpisodicNode } from '../models';
-import { buildDedupeEdgesMessages } from '../prompts';
+import { buildDedupeEdgesMessages, edgeDedupeJsonSchema } from '../prompts';
 import { EntityEdgeRepository } from '../repository/repositories';
 import { SearchByTextParamsSchema } from '../types';
 import {
@@ -27,7 +27,7 @@ import {
   MAX_KEYWORD_CANDIDATES,
   normalizeString,
 } from './resolution-utils';
-import { edgeDedupeJsonSchema, EdgeResolutionResult } from './types';
+import { EdgeResolutionResult } from './types';
 
 @Injectable()
 export class EdgeResolutionService {

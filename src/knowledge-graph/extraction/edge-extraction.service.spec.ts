@@ -42,9 +42,9 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
       ],
@@ -70,9 +70,9 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
           validAt: '2024-01-01T00:00:00.000Z',
           invalidAt: '2024-06-01T00:00:00.000Z',
@@ -96,9 +96,9 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
       ],
@@ -120,15 +120,15 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Unknown Person',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Unknown Person',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Someone works at Acme.',
         },
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
       ],
@@ -150,15 +150,15 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Unknown Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Unknown Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works somewhere.',
         },
         {
-          source: 'Bob',
-          target: 'Acme Corp',
-          name: 'CEO_OF',
+          sourceEntityName: 'Bob',
+          targetEntityName: 'Acme Corp',
+          relationType: 'CEO_OF',
           fact: 'Bob is the CEO of Acme Corp.',
         },
       ],
@@ -181,9 +181,9 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'alice',
-          target: 'acme corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'alice',
+          targetEntityName: 'acme corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
       ],
@@ -206,9 +206,9 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
       ],
@@ -243,15 +243,15 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          source: 'Alice',
-          target: 'Acme Corp',
-          name: 'WORKS_AT',
+          sourceEntityName: 'Alice',
+          targetEntityName: 'Acme Corp',
+          relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
         {
-          source: 'Bob',
-          target: 'Acme Corp',
-          name: 'CEO_OF',
+          sourceEntityName: 'Bob',
+          targetEntityName: 'Acme Corp',
+          relationType: 'CEO_OF',
           fact: 'Bob is CEO of Acme Corp.',
         },
       ],

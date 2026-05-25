@@ -1,8 +1,30 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
 
 import { EpisodicNode } from '@/knowledge-graph/models';
 
 import { formatPreviousEpisodes } from '../text-utils';
+
+// Schema
+
+export const EdgeDedupeSchema = z.object({
+  duplicate_facts: z
+    .array(z.number())
+    .describe(
+      'List of idx values of duplicate facts (only from EXISTING FACTS or REVERSED-DIRECTION FACTS range). Empty list if none.',
+    ),
+  contradicted_facts: z
+    .array(z.number())
+    .describe(
+      'List of idx values of contradicted facts (from full idx range). Empty list if none.',
+    ),
+});
+
+export type EdgeDedupe = z.infer<typeof EdgeDedupeSchema>;
+
+export const edgeDedupeJsonSchema = z.toJSONSchema(EdgeDedupeSchema, { io: 'input' });
+
+// Prompt builder
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph edge deduplication system.
 

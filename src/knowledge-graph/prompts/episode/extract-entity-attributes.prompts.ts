@@ -1,5 +1,9 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
+// Response schema is dynamic per call: the caller derives it from the matched
+// EntityTypeMap entry's `schema` field at invocation time (see
+// EpisodeService.extractEntityAttributesImpl), so no static schema is bound here.
+
 const SYSTEM_PROMPT = `You are a helpful assistant that extracts entity properties from the provided text.
 
 Extract only properties that are clearly mentioned in the text. Do not infer or hallucinate properties not present.`;

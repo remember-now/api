@@ -22,9 +22,9 @@ import {
   buildExtractNodesAndEdgesMessages,
   buildExtractTimestampsBatchMessages,
   combinedExtractionJsonSchema,
+  timestampsBatchJsonSchema,
 } from '../prompts';
 import { NodeLabel, NodeLabels, NodeLabelSchema } from '../types';
-import { timestampsBatchJsonSchema } from './types';
 
 type CombinedExtractionResult = {
   nodes: EntityNode[];

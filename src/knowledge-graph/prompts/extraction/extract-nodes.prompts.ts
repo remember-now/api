@@ -1,9 +1,37 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
 
 import { EntityTypeMap } from '@/knowledge-graph/episode/types';
 import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
+import { NodeNameSchema } from '@/knowledge-graph/types';
 
 import { formatPreviousEpisodes } from '../text-utils';
+
+// Schemas
+
+export const ExtractedEntitySchema = z.object({
+  name: NodeNameSchema.describe('Name of the extracted entity'),
+  entityTypeId: z
+    .number()
+    .optional()
+    .describe(
+      'ID of the classified entity type. Must be one of the provided entity_type_id integers. Omit when no provided type fits.',
+    ),
+});
+
+export const ExtractedEntitiesSchema = z.object({
+  extractedEntities: z
+    .array(ExtractedEntitySchema)
+    .describe('List of extracted entities'),
+});
+
+export type ExtractedEntities = z.infer<typeof ExtractedEntitiesSchema>;
+
+export const extractedEntitiesJsonSchema = z.toJSONSchema(ExtractedEntitiesSchema, {
+  io: 'input',
+});
+
+// Prompt builders
 
 // TODO: the "bare head noun" / "bare animal noun" exclusions reject kinds
 // even when they are the subject of a declarative claim about the kind itself

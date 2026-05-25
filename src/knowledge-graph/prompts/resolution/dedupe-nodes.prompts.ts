@@ -1,8 +1,37 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
 
 import { EpisodicNode } from '@/knowledge-graph/models';
+import { NodeNameSchema } from '@/knowledge-graph/types';
 
 import { formatPreviousEpisodes } from '../text-utils';
+
+// Schemas
+
+export const NodeResolutionSchema = z.object({
+  id: z.number().describe('integer id of the entity'),
+  name: NodeNameSchema.describe(
+    'Name of the entity. Should be the most complete and descriptive name of the entity. Do not include any JSON formatting in the Entity name such as {}.',
+  ),
+  duplicate_candidate_id: z
+    .number()
+    .int()
+    .describe(
+      'candidate_id of the matching EXISTING CANDIDATE ENTITY, or -1 if no duplicate exists.',
+    ),
+});
+
+export const NodeResolutionsSchema = z.object({
+  entity_resolutions: z.array(NodeResolutionSchema).describe('List of resolved nodes'),
+});
+
+export type NodeResolutions = z.infer<typeof NodeResolutionsSchema>;
+
+export const nodeResolutionsJsonSchema = z.toJSONSchema(NodeResolutionsSchema, {
+  io: 'input',
+});
+
+// Prompt builder
 
 const SYSTEM_PROMPT = `You are an expert knowledge graph deduplication system.
 

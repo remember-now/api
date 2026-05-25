@@ -10,30 +10,64 @@ import { concatenateEpisodes } from '../text-utils';
 // Schemas
 
 export const CombinedEntitySchema = z.object({
-  name: NodeNameSchema,
-  entityTypeId: z.number().optional(),
+  name: NodeNameSchema.describe('Name of the extracted entity'),
+  entityTypeId: z
+    .number()
+    .optional()
+    .describe(
+      'ID of the classified entity type. Must be one of the provided entity_type_id integers. Omit when no provided type fits.',
+    ),
 });
 
 export const CombinedFactSchema = z.object({
-  sourceEntityName: NodeNameSchema,
-  targetEntityName: NodeNameSchema,
-  relationType: RelationshipTypeSchema,
-  fact: z.string(),
-  validAt: z.string().nullable().optional(),
-  invalidAt: z.string().nullable().optional(),
-  episodeIndices: z.array(z.number()),
+  sourceEntityName: NodeNameSchema.describe(
+    'The name of the source entity from the extracted entities list',
+  ),
+  targetEntityName: NodeNameSchema.describe(
+    'The name of the target entity from the extracted entities list',
+  ),
+  relationType: RelationshipTypeSchema.describe(
+    'The type of relationship between the entities, in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH)',
+  ),
+  fact: z
+    .string()
+    .describe(
+      'A self-contained natural language description of the relationship, paraphrased from the source text with all specific details preserved',
+    ),
+  validAt: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'When the relationship became true. ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z). Set to reference time if ongoing; null if unknown.',
+    ),
+  invalidAt: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'When the relationship stopped being true. ISO 8601 with Z suffix. Set only when explicitly expressed; null otherwise.',
+    ),
+  episodeIndices: z
+    .array(z.number())
+    .default([0])
+    .describe(
+      'List of episode numbers (0-indexed) that this fact was derived from. When processing a single episode, this should be [0].',
+    ),
 });
 
 export const CombinedExtractionSchema = z.object({
-  entities: z.array(CombinedEntitySchema),
-  facts: z.array(CombinedFactSchema),
+  entities: z.array(CombinedEntitySchema).describe('List of extracted entities'),
+  facts: z.array(CombinedFactSchema).describe('List of extracted relationship facts'),
 });
 
 export type CombinedEntity = z.infer<typeof CombinedEntitySchema>;
 export type CombinedFact = z.infer<typeof CombinedFactSchema>;
 export type CombinedExtraction = z.infer<typeof CombinedExtractionSchema>;
 
-export const combinedExtractionJsonSchema = z.toJSONSchema(CombinedExtractionSchema);
+export const combinedExtractionJsonSchema = z.toJSONSchema(CombinedExtractionSchema, {
+  io: 'input',
+});
 
 // Prompt builder
 

@@ -36,15 +36,6 @@ export const EpisodeSchema = z
   })
   .brand<'Episode'>();
 
-export const NodeSummarySchema = z.object({
-  summaries: z.array(
-    z.object({
-      id: UuidSchema,
-      summary: z.string(),
-    }),
-  ),
-});
-
 export const EntityTypeMapSchema = z.record(
   NodeLabelSchema,
   z.object({
@@ -87,7 +78,6 @@ export const AddEpisodeResultSchema = z.object({
 
 // Types
 
-export type NodeSummary = z.infer<typeof NodeSummarySchema>;
 export type EntityTypeMap = z.infer<typeof EntityTypeMapSchema>;
 export type EdgeTypeMap = z.infer<typeof EdgeTypeMapSchema>;
 export type EdgeTypeMappings = z.infer<typeof EdgeTypeMappingsSchema>;
@@ -96,7 +86,3 @@ export type Episode = z.infer<typeof EpisodeSchema>;
 export type AddEpisodeOptionsInput = z.input<typeof AddEpisodeOptionsSchema>;
 export type AddEpisodeOptions = z.infer<typeof AddEpisodeOptionsSchema>;
 export type AddEpisodeResult = z.infer<typeof AddEpisodeResultSchema>;
-
-// JSON Schemas
-
-export const nodeSummaryJsonSchema = z.toJSONSchema(NodeSummarySchema);

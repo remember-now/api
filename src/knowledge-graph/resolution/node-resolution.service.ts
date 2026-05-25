@@ -12,7 +12,7 @@ import {
 } from '@/observability';
 
 import { EntityNode, EpisodicNode } from '../models';
-import { buildDedupeNodesMessages } from '../prompts';
+import { buildDedupeNodesMessages, nodeResolutionsJsonSchema } from '../prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
@@ -22,7 +22,7 @@ import {
   normalizeString,
   shannonEntropy,
 } from './resolution-utils';
-import { NodeResolutionResult, nodeResolutionsJsonSchema } from './types';
+import { NodeResolutionResult } from './types';
 
 @Injectable()
 export class NodeResolutionService {
