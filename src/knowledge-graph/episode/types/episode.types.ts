@@ -36,18 +36,24 @@ export const EpisodeSchema = z
   })
   .brand<'Episode'>();
 
+const AttributeSchema = z
+  .instanceof(z.ZodType)
+  .refine((s) => s instanceof z.ZodObject && Object.keys(s.shape).length > 0, {
+    message: 'Attribute schema must be a non-empty z.object',
+  });
+
 export const EntityTypeMapSchema = z.record(
   NodeLabelSchema,
   z.object({
     description: z.string(),
-    schema: z.instanceof(z.ZodType),
+    schema: AttributeSchema,
   }),
 );
 export const EdgeTypeMapSchema = z.record(
   RelationshipTypeSchema,
   z.object({
     description: z.string(),
-    schema: z.instanceof(z.ZodType),
+    schema: AttributeSchema,
   }),
 );
 

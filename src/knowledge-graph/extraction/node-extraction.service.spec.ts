@@ -37,14 +37,9 @@ describe('NodeExtractionService', () => {
     nodes.forEach((n) => expect(n.graphId).toBe(KG_TEST_GRAPH_ID));
   });
 
-  it('should filter empty names', async () => {
+  it('should filter whitespace-only names (schema rejects empty strings upstream)', async () => {
     mockRunnable.invoke.mockResolvedValue({
-      extractedEntities: [
-        { name: 'Alice' },
-        { name: '' },
-        { name: '   ' },
-        { name: 'Bob' },
-      ],
+      extractedEntities: [{ name: 'Alice' }, { name: '   ' }, { name: 'Bob' }],
     });
 
     const nodes = await service.extractNodes(mockModel, baseEpisode, []);

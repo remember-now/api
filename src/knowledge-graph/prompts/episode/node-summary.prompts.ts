@@ -12,7 +12,7 @@ import {
 
 // Schema
 
-const NodeSummarySchema = z.object({
+export const NodeSummarySchema = z.object({
   summaries: z
     .array(
       z.object({
@@ -29,8 +29,6 @@ const NodeSummarySchema = z.object({
       'List of entity summaries. Only include entities that need summary updates.',
     ),
 });
-
-export const nodeSummaryJsonSchema = z.toJSONSchema(NodeSummarySchema, { io: 'input' });
 
 // Prompt builder
 

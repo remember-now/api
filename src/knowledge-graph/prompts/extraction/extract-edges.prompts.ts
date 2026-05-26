@@ -29,15 +29,15 @@ const ExtractedEdgeSchema = z.object({
     .describe(
       'A natural language description of the relationship between the entities, paraphrased from the source text',
     ),
-  validAt: z
-    .string()
+  validAt: z.iso
+    .datetime()
     .nullable()
     .optional()
     .describe(
       'The date and time when the relationship described by the edge fact became true or was established. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)',
     ),
-  invalidAt: z
-    .string()
+  invalidAt: z.iso
+    .datetime()
     .nullable()
     .optional()
     .describe(
@@ -52,12 +52,8 @@ const ExtractedEdgeSchema = z.object({
   //   ),
 });
 
-const ExtractedEdgesSchema = z.object({
+export const ExtractedEdgesSchema = z.object({
   edges: z.array(ExtractedEdgeSchema).describe('List of extracted relationship facts'),
-});
-
-export const extractedEdgesJsonSchema = z.toJSONSchema(ExtractedEdgesSchema, {
-  io: 'input',
 });
 
 // Prompt builder
@@ -223,25 +219,21 @@ ${JSON.stringify(edgeTypesContext, null, 2)}
 // `edge_operations.py:_extract_edge_timestamps`. Caller:
 // `EpisodeService.extractEdgeTimestampsFallback`.
 
-const EdgeTimestampsSchema = z.object({
-  validAt: z
-    .string()
+export const EdgeTimestampsSchema = z.object({
+  validAt: z.iso
+    .datetime()
     .nullable()
     .optional()
     .describe(
       'When the fact became true. ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z). Null if no temporal information.',
     ),
-  invalidAt: z
-    .string()
+  invalidAt: z.iso
+    .datetime()
     .nullable()
     .optional()
     .describe(
       'When the fact stopped being true. ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z). Null if ongoing or unknown.',
     ),
-});
-
-export const edgeTimestampsJsonSchema = z.toJSONSchema(EdgeTimestampsSchema, {
-  io: 'input',
 });
 
 const TIMESTAMPS_FALLBACK_SYSTEM_PROMPT = `You extract temporal bounds from facts. NEVER hallucinate dates.

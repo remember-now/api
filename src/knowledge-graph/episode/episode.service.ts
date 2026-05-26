@@ -16,6 +16,7 @@ import {
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
+import { invokeStructured } from '../llm';
 import {
   createEpisodicEdge,
   createEpisodicNode,
@@ -31,9 +32,9 @@ import {
   buildFillEntityAttributesMessages,
   buildNodeSummaryMessages,
   buildSummarizeSagasMessages,
-  edgeTimestampsJsonSchema,
-  nodeSummaryJsonSchema,
-  sagaSummaryJsonSchema,
+  EdgeTimestampsSchema,
+  NodeSummarySchema,
+  SagaSummarySchema,
 } from '../prompts';
 import {
   EntityEdgeRepository,
@@ -231,14 +232,11 @@ export class EpisodeService {
       existingSummary: saga.summary,
       newEpisodes: unsummarized,
     });
-
-    const result = await model
-      .withStructuredOutput(sagaSummaryJsonSchema)
-      .invoke(messages, {
-        callbacks: this.llmTracer.getCallbacks(ctx),
-        runName: 'summarize-saga',
-        tags: ['knowledge-graph', 'saga.summary'],
-      });
+    const result = await invokeStructured(model, SagaSummarySchema, messages, {
+      callbacks: this.llmTracer.getCallbacks(ctx),
+      runName: 'summarize-saga',
+      tags: ['knowledge-graph', 'saga.summary'],
+    });
 
     const updatedSaga = {
       ...saga,
@@ -996,19 +994,23 @@ export class EpisodeService {
 
       for (let i = 0; i < summaryInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
         const batch = summaryInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
+
         const summaryMessages = buildNodeSummaryMessages({
           episode,
           previousEpisodes,
           nodes: batch,
           entityTypeDescriptions,
         });
-        const summaryResult = await model
-          .withStructuredOutput(nodeSummaryJsonSchema)
-          .invoke(summaryMessages, {
+        const summaryResult = await invokeStructured(
+          model,
+          NodeSummarySchema,
+          summaryMessages,
+          {
             callbacks: this.llmTracer.getCallbacks(ctx),
             runName: 'summarize-nodes',
             tags: ['knowledge-graph', 'node.summary'],
-          });
+          },
+        );
         for (const s of summaryResult.summaries) {
           summaryMap.set(normalizeString(s.name), s.summary);
         }
@@ -1080,13 +1082,12 @@ export class EpisodeService {
         referenceTime: nodeCtx.episode.validAt,
         existingAttributes: node.attributes ?? {},
       });
-      const attrs = await model
-        .withStructuredOutput(z.toJSONSchema(entityType.schema, { io: 'input' }))
-        .invoke(attrMessages, {
-          callbacks: this.llmTracer.getCallbacks(ctx),
-          runName: 'fill-entity-attributes',
-          tags: ['knowledge-graph', 'attributes.entity'],
-        });
+      const attrs = (await invokeStructured(model, entityType.schema, attrMessages, {
+        callbacks: this.llmTracer.getCallbacks(ctx),
+        runName: 'fill-entity-attributes',
+        tags: ['knowledge-graph', 'attributes.entity'],
+      })) as Record<string, unknown>;
+
       node.attributes = { ...node.attributes, ...attrs };
       extracted++;
     }
@@ -1135,7 +1136,7 @@ export class EpisodeService {
 
     type EdgeAttrTask = {
       edge: EntityEdge;
-      jsonSchema: { properties?: Record<string, unknown> };
+      schema: z.ZodType;
       referenceTime: Date;
     };
     const tasks: EdgeAttrTask[] = [];
@@ -1151,19 +1152,18 @@ export class EpisodeService {
       );
       const typeDef = applicable[edge.name];
       if (!typeDef) continue;
-      const jsonSchema = z.toJSONSchema(typeDef.schema, { io: 'input' }) as {
-        properties?: Record<string, unknown>;
-      };
-      if (Object.keys(jsonSchema.properties ?? {}).length === 0) continue;
+
       const edgeCtx = edgeContext.get(edge.id);
       if (!edgeCtx) continue;
-      tasks.push({ edge, jsonSchema, referenceTime: edgeCtx.referenceTime });
+      tasks.push({ edge, schema: typeDef.schema, referenceTime: edgeCtx.referenceTime });
     }
 
     await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
-      tasks.map(({ edge, jsonSchema, referenceTime }) => async () => {
-        const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
+      tasks.map(({ edge, schema, referenceTime }) => async () => {
+        const attrs = (await invokeStructured(
+          model,
+          schema,
           buildFillEdgeAttributesMessages({
             fact: edge.fact,
             referenceTime,
@@ -1200,22 +1200,19 @@ export class EpisodeService {
       LLM_CONCURRENCY_LIMIT,
       candidates.map((edge) => async () => {
         const referenceTime = edgeContext.get(edge.id)!.referenceTime;
-        const result = await model
-          .withStructuredOutput(edgeTimestampsJsonSchema)
-          .invoke(buildExtractTimestampsMessages({ fact: edge.fact, referenceTime }), {
+        const result = await invokeStructured(
+          model,
+          EdgeTimestampsSchema,
+          buildExtractTimestampsMessages({ fact: edge.fact, referenceTime }),
+          {
             callbacks: this.llmTracer.getCallbacks(ctx),
             runName: 'extract-edge-timestamps-fallback',
             tags: ['knowledge-graph', 'timestamps.edge.fallback'],
-          });
+          },
+        );
 
-        if (result.validAt) {
-          const d = new Date(result.validAt);
-          if (!Number.isNaN(d.getTime())) edge.validAt = d;
-        }
-        if (result.invalidAt) {
-          const d = new Date(result.invalidAt);
-          if (!Number.isNaN(d.getTime())) edge.invalidAt = d;
-        }
+        if (result.validAt) edge.validAt = new Date(result.validAt);
+        if (result.invalidAt) edge.invalidAt = new Date(result.invalidAt);
       }),
     );
 

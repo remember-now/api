@@ -11,14 +11,12 @@ import {
 
 // Schema
 
-const SagaSummarySchema = z.object({
+export const SagaSummarySchema = z.object({
   summary: z
     .string()
     .max(MAX_SUMMARY_CHARS)
     .describe('Factual knowledge brief for the saga'),
 });
-
-export const sagaSummaryJsonSchema = z.toJSONSchema(SagaSummarySchema, { io: 'input' });
 
 // Prompt builder
 

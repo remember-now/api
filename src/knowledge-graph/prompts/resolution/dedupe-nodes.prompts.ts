@@ -21,12 +21,8 @@ const NodeResolutionSchema = z.object({
     ),
 });
 
-const NodeResolutionsSchema = z.object({
+export const NodeResolutionsSchema = z.object({
   entityResolutions: z.array(NodeResolutionSchema).describe('List of resolved nodes'),
-});
-
-export const nodeResolutionsJsonSchema = z.toJSONSchema(NodeResolutionsSchema, {
-  io: 'input',
 });
 
 // Prompt builder

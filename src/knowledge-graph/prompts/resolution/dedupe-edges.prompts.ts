@@ -11,7 +11,7 @@ import {
 
 // Schema
 
-const EdgeDedupeSchema = z.object({
+export const EdgeDedupeSchema = z.object({
   duplicateFacts: z
     .array(z.number())
     .describe(
@@ -23,8 +23,6 @@ const EdgeDedupeSchema = z.object({
       'List of idx values of contradicted facts (from full idx range). Empty list if none.',
     ),
 });
-
-export const edgeDedupeJsonSchema = z.toJSONSchema(EdgeDedupeSchema, { io: 'input' });
 
 // Prompt builder
 

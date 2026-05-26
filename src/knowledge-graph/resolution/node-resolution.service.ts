@@ -11,8 +11,9 @@ import {
   type SpanMetrics,
 } from '@/observability';
 
+import { invokeStructured } from '../llm';
 import { EntityNode, EpisodicNode } from '../models';
-import { buildDedupeNodesMessages, nodeResolutionsJsonSchema } from '../prompts';
+import { buildDedupeNodesMessages, NodeResolutionsSchema } from '../prompts';
 import {
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
@@ -162,13 +163,11 @@ export class NodeResolutionService {
         customInstructions,
       });
 
-      const raw = await model
-        .withStructuredOutput(nodeResolutionsJsonSchema)
-        .invoke(messages, {
-          callbacks: this.llmTracer.getCallbacks(ctx),
-          runName: 'resolve-nodes',
-          tags: ['knowledge-graph', 'resolution.node'],
-        });
+      const raw = await invokeStructured(model, NodeResolutionsSchema, messages, {
+        callbacks: this.llmTracer.getCallbacks(ctx),
+        runName: 'resolve-nodes',
+        tags: ['knowledge-graph', 'resolution.node'],
+      });
 
       const resolutions = raw.entityResolutions;
 

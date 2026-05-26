@@ -4,8 +4,9 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Uuid } from '@/common/schemas';
 import type { LlmContext, LlmTracer } from '@/observability';
 
+import { invokeStructured } from '../llm';
 import { EntityNodeRepository } from '../repository/repositories';
-import { crossEncoderScoreJsonSchema, DEFAULT_MMR_LAMBDA } from './types';
+import { CrossEncoderScoreSchema, DEFAULT_MMR_LAMBDA } from './types';
 
 // ─── RRF ─────────────────────────────────────────────────────────────────────
 
@@ -188,14 +189,14 @@ export async function crossEncoderReranker(
 ): Promise<[Uuid[], number[]]> {
   if (items.length === 0) return [[], []];
 
-  const scoredModel = model.withStructuredOutput(crossEncoderScoreJsonSchema);
   const callbacks = opts?.llmTracer?.getCallbacks(opts.ctx) ?? [];
 
   const rawScores = await Promise.all(
     items.map((item) =>
-      scoredModel.invoke(
+      invokeStructured(
+        model,
+        CrossEncoderScoreSchema,
         [
-          // TOOD: Is this the best way to do this? how is withStructuredOutput populating the prompt?
           new SystemMessage(
             'Rate the relevance of the text to the query from 0 to 100. Respond with only a JSON object containing "score".',
           ),
@@ -212,7 +213,7 @@ export async function crossEncoderReranker(
 
   const scored = items
     .map((item, i) => {
-      const raw = rawScores[i] as { score: number };
+      const raw = rawScores[i];
       const normalized = (raw.score ?? 0) / 100;
       return [item.id, normalized] as [Uuid, number];
     })

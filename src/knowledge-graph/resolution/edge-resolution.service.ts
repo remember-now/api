@@ -16,8 +16,9 @@ import {
   LLM_CONCURRENCY_LIMIT,
   withConcurrency,
 } from '../episode/batch-utils';
+import { invokeStructured } from '../llm';
 import { EntityEdge, EpisodicNode } from '../models';
-import { buildDedupeEdgesMessages, edgeDedupeJsonSchema } from '../prompts';
+import { buildDedupeEdgesMessages, EdgeDedupeSchema } from '../prompts';
 import { EntityEdgeRepository } from '../repository/repositories';
 import { SearchByTextParamsSchema } from '../types';
 import {
@@ -496,13 +497,11 @@ export class EdgeResolutionService {
       customInstructions,
     });
 
-    const dedupe = await model
-      .withStructuredOutput(edgeDedupeJsonSchema)
-      .invoke(messages, {
-        callbacks: this.llmTracer.getCallbacks(ctx),
-        runName: 'resolve-edges',
-        tags: ['knowledge-graph', 'resolution.edge'],
-      });
+    const dedupe = await invokeStructured(model, EdgeDedupeSchema, messages, {
+      callbacks: this.llmTracer.getCallbacks(ctx),
+      runName: 'resolve-edges',
+      tags: ['knowledge-graph', 'resolution.edge'],
+    });
 
     return { dedupe, idxToEdge };
   }

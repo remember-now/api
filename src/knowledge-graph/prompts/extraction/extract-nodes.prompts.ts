@@ -30,14 +30,10 @@ const ExtractedEntitySchema = z.object({
   //   ),
 });
 
-const ExtractedEntitiesSchema = z.object({
+export const ExtractedEntitiesSchema = z.object({
   extractedEntities: z
     .array(ExtractedEntitySchema)
     .describe('List of extracted entities'),
-});
-
-export const extractedEntitiesJsonSchema = z.toJSONSchema(ExtractedEntitiesSchema, {
-  io: 'input',
 });
 
 // Prompt builders

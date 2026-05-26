@@ -11,8 +11,9 @@ import {
 } from '@/observability';
 
 import { EntityTypeMap } from '../episode/types';
+import { invokeStructured } from '../llm';
 import { createEntityNode, EntityNode, EpisodicNode } from '../models';
-import { buildExtractNodesMessages, extractedEntitiesJsonSchema } from '../prompts';
+import { buildExtractNodesMessages, ExtractedEntitiesSchema } from '../prompts';
 import { NodeLabel, NodeLabels, NodeLabelSchema } from '../types';
 
 function resolveLabels(
@@ -70,14 +71,11 @@ export class NodeExtractionService {
       entityTypes,
       customInstructions,
     });
-
-    const result = await model
-      .withStructuredOutput(extractedEntitiesJsonSchema)
-      .invoke(messages, {
-        callbacks: this.llmTracer.getCallbacks(ctx),
-        runName: 'extract-nodes',
-        tags: ['knowledge-graph', 'extraction.node'],
-      });
+    const result = await invokeStructured(model, ExtractedEntitiesSchema, messages, {
+      callbacks: this.llmTracer.getCallbacks(ctx),
+      runName: 'extract-nodes',
+      tags: ['knowledge-graph', 'extraction.node'],
+    });
 
     const nodes = result.extractedEntities
       .filter((e) => e.name.trim() !== '')

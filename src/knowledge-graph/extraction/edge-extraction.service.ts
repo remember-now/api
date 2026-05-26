@@ -11,8 +11,9 @@ import {
 } from '@/observability';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
+import { invokeStructured } from '../llm';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import { buildExtractEdgesMessages, extractedEdgesJsonSchema } from '../prompts';
+import { buildExtractEdgesMessages, ExtractedEdgesSchema } from '../prompts';
 
 @Injectable()
 export class EdgeExtractionService {
@@ -68,14 +69,11 @@ export class EdgeExtractionService {
       edgeTypes,
       edgeTypeMappings,
     });
-
-    const result = await model
-      .withStructuredOutput(extractedEdgesJsonSchema)
-      .invoke(messages, {
-        callbacks: this.llmTracer.getCallbacks(ctx),
-        runName: 'extract-edges',
-        tags: ['knowledge-graph', 'extraction.edge'],
-      });
+    const result = await invokeStructured(model, ExtractedEdgesSchema, messages, {
+      callbacks: this.llmTracer.getCallbacks(ctx),
+      runName: 'extract-edges',
+      tags: ['knowledge-graph', 'extraction.edge'],
+    });
 
     const edges = result.edges
       .filter((e) => {
@@ -93,8 +91,8 @@ export class EdgeExtractionService {
           sourceNodeId: sourceNode.id,
           targetNodeId: targetNode.id,
           episodes: [episode.id],
-          validAt: typeof e.validAt === 'string' ? new Date(e.validAt) : null,
-          invalidAt: typeof e.invalidAt === 'string' ? new Date(e.invalidAt) : null,
+          validAt: e.validAt ? new Date(e.validAt) : null,
+          invalidAt: e.invalidAt ? new Date(e.invalidAt) : null,
         });
       });
 

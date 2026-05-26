@@ -47,10 +47,6 @@ export type SearchOptions = z.infer<typeof SearchOptionsSchema>;
 export type SearchOptionsInput = z.input<typeof SearchOptionsSchema>;
 export type CrossEncoderScore = z.infer<typeof CrossEncoderScoreSchema>;
 
-// JSON Schemas
-
-export const crossEncoderScoreJsonSchema = z.toJSONSchema(CrossEncoderScoreSchema);
-
 // Helpers
 
 export function emptySearchResults(): SearchResults {
