@@ -18,11 +18,7 @@ import {
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
-import {
-  CombinedExtractionService,
-  EdgeExtractionService,
-  NodeExtractionService,
-} from '../extraction';
+import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import {
   EntityEdgeRepository,
   EntityNodeRepository,
@@ -42,7 +38,6 @@ describe('EpisodeService', () => {
   let mockEmbeddingService: DeepMocked<EmbeddingService>;
   let mockNodeExtraction: DeepMocked<NodeExtractionService>;
   let mockEdgeExtraction: DeepMocked<EdgeExtractionService>;
-  let mockCombinedExtraction: DeepMocked<CombinedExtractionService>;
   let mockNodeResolution: DeepMocked<NodeResolutionService>;
   let mockEdgeResolution: DeepMocked<EdgeResolutionService>;
   let mockEntityNodeRepo: DeepMocked<EntityNodeRepository>;
@@ -68,7 +63,6 @@ describe('EpisodeService', () => {
     mockEmbeddingService = module.get(EmbeddingService);
     mockNodeExtraction = module.get(NodeExtractionService);
     mockEdgeExtraction = module.get(EdgeExtractionService);
-    mockCombinedExtraction = module.get(CombinedExtractionService);
     mockNodeResolution = module.get(NodeResolutionService);
     mockEdgeResolution = module.get(EdgeResolutionService);
     mockEntityNodeRepo = module.get(EntityNodeRepository);
@@ -115,11 +109,6 @@ describe('EpisodeService', () => {
     mockEntityEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockRunnable.invoke.mockResolvedValue({ summaries: [] });
     mockCommunityService.buildCommunities.mockResolvedValue(undefined);
-    mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
-      nodes: [],
-      edges: [],
-      nodeEpisodeIndexMap: new Map(),
-    });
   });
 
   afterEach(() => {
@@ -763,51 +752,6 @@ describe('EpisodeService', () => {
     });
   });
 
-  // ─── Combined extraction (useCombinedExtraction: true) ────────────────────
-
-  describe('addEpisodes - combined extraction (useCombinedExtraction)', () => {
-    it('uses CombinedExtractionService instead of NodeExtractionService', async () => {
-      await service.addEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1')],
-        useCombinedExtraction: true,
-      });
-
-      expect(mockCombinedExtraction.extractNodesAndEdges).toHaveBeenCalled();
-      expect(mockNodeExtraction.extractNodes).not.toHaveBeenCalled();
-    });
-
-    it('reuses preExtractedEdges from combined extraction (skips separate extractEdges call)', async () => {
-      const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
-      const edge = KgEdgeFactory.createEntityEdge({
-        name: 'WORKS_AT',
-        sourceNodeId: node.id,
-        targetNodeId: u('target'),
-        fact: 'fact',
-      });
-      mockCombinedExtraction.extractNodesAndEdges.mockResolvedValue({
-        nodes: [node],
-        edges: [edge],
-        nodeEpisodeIndexMap: new Map(),
-      });
-      mockEmbeddingService.embedNodes.mockResolvedValue([node]);
-      mockNodeResolution.resolveNodes.mockResolvedValue({
-        resolvedNodes: [node],
-        idMap: new Map([[node.id, node.id]]),
-        duplicatePairs: [],
-      });
-
-      await service.addEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1')],
-        useCombinedExtraction: true,
-      });
-
-      expect(mockEdgeExtraction.extractEdges).not.toHaveBeenCalled();
-      expect(mockEmbeddingService.embedEdges).toHaveBeenCalledWith([edge]);
-    });
-  });
-
   // ─── Community building ───────────────────────────────────────────────────
 
   describe('addEpisodes - community building', () => {
@@ -874,7 +818,7 @@ describe('EpisodeService', () => {
         duplicatePairs: [],
       });
       mockRunnable.invoke.mockResolvedValue({
-        summaries: [{ id: node.id, summary: 'Alice is an engineer' }],
+        summaries: [{ name: node.name, summary: 'Alice is an engineer' }],
       });
 
       await service.addEpisodes({

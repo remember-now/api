@@ -3,24 +3,26 @@ import { z } from 'zod';
 
 import { EpisodicNode } from '@/knowledge-graph/models';
 
-import { formatPreviousEpisodes } from '../text-utils';
+import {
+  formatCurrentEpisode,
+  formatPreviousEpisodes,
+  formatPromptTimestamp,
+} from '../text-utils';
 
 // Schema
 
-export const EdgeDedupeSchema = z.object({
-  duplicate_facts: z
+const EdgeDedupeSchema = z.object({
+  duplicateFacts: z
     .array(z.number())
     .describe(
-      'List of idx values of duplicate facts (only from EXISTING FACTS or REVERSED-DIRECTION FACTS range). Empty list if none.',
+      'List of idx values of duplicate facts (only from EXISTING FACTS range). Empty list if none.',
     ),
-  contradicted_facts: z
+  contradictedFacts: z
     .array(z.number())
     .describe(
       'List of idx values of contradicted facts (from full idx range). Empty list if none.',
     ),
 });
-
-export type EdgeDedupe = z.infer<typeof EdgeDedupeSchema>;
 
 export const edgeDedupeJsonSchema = z.toJSONSchema(EdgeDedupeSchema, { io: 'input' });
 
@@ -29,17 +31,76 @@ export const edgeDedupeJsonSchema = z.toJSONSchema(EdgeDedupeSchema, { io: 'inpu
 const SYSTEM_PROMPT = `You are an expert knowledge graph edge deduplication system.
 
 Your task is to determine whether a newly extracted fact (edge) duplicates or contradicts existing facts.
+NEVER mark facts as duplicates if they have key differences, particularly around numeric values, dates, or key qualifiers.
 
-Rules:
-- A duplicate fact expresses the same relationship with no new information
-- A contradiction occurs when the new fact directly negates or supersedes an existing fact (e.g. a person changed jobs — the old job fact is contradicted)
-- Temporal change is not deletion; use contradiction only when the new fact makes an old fact false
-- Return integer indices from the unified EXISTING FACTS list (numbered continuously across all sections)
-- duplicate_facts: indices of facts that say the same thing as the new fact (should only reference EXISTING FACTS or REVERSED-DIRECTION FACTS)
-- contradicted_facts: indices of facts that are made false by the new fact (can reference any fact in the list)
-- A fact can appear in BOTH arrays — this means it is superseded: the same information but now outdated
-- Return empty arrays when no duplicates or contradictions exist
-- REVERSED-DIRECTION FACTS are duplicates only when the relation is symmetric (sibling, spouse, colleague). For asymmetric relations (manages, owns, loves), reversed direction means a different statement — not a duplicate.`;
+IMPORTANT constraints:
+- duplicateFacts: ONLY idx values from EXISTING FACTS (NEVER include FACT INVALIDATION CANDIDATES)
+- contradictedFacts: idx values from EITHER list (EXISTING FACTS or FACT INVALIDATION CANDIDATES)
+- The idx values are continuous across both lists (INVALIDATION CANDIDATES start where EXISTING FACTS end)
+
+You will receive TWO lists of facts with CONTINUOUS idx numbering across both lists.
+EXISTING FACTS are indexed first, followed by FACT INVALIDATION CANDIDATES.
+
+1. DUPLICATE DETECTION:
+- If the NEW FACT represents identical factual information as any fact in EXISTING FACTS, return those idx values in duplicateFacts.
+- If no duplicates, return an empty list for duplicateFacts.
+
+2. CONTRADICTION DETECTION:
+- Determine which facts the NEW FACT contradicts from either list.
+- A fact from EXISTING FACTS can be both a duplicate AND contradicted (e.g., semantically the same but the new fact updates/supersedes it).
+- Return all contradicted idx values in contradictedFacts.
+- If no contradictions, return an empty list for contradictedFacts.
+
+<EXAMPLES>
+<NEW FACT>
+- name: WORKS_AT, fact: "Alice joined Acme Corp in 2020"
+</NEW FACT>
+<EXISTING FACTS>
+- idx: 0, name: WORKS_AT, fact: "Alice joined Acme Corp in 2020"
+</EXISTING FACTS>
+<FACT INVALIDATION CANDIDATES>
+None
+</FACT INVALIDATION CANDIDATES>
+Result: {"duplicateFacts": [0], "contradictedFacts": []}
+(identical factual information)
+
+<NEW FACT>
+- name: WORKS_AT, fact: "Alice works at Acme Corp as a senior engineer"
+</NEW FACT>
+<EXISTING FACTS>
+- idx: 0, name: WORKS_AT, fact: "Alice works at Acme Corp as a software engineer"
+</EXISTING FACTS>
+<FACT INVALIDATION CANDIDATES>
+None
+</FACT INVALIDATION CANDIDATES>
+Result: {"duplicateFacts": [], "contradictedFacts": [0]}
+(same relationship but updated title - contradiction, NOT a duplicate)
+
+<NEW FACT>
+- name: RAN, fact: "Bob ran 3 miles on Wednesday"
+</NEW FACT>
+<EXISTING FACTS>
+- idx: 0, name: RAN, fact: "Bob ran 5 miles on Tuesday"
+</EXISTING FACTS>
+<FACT INVALIDATION CANDIDATES>
+None
+</FACT INVALIDATION CANDIDATES>
+Result: {"duplicateFacts": [], "contradictedFacts": []}
+(different events on different days - neither duplicate nor contradiction)
+
+<NEW FACT>
+- name: WORKS_AT, fact: "Alice left Acme Corp in January 2024"
+</NEW FACT>
+<EXISTING FACTS>
+- idx: 0, name: WORKS_AT, fact: "Alice works at Acme Corp"
+</EXISTING FACTS>
+<FACT INVALIDATION CANDIDATES>
+- idx: 1, name: EMPLOYED_BY, fact: "Alice is employed by Acme Corp full-time"
+</FACT INVALIDATION CANDIDATES>
+Result: {"duplicateFacts": [], "contradictedFacts": [0, 1]}
+(continuous indexing across both lists - the new fact contradicts the existing fact AND the similar-topic invalidation candidate)
+</EXAMPLES>
+`;
 
 function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>): string {
   if (edges.length === 0) return 'None';
@@ -50,15 +111,14 @@ function formatEdges(edges: Array<{ idx: number; name: string; fact: string }>):
 
 function rangeLabel(offset: number, count: number): string {
   if (count === 0) return `index ${offset} (none)`;
-  return count === 1 ? `index ${offset}` : `indices ${offset}–${offset + count - 1}`;
+  return count === 1 ? `index ${offset}` : `indices ${offset}-${offset + count - 1}`;
 }
 
 export function buildDedupeEdgesMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   newEdge: { name: string; fact: string };
-  sameDirectionEdges: Array<{ idx: number; name: string; fact: string }>;
-  reversedDirectionEdges: Array<{ idx: number; name: string; fact: string }>;
+  endpointEdges: Array<{ idx: number; name: string; fact: string }>;
   similarEdges: Array<{ idx: number; name: string; fact: string }>;
   referenceTime: Date;
   customInstructions?: string;
@@ -67,35 +127,46 @@ export function buildDedupeEdgesMessages(ctx: {
     episode,
     previousEpisodes,
     newEdge,
-    sameDirectionEdges,
-    reversedDirectionEdges,
+    endpointEdges,
     similarEdges,
     referenceTime,
     customInstructions,
   } = ctx;
 
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
-  const sameRange = rangeLabel(0, sameDirectionEdges.length);
-  const reversedRange = rangeLabel(
-    sameDirectionEdges.length,
-    reversedDirectionEdges.length,
-  );
-  const similarRange = rangeLabel(
-    sameDirectionEdges.length + reversedDirectionEdges.length,
-    similarEdges.length,
-  );
+  const endpointRange = rangeLabel(0, endpointEdges.length);
+  const similarRange = rangeLabel(endpointEdges.length, similarEdges.length);
 
-  let humanContent =
-    `REFERENCE TIME: ${referenceTime.toISOString()}\n\n` +
-    `PREVIOUS EPISODES:\n${previousEpisodesText}\n\n` +
-    `CURRENT EPISODE:\n${episode.content}\n\n` +
-    `NEW FACT:\n- name: ${newEdge.name}, fact: "${newEdge.fact}"\n\n` +
-    `EXISTING FACTS (same source→target as new fact, ${sameRange}):\n${formatEdges(sameDirectionEdges)}\n\n` +
-    `REVERSED-DIRECTION FACTS (same nodes swapped, ${reversedRange}):\n${formatEdges(reversedDirectionEdges)}\n\n` +
-    `FACT INVALIDATION CANDIDATES (similar topic, ${similarRange}):\n${formatEdges(similarEdges)}`;
+  let humanContent = `Apply every rule from the system instructions when deduplicating the NEW FACT against the existing facts below.
+
+<REFERENCE TIME>
+${formatPromptTimestamp(referenceTime)}
+</REFERENCE TIME>
+
+<PREVIOUS EPISODES>
+${previousEpisodesText}
+</PREVIOUS EPISODES>
+
+<CURRENT EPISODE>
+${formatCurrentEpisode(episode)}
+</CURRENT EPISODE>
+
+<NEW FACT>
+- name: ${newEdge.name}, fact: "${newEdge.fact}"
+</NEW FACT>
+
+<EXISTING FACTS>
+Same source -> target as new fact, ${endpointRange}
+${formatEdges(endpointEdges)}
+</EXISTING FACTS>
+
+<FACT INVALIDATION CANDIDATES>
+Similar topic, ${similarRange}
+${formatEdges(similarEdges)}
+</FACT INVALIDATION CANDIDATES>`;
 
   if (customInstructions) {
-    humanContent += `\n\n${customInstructions}`;
+    humanContent += `\n\n<CUSTOM INSTRUCTIONS>\n${customInstructions}\n</CUSTOM INSTRUCTIONS>`;
   }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];

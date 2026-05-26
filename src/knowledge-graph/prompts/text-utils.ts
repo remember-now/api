@@ -2,6 +2,14 @@ import { EpisodicNode } from '../models';
 
 export const MAX_SUMMARY_CHARS = 1000;
 
+// Node's Date.toISOString() emits millisecond precision ("2025-04-30T00:00:00.000Z"),
+// but every prompt rule example uses the second-precision form ("2025-04-30T00:00:00Z").
+// Strip milliseconds so the timestamps the model sees on input match the format it is
+// instructed to emit on output.
+export function formatPromptTimestamp(date: Date): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 const ABBREVIATIONS = new Set([
   'e.g',
   'i.e',
@@ -52,13 +60,28 @@ export function truncateAtSentence(text: string, maxChars = MAX_SUMMARY_CHARS): 
 
 export function concatenateEpisodes(episodes: EpisodicNode[]): string {
   return episodes
-    .map((ep, i) => `[Episode ${i}] (${ep.validAt.toISOString()})\n${ep.content}`)
+    .map(
+      (ep, i) => `[Episode ${i}] (${formatPromptTimestamp(ep.validAt)})\n${ep.content}`,
+    )
     .join('\n\n');
 }
 
 export function formatPreviousEpisodes(episodes: EpisodicNode[]): string {
   if (episodes.length === 0) return 'None';
   return episodes
-    .map((e) => `- [${e.name}] (${e.validAt.toISOString()}): ${e.content}`)
+    .map((e) => `- [${e.name}] (${formatPromptTimestamp(e.validAt)}): ${e.content}`)
     .join('\n');
+}
+
+export function formatCurrentEpisode(
+  episode: EpisodicNode,
+  opts: { includeSource?: boolean } = {},
+): string {
+  const lines = [
+    `Name: ${episode.name}`,
+    `Timestamp: ${formatPromptTimestamp(episode.validAt)}`,
+  ];
+  if (opts.includeSource) lines.push(`Source: ${episode.source}`);
+  lines.push(`Content: ${episode.content}`);
+  return lines.join('\n');
 }

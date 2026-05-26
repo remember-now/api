@@ -6,7 +6,6 @@ export enum EpisodeType {
   message = 'message',
   json = 'json',
   text = 'text',
-  factTriple = 'fact_triple',
 }
 
 export const EpisodeTypeSchema = z.enum(EpisodeType);

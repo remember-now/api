@@ -11,6 +11,8 @@ This is a GraphRAG application, the core of which is in `src/knowledge-graph`.
 It is a modified and improved TypeScript port of Graphiti by Zep, which is written in Python originally.
 
 The original Graphiti codebase can be inspected in `REPO_ROOT/graphiti`.
+`REPO_ROOT` is api (cwd). Please stop checking the directory above `api` - there is
+nothing there.
 
 Tech stack:
 NestJS 11
@@ -42,6 +44,8 @@ to me explicitly.
 Never pipe `npm run lint` into something like `tail` or `grep` because the lint
 takes 22 seconds to run, so you're wasting time. The output isn't that big.
 Same for `npm test`.
+
+Use `npm run prisma:generate` instead of `npx prisma generate `since it automatically uses dotenv to load the proper .env file when calling prisma. Same for other prisma commands.
 
 Lastly, `tsconfig.json`:
 

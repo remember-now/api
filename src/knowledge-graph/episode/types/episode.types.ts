@@ -65,7 +65,6 @@ export const AddEpisodeOptionsSchema = z.object({
   excludedEntityTypes: z.array(NodeLabelSchema).optional(),
   customInstructions: z.string().optional(),
   updateCommunities: z.boolean().optional(),
-  useCombinedExtraction: z.boolean().default(false),
 });
 
 export const AddEpisodeResultSchema = z.object({

@@ -15,11 +15,7 @@ import {
 
 import { CommunityService } from '../community';
 import { EmbeddingService } from '../embedding';
-import {
-  CombinedExtractionService,
-  EdgeExtractionService,
-  NodeExtractionService,
-} from '../extraction';
+import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import {
   createEpisodicEdge,
   createEpisodicNode,
@@ -30,10 +26,12 @@ import {
   EpisodicNode,
 } from '../models';
 import {
-  buildExtractEdgeAttributesMessages,
-  buildExtractEntityAttributesMessages,
+  buildExtractTimestampsMessages,
+  buildFillEdgeAttributesMessages,
+  buildFillEntityAttributesMessages,
   buildNodeSummaryMessages,
-  buildSummarizeSagaMessages,
+  buildSummarizeSagasMessages,
+  edgeTimestampsJsonSchema,
   nodeSummaryJsonSchema,
   sagaSummaryJsonSchema,
 } from '../prompts';
@@ -92,7 +90,6 @@ export class EpisodeService {
     private readonly edgeExtractionService: EdgeExtractionService,
     private readonly nodeResolutionService: NodeResolutionService,
     private readonly edgeResolutionService: EdgeResolutionService,
-    private readonly combinedExtractionService: CombinedExtractionService,
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly episodicNodeRepository: EpisodicNodeRepository,
@@ -229,7 +226,7 @@ export class EpisodeService {
       };
     }
 
-    const messages = buildSummarizeSagaMessages({
+    const messages = buildSummarizeSagasMessages({
       sagaName: saga.name,
       existingSummary: saga.summary,
       newEpisodes: unsummarized,
@@ -270,7 +267,6 @@ export class EpisodeService {
       ],
       metadata: {
         episodeCount: String(parsed.episodes.length),
-        useCombinedExtraction: String(parsed.useCombinedExtraction),
       },
     };
 
@@ -293,7 +289,6 @@ export class EpisodeService {
       excludedEntityTypes,
       customInstructions,
       updateCommunities,
-      useCombinedExtraction,
     } = parsed;
 
     const effectiveEdgeTypeMappings = getEffectiveTypeMappings(
@@ -333,30 +328,19 @@ export class EpisodeService {
     });
     await this.episodicNodeRepository.saveBulk(episodicNodes);
 
-    // 4. Extract nodes (and edges, if using combined extraction) in parallel.
-    // Combined path: single LLM call per episode yields both nodes and edges.
-    // Separate path: node extraction only; edges are extracted later in step 11.
-    let preExtractedEdgesPerEpisode: EntityEdge[][] | null = null;
-
+    // 4. Extract nodes in parallel. Edges are extracted later in step 11.
     const extractedNodesPerEpisode = await withConcurrency(
       LLM_CONCURRENCY_LIMIT,
       episodicNodes.map((ep, i) => async () => {
-        const { extractedNodes, preExtractedEdges } = await this.extractNodes(
+        const { extractedNodes } = await this.extractNodes(
           model,
           ep,
           prevEpisodesPerEpisode[i],
           entityTypes,
-          edgeTypes,
-          effectiveEdgeTypeMappings,
           customInstructions,
           excludedEntityTypes,
-          useCombinedExtraction,
           { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
         );
-        if (useCombinedExtraction) {
-          (preExtractedEdgesPerEpisode ??= Array(episodicNodes.length).fill([]))[i] =
-            preExtractedEdges;
-        }
         return extractedNodes;
       }),
     );
@@ -460,28 +444,25 @@ export class EpisodeService {
       });
     });
 
-    // 11. Extract edges in parallel, then resolve pointers.
-    // Combined path: edges were already extracted in step 4; remap node IDs via finalIdMap.
-    // Separate path: extract edges using the canonical nodes resolved above.
-    const rawEdgesPerEpisode = preExtractedEdgesPerEpisode
-      ? preExtractedEdgesPerEpisode
-      : await withConcurrency(
-          LLM_CONCURRENCY_LIMIT,
-          episodicNodes.map(
-            (ep, i) => () =>
-              this.edgeExtractionService.extractEdges(
-                model,
-                ep,
-                canonicalNodesPerEpisode[i],
-                prevEpisodesPerEpisode[i],
-                ep.validAt,
-                customInstructions,
-                edgeTypes,
-                effectiveEdgeTypeMappings,
-                { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
-              ),
+    // 11. Extract edges in parallel using the canonical nodes resolved above,
+    // then resolve pointers.
+    const rawEdgesPerEpisode = await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      episodicNodes.map(
+        (ep, i) => () =>
+          this.edgeExtractionService.extractEdges(
+            model,
+            ep,
+            canonicalNodesPerEpisode[i],
+            prevEpisodesPerEpisode[i],
+            ep.validAt,
+            customInstructions,
+            edgeTypes,
+            effectiveEdgeTypeMappings,
+            { ...ctx, metadata: { ...ctx.metadata, episodeId: ep.id } },
           ),
-        );
+      ),
+    );
 
     const pointedEdgesPerEpisode = rawEdgesPerEpisode.map((edges) =>
       resolveEdgePointers(edges, finalIdMap),
@@ -568,10 +549,10 @@ export class EpisodeService {
       }
     });
 
-    // 17. Extract edge attributes post-resolution (custom edge types). Only
+    // 17. Fill edge attributes post-resolution (custom edge types). Only
     // new edges - existing duplicates already carry attributes from prior
     // ingestion and re-running risks overwriting them with thinner values.
-    await this.extractEdgeAttributes(
+    await this.fillEdgeAttributes(
       model,
       allNewEdges,
       allCanonicalNodes,
@@ -581,12 +562,17 @@ export class EpisodeService {
       ctx,
     );
 
-    // 18. Extract entity attributes post-resolution (with resolved-edge context).
+    // 17a. Per-edge timestamp fallback: when the batch extraction prompt
+    // returned null validAt/invalidAt, ask the LLM specifically about that
+    // single fact. Mirrors graphiti's `_extract_edge_timestamps`.
+    await this.extractEdgeTimestampsFallback(model, allNewEdges, edgeContext, ctx);
+
+    // 18. Fill entity attributes post-resolution (with resolved-edge context).
     // Includes matched-existing nodes so attributes get refined from the new
     // episode's content instead of frozen at first mention. Mirrors upstream
     // `extract_attributes_from_nodes(... nodes ...)` which runs on the full
     // resolved set, not just new ones.
-    await this.extractEntityAttributes(
+    await this.fillEntityAttributes(
       model,
       allCanonicalNodes,
       allResolvedEdges,
@@ -601,7 +587,14 @@ export class EpisodeService {
     // contributed to the node's prior summary, so re-feeding them risks the LLM
     // re-emitting known facts. Mirrors upstream
     // `extract_attributes_from_nodes(..., edges=new_edges)`.
-    await this.summarizeNodes(model, allCanonicalNodes, allNewEdges, nodeContext, ctx);
+    await this.summarizeNodes(
+      model,
+      allCanonicalNodes,
+      allNewEdges,
+      entityTypes,
+      nodeContext,
+      ctx,
+    );
 
     // 20. Re-embed canonical nodes renamed during dedup. Resolution rewrites
     // node.name and nulls nameEmbedding (stale vector) - if we don't refill
@@ -729,7 +722,6 @@ export class EpisodeService {
           (s, a) => s + a.length,
           0,
         ),
-        useCombinedExtraction: useCombinedExtraction,
         updateCommunities: updateCommunities,
         duration_ms: Math.round(performance.now() - startMs),
       },
@@ -741,26 +733,17 @@ export class EpisodeService {
     episode: EpisodicNode,
     previousEpisodesForEpisode: EpisodicNode[],
     entityTypes?: EntityTypeMap,
-    edgeTypes?: EdgeTypeMap,
-    edgeTypeMappings?: EdgeTypeMappings,
     customInstructions?: string,
     excludedEntityTypes?: string[],
-    useCombinedExtraction: boolean = false,
     ctx?: LlmContext,
-  ): Promise<{
-    extractedNodes: EntityNode[];
-    preExtractedEdges?: EntityEdge[];
-  }> {
+  ): Promise<{ extractedNodes: EntityNode[] }> {
     const { metrics: _m, ...rest } = await this.extractNodesImpl(
       model,
       episode,
       previousEpisodesForEpisode,
       entityTypes,
-      edgeTypes,
-      edgeTypeMappings,
       customInstructions,
       excludedEntityTypes,
-      useCombinedExtraction,
       ctx,
     );
     return rest;
@@ -772,40 +755,16 @@ export class EpisodeService {
     episode: EpisodicNode,
     previousEpisodesForEpisode: EpisodicNode[],
     entityTypes?: EntityTypeMap,
-    edgeTypes?: EdgeTypeMap,
-    edgeTypeMappings?: EdgeTypeMappings,
     customInstructions?: string,
     excludedEntityTypes?: string[],
-    useCombinedExtraction: boolean = false,
     ctx?: LlmContext,
-  ): Promise<{
-    extractedNodes: EntityNode[];
-    preExtractedEdges?: EntityEdge[];
-    metrics: SpanMetrics;
-  }> {
-    const baseMetrics: SpanMetrics = {
-      'episode.id': episode.id,
-      useCombinedExtraction: useCombinedExtraction,
-    };
+  ): Promise<{ extractedNodes: EntityNode[]; metrics: SpanMetrics }> {
+    const baseMetrics: SpanMetrics = { 'episode.id': episode.id };
 
     let extractedNodes: EntityNode[];
-    let preExtractedEdges: EntityEdge[] | undefined;
     let chunksCount: number | undefined;
 
-    if (useCombinedExtraction) {
-      const { nodes, edges } = await this.combinedExtractionService.extractNodesAndEdges(
-        model,
-        [episode],
-        entityTypes,
-        edgeTypes,
-        edgeTypeMappings,
-        customInstructions,
-        excludedEntityTypes,
-        ctx,
-      );
-      extractedNodes = nodes;
-      preExtractedEdges = edges;
-    } else if (shouldChunk(episode.content)) {
+    if (shouldChunk(episode.content)) {
       const chunks = await chunkContent(episode.content, episode.source);
       const perChunk = await Promise.all(
         chunks.map((chunk) =>
@@ -844,11 +803,9 @@ export class EpisodeService {
 
     return {
       extractedNodes,
-      preExtractedEdges,
       metrics: {
         ...baseMetrics,
         'extracted.count': extractedNodes.length,
-        'preExtracted.edges.count': preExtractedEdges?.length,
         'chunks.count': chunksCount,
       },
     };
@@ -968,10 +925,11 @@ export class EpisodeService {
     model: BaseChatModel,
     nodes: EntityNode[],
     allEdges: EntityEdge[],
+    entityTypes: EntityTypeMap | undefined,
     nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
     ctx?: LlmContext,
   ): Promise<void> {
-    await this.summarizeNodesImpl(model, nodes, allEdges, nodeContext, ctx);
+    await this.summarizeNodesImpl(model, nodes, allEdges, entityTypes, nodeContext, ctx);
   }
 
   @Span('summarizeNodes', { onResult: metricsOnResult })
@@ -979,6 +937,7 @@ export class EpisodeService {
     model: BaseChatModel,
     nodes: EntityNode[],
     allEdges: EntityEdge[],
+    entityTypes: EntityTypeMap | undefined,
     nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
     ctx?: LlmContext,
   ): Promise<{ metrics: SpanMetrics }> {
@@ -1007,20 +966,33 @@ export class EpisodeService {
       }
     }
 
-    const summaryMap = new Map<Uuid, string>();
+    const entityTypeDescriptions: Record<string, string> = entityTypes
+      ? Object.fromEntries(
+          Object.entries(entityTypes).map(([label, { description }]) => [
+            label,
+            description,
+          ]),
+        )
+      : {};
+
+    const summaryMap = new Map<string, string>();
     for (const {
       episode,
       previousEpisodes,
       nodes: groupNodes,
     } of nodesByEpisode.values()) {
-      const summaryInput = groupNodes.map((n) => ({
-        id: n.id,
-        name: n.name,
-        summary: n.summary,
-        facts: allEdges
-          .filter((e) => e.sourceNodeId === n.id || e.targetNodeId === n.id)
-          .map((e) => e.fact),
-      }));
+      const summaryInput = groupNodes.map((n) => {
+        const label = n.labels.find((l) => l !== 'Entity');
+        const type = label && entityTypes?.[label] ? label : undefined;
+        return {
+          name: n.name,
+          type,
+          existingSummary: n.summary,
+          facts: allEdges
+            .filter((e) => e.sourceNodeId === n.id || e.targetNodeId === n.id)
+            .map((e) => e.fact),
+        };
+      });
 
       for (let i = 0; i < summaryInput.length; i += MAX_NODES_PER_SUMMARY_BATCH) {
         const batch = summaryInput.slice(i, i + MAX_NODES_PER_SUMMARY_BATCH);
@@ -1028,6 +1000,7 @@ export class EpisodeService {
           episode,
           previousEpisodes,
           nodes: batch,
+          entityTypeDescriptions,
         });
         const summaryResult = await model
           .withStructuredOutput(nodeSummaryJsonSchema)
@@ -1037,13 +1010,13 @@ export class EpisodeService {
             tags: ['knowledge-graph', 'node.summary'],
           });
         for (const s of summaryResult.summaries) {
-          summaryMap.set(s.id, s.summary);
+          summaryMap.set(normalizeString(s.name), s.summary);
         }
       }
     }
 
     for (const node of nodes) {
-      const summary = summaryMap.get(node.id);
+      const summary = summaryMap.get(normalizeString(node.name));
       if (summary !== undefined) node.summary = summary;
     }
 
@@ -1055,7 +1028,7 @@ export class EpisodeService {
     };
   }
 
-  private async extractEntityAttributes(
+  private async fillEntityAttributes(
     model: BaseChatModel,
     nodes: EntityNode[],
     allEdges: EntityEdge[],
@@ -1063,7 +1036,7 @@ export class EpisodeService {
     nodeContext: Map<Uuid, { episode: EpisodicNode; previousEpisodes: EpisodicNode[] }>,
     ctx?: LlmContext,
   ): Promise<void> {
-    await this.extractEntityAttributesImpl(
+    await this.fillEntityAttributesImpl(
       model,
       nodes,
       allEdges,
@@ -1073,8 +1046,8 @@ export class EpisodeService {
     );
   }
 
-  @Span('extractEntityAttributes', { onResult: metricsOnResult })
-  private async extractEntityAttributesImpl(
+  @Span('fillEntityAttributes', { onResult: metricsOnResult })
+  private async fillEntityAttributesImpl(
     model: BaseChatModel,
     nodes: EntityNode[],
     allEdges: EntityEdge[],
@@ -1086,39 +1059,41 @@ export class EpisodeService {
       'nodes.count': nodes.length,
       'entityTypes.count': entityTypes ? Object.keys(entityTypes).length : 0,
     };
-
     if (!entityTypes) return { metrics: { ...baseMetrics, 'extracted.count': 0 } };
     let extracted = 0;
+
     for (const node of nodes) {
       const label = node.labels.find((l) => l !== 'Entity');
       const entityType = label ? entityTypes[label] : undefined;
       if (!entityType) continue;
+
       const nodeCtx = nodeContext.get(node.id);
       if (!nodeCtx) continue;
       const nodeEdges = allEdges.filter(
         (e) => e.sourceNodeId === node.id || e.targetNodeId === node.id,
       );
-      const attrMessages = buildExtractEntityAttributesMessages({
+      const attrMessages = buildFillEntityAttributesMessages({
+        entityName: node.name,
         episodeContent: nodeCtx.episode.content,
         previousEpisodesContent: nodeCtx.previousEpisodes.map((ep) => ep.content),
         relatedFacts: nodeEdges.map((e) => e.fact),
         referenceTime: nodeCtx.episode.validAt,
         existingAttributes: node.attributes ?? {},
       });
-      const attrs = (await model
+      const attrs = await model
         .withStructuredOutput(z.toJSONSchema(entityType.schema, { io: 'input' }))
         .invoke(attrMessages, {
           callbacks: this.llmTracer.getCallbacks(ctx),
-          runName: 'extract-entity-attributes',
+          runName: 'fill-entity-attributes',
           tags: ['knowledge-graph', 'attributes.entity'],
-        })) as Record<string, unknown>;
+        });
       node.attributes = { ...node.attributes, ...attrs };
       extracted++;
     }
     return { metrics: { ...baseMetrics, 'extracted.count': extracted } };
   }
 
-  private async extractEdgeAttributes(
+  private async fillEdgeAttributes(
     model: BaseChatModel,
     resolvedEdges: EntityEdge[],
     canonicalNodes: EntityNode[],
@@ -1127,7 +1102,7 @@ export class EpisodeService {
     edgeContext: Map<Uuid, { referenceTime: Date }>,
     ctx?: LlmContext,
   ): Promise<void> {
-    await this.extractEdgeAttributesImpl(
+    await this.fillEdgeAttributesImpl(
       model,
       resolvedEdges,
       canonicalNodes,
@@ -1138,8 +1113,8 @@ export class EpisodeService {
     );
   }
 
-  @Span('extractEdgeAttributes', { onResult: metricsOnResult })
-  private async extractEdgeAttributesImpl(
+  @Span('fillEdgeAttributes', { onResult: metricsOnResult })
+  private async fillEdgeAttributesImpl(
     model: BaseChatModel,
     resolvedEdges: EntityEdge[],
     canonicalNodes: EntityNode[],
@@ -1189,14 +1164,14 @@ export class EpisodeService {
       LLM_CONCURRENCY_LIMIT,
       tasks.map(({ edge, jsonSchema, referenceTime }) => async () => {
         const attrs = (await model.withStructuredOutput(jsonSchema).invoke(
-          buildExtractEdgeAttributesMessages({
+          buildFillEdgeAttributesMessages({
             fact: edge.fact,
             referenceTime,
             existingAttributes: edge.attributes ?? {},
           }),
           {
             callbacks: this.llmTracer.getCallbacks(ctx),
-            runName: 'extract-edge-attributes',
+            runName: 'fill-edge-attributes',
             tags: ['knowledge-graph', 'attributes.edge'],
           },
         )) as Record<string, unknown>;
@@ -1204,5 +1179,48 @@ export class EpisodeService {
       }),
     );
     return { metrics: { ...baseMetrics, 'extracted.count': tasks.length } };
+  }
+
+  // Per-edge fallback: when the batch extraction prompt leaves an edge with
+  // both validAt and invalidAt null, ask the LLM specifically for the temporal
+  // window of that single fact. Mirrors graphiti's `_extract_edge_timestamps`
+  // (edge_operations.py:576).
+  @Span('extractEdgeTimestampsFallback', { onResult: metricsOnResult })
+  private async extractEdgeTimestampsFallback(
+    model: BaseChatModel,
+    edges: EntityEdge[],
+    edgeContext: Map<Uuid, { referenceTime: Date }>,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const candidates = edges.filter(
+      (e) => e.validAt === null && e.invalidAt === null && edgeContext.has(e.id),
+    );
+
+    await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      candidates.map((edge) => async () => {
+        const referenceTime = edgeContext.get(edge.id)!.referenceTime;
+        const result = await model
+          .withStructuredOutput(edgeTimestampsJsonSchema)
+          .invoke(buildExtractTimestampsMessages({ fact: edge.fact, referenceTime }), {
+            callbacks: this.llmTracer.getCallbacks(ctx),
+            runName: 'extract-edge-timestamps-fallback',
+            tags: ['knowledge-graph', 'timestamps.edge.fallback'],
+          });
+
+        if (result.validAt) {
+          const d = new Date(result.validAt);
+          if (!Number.isNaN(d.getTime())) edge.validAt = d;
+        }
+        if (result.invalidAt) {
+          const d = new Date(result.invalidAt);
+          if (!Number.isNaN(d.getTime())) edge.invalidAt = d;
+        }
+      }),
+    );
+
+    return {
+      metrics: { 'edges.count': edges.length, 'candidates.count': candidates.length },
+    };
   }
 }

@@ -155,8 +155,8 @@ describe('EdgeResolutionService', () => {
 
     // idx 0 is in endpoint range (1 endpoint edge)
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [0],
-      contradicted_facts: [],
+      duplicateFacts: [0],
+      contradictedFacts: [],
     });
 
     const result = await service.resolveEdges(
@@ -192,8 +192,8 @@ describe('EdgeResolutionService', () => {
     existingEdge.id = u('old-edge-id');
 
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [],
-      contradicted_facts: [0],
+      duplicateFacts: [],
+      contradictedFacts: [0],
     });
 
     const result = await service.resolveEdges(
@@ -226,8 +226,8 @@ describe('EdgeResolutionService', () => {
     existingEdge.id = u('old-edge-id');
 
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [],
-      contradicted_facts: [0],
+      duplicateFacts: [],
+      contradictedFacts: [0],
     });
 
     const result = await service.resolveEdges(
@@ -246,7 +246,7 @@ describe('EdgeResolutionService', () => {
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });
 
-  it('should not treat edge as duplicate when duplicate_facts index is in similar range only', async () => {
+  it('should not treat edge as duplicate when duplicateFacts index is in similar range only', async () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
@@ -270,10 +270,10 @@ describe('EdgeResolutionService', () => {
     similarEdge.id = u('similar-id');
 
     // idx 0 = endpoint edge, idx 1 = similar edge
-    // duplicate_facts = [1] (similar range idx) → should NOT trigger isDuplicate
+    // duplicateFacts = [1] (similar range idx) → should NOT trigger isDuplicate
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [1],
-      contradicted_facts: [],
+      duplicateFacts: [1],
+      contradictedFacts: [],
     });
 
     const result = await service.resolveEdges(
@@ -285,7 +285,7 @@ describe('EdgeResolutionService', () => {
       KG_REFERENCE_TIME,
     );
 
-    // Similar range idx in duplicate_facts does NOT mark as duplicate
+    // Similar range idx in duplicateFacts does NOT mark as duplicate
     expect(result.resolvedEdges).toHaveLength(1);
   });
 
@@ -322,8 +322,8 @@ describe('EdgeResolutionService', () => {
 
     mockEdgeRepo.searchByFact.mockResolvedValue([keywordEdge]);
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [],
-      contradicted_facts: [],
+      duplicateFacts: [],
+      contradictedFacts: [],
     });
 
     await service.resolveEdges(
@@ -355,8 +355,8 @@ describe('EdgeResolutionService', () => {
     // keyword search returns the endpoint edge - should be excluded from similarEdges
     mockEdgeRepo.searchByFact.mockResolvedValue([endpointEdge]);
     mockRunnable.invoke.mockResolvedValue({
-      duplicate_facts: [],
-      contradicted_facts: [],
+      duplicateFacts: [],
+      contradictedFacts: [],
     });
 
     // existingEdges contains the endpoint edge (same src/tgt as `edge`)

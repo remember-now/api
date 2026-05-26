@@ -14,7 +14,7 @@ describe('truncateAtSentence', () => {
 
   it('truncates at the last complete sentence before maxChars', () => {
     const text = 'First sentence. Second sentence. Third sentence.';
-    // maxChars = 35 falls inside "Third sentence." — should cut after "Second sentence."
+    // maxChars = 35 falls inside "Third sentence." - should cut after "Second sentence."
     expect(truncateAtSentence(text, 35)).toBe('First sentence. Second sentence.');
   });
 
@@ -61,8 +61,8 @@ describe('concatenateEpisodes', () => {
     });
 
     expect(concatenateEpisodes([e0, e1])).toBe(
-      '[Episode 0] (2026-01-01T00:00:00.000Z)\nfirst content\n\n' +
-        '[Episode 1] (2026-02-01T00:00:00.000Z)\nsecond content',
+      '[Episode 0] (2026-01-01T00:00:00Z)\nfirst content\n\n' +
+        '[Episode 1] (2026-02-01T00:00:00Z)\nsecond content',
     );
   });
 });
@@ -79,7 +79,7 @@ describe('formatPreviousEpisodes', () => {
       validAt: new Date('2025-12-31T00:00:00.000Z'),
     });
     expect(formatPreviousEpisodes([e0])).toBe(
-      '- [Prev] (2025-12-31T00:00:00.000Z): prior content',
+      '- [Prev] (2025-12-31T00:00:00Z): prior content',
     );
   });
 });

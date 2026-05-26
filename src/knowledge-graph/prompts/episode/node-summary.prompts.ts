@@ -1,25 +1,28 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
-import { UuidSchema } from '@/common/schemas';
 import { EpisodicNode } from '@/knowledge-graph/models';
+import { NodeNameSchema } from '@/knowledge-graph/types';
 
-import { formatPreviousEpisodes, MAX_SUMMARY_CHARS } from '../text-utils';
+import {
+  formatCurrentEpisode,
+  formatPreviousEpisodes,
+  MAX_SUMMARY_CHARS,
+} from '../text-utils';
 
 // Schema
 
-export const NodeSummarySchema = z.object({
+const NodeSummarySchema = z.object({
   summaries: z
     .array(
       z.object({
-        id: UuidSchema.describe(
-          'UUID of the entity being summarized (echoed from the input)',
+        name: NodeNameSchema.describe(
+          'Name of the entity being summarized (echoed verbatim from the input)',
         ),
         summary: z
           .string()
-          .describe(
-            `Updated factual summary for the entity, under ${MAX_SUMMARY_CHARS} characters`,
-          ),
+          .max(MAX_SUMMARY_CHARS)
+          .describe(`Updated summary for the entity`),
       }),
     )
     .describe(
@@ -27,44 +30,146 @@ export const NodeSummarySchema = z.object({
     ),
 });
 
-export type NodeSummary = z.infer<typeof NodeSummarySchema>;
-
 export const nodeSummaryJsonSchema = z.toJSONSchema(NodeSummarySchema, { io: 'input' });
 
 // Prompt builder
 
-const SYSTEM_PROMPT = `You are an expert knowledge graph assistant. Generate a factual summary (≤ ${MAX_SUMMARY_CHARS} characters) for each entity using the provided episode context.
+const SYSTEM_PROMPT = `You maintain detailed, information-dense entity memories from episode text.
+
+Use ONLY facts explicitly stated in the PREVIOUS EPISODES and CURRENT EPISODE, and durable facts
+already present in each entity's existingSummary field. NEVER infer beyond what is directly supported.
+
+Primary goal:
+Write a dense factual summary of the entity that preserves as many supported details as possible while staying coherent and durable.
+
+When the input includes ENTITY TYPE DESCRIPTIONS, use them to decide which facts are most relevant
+to the entity type. NEVER mention the entity type, type description, or classification in the summary text itself.
+
+What to capture:
+- Stable facts about the entity
+- All materially relevant named people, organizations, places, events, documents, objects, and other entities linked to it
+- Explicit actions, roles, responsibilities, relationships, and outcomes
+- Counts, sequences, and repeated patterns when the evidence supports them
+- Temporal details at the highest fidelity available: dates, months, years, ordering, and changes over time
+- Current state over superseded state when newer episodes clearly update older information
 
 Rules:
-- Write 2–6 dense sentences in third person
-- NEVER use meta-language verbs: "mentioned", "discussed", "stated", "noted", "said"
-- Write factual statements that stand alone without referencing the conversation
-- Preserve names, dates, and counts precisely
-- If an existing summary is provided, merge it with new facts; newer facts win on contradiction
-- Skip entities with no relevant context in the episode`;
+- Be exhaustive within the evidence. Prefer retaining a supported concrete detail over omitting it for brevity.
+- NEVER infer preferences, habits, recurrence, frequency, causality, intent, importance, or category
+from a name, a single mention, or weak evidence.
+- Only describe something as recurring, preferred, typical, habitual, or ongoing when multiple episodes
+explicitly support that claim or one episode states it directly.
+- Include all materially relevant named participants that appear in the evidence.
+- Include temporal qualifiers whenever they are available.
+- Mention counts when they are directly supported and meaningful. Prefer direct factual phrasing
+over meta phrasing.
+- When the durable fact is the content of what was said, state the content directly instead of
+describing that it was said.
+- Use communication verbs only when the act of speaking, asking, sharing, presenting,
+announcing, or telling is itself the important fact.
+- NEVER manufacture pattern language from a single occurrence. A single mention can support a fact,
+but not a trend, habit, or preference unless the text states that directly.
+- If the evidence is insufficient or ambiguous, omit the claim.
+- NEVER mention the source material or summarization process.
+- NEVER mention episodes, messages, prompts, summaries, memory, graphs, nodes, labels, node types,
+ontology, schema, or categorization.
+- NEVER output phrases like "the summary", "the entity", "categorized as", "tagged as", "suggests",
+"implies", "appears to", or "recorded interaction".
+- NEVER use "the entity" as a pronoun. Use the entity's actual name or a natural pronoun
+(he, she, it, they).
+- NEVER use meta-language verbs like "mentioned", "described", "stated", "noted", "discussed",
+"referenced", "indicated", or "reported". State the fact directly instead of describing how it
+was communicated.
+- NEVER begin the summary with "A ", "An ", or "This is". If the entity's name starts with
+"The" (e.g. "The Washington Post"), that is acceptable; otherwise NEVER lead with "The ".
+Lead with the entity's name or a concrete fact.
+- When newer episode text conflicts with older summary content, prefer the newer explicit fact.
+- Omit an entity from the output when its summary does not need to change - either the new
+episodes add no durable fact, or there is no existing summary and no relevant information in
+the episodes. Omitted entities preserve their existing value (or absence) on the caller side.
+- The summary should read like a compact brief, not a tagline.
+- Write 2-6 dense sentences in third person.
+- Return only the summary text.
+
+<EXAMPLES>
+Input:
+<PREVIOUS EPISODES>
+- [workshop-recap] (2025-03-03T00:00:00Z): Mina: Jordan Lee presented a ceramics workshop at Belmont Arts Center on March 3, 2025. 
+The workshop had 24 attendees and focused on wheel-thrown bowls.
+- [followup-announcement] (2025-03-10T00:00:00Z): Owen: After the session, Jordan announced a second April workshop for returning students.
+</PREVIOUS EPISODES>
+
+<CURRENT EPISODE>
+Name: studio-update
+Timestamp: 2025-04-14T00:00:00Z
+Content: Mina: Jordan shared that the new kiln room opened last month and that Jordan now supervises two studio assistants. 
+Owen: Jordan still teaches beginner ceramics on Wednesday evenings.
+</CURRENT EPISODE>
+
+<ENTITY TYPE DESCRIPTIONS>
+- Person: A human being.
+</ENTITY TYPE DESCRIPTIONS>
+
+<ENTITIES>
+- name: "Jordan Lee", type: "Person", existingSummary: "Jordan Lee works at Belmont Arts Center.",
+facts: ["Jordan Lee presented a ceramics workshop at Belmont Arts Center",
+"Jordan Lee announced a second April workshop", "Jordan Lee supervises two studio assistants",
+"Jordan Lee teaches beginner ceramics on Wednesday evenings"]
+</ENTITIES>
+
+GOOD output:
+{"summaries": [{"name": "Jordan Lee", "summary": "Jordan Lee works at Belmont Arts Center.
+Jordan presented a ceramics workshop there on March 3, 2025 for 24 attendees focused on
+wheel-thrown bowls, and later announced a second April workshop for returning students.
+Jordan supervises two studio assistants, teaches beginner ceramics on Wednesday evenings,
+and works out of the new kiln room that opened the previous month."}]}
+
+BAD output:
+{"summaries": [{"name": "Jordan Lee", "summary": "Jordan Lee seems interested in ceramics.
+Jordan mentioned teaching and was described as busy at the arts center."}]}
+</EXAMPLES>`;
 
 export function buildNodeSummaryMessages(ctx: {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   nodes: Array<{
-    id: string;
     name: string;
-    summary: string;
+    type?: string;
+    existingSummary: string;
     facts: string[];
   }>;
+  entityTypeDescriptions?: Record<string, string>;
 }): BaseMessage[] {
-  const { episode, previousEpisodes, nodes } = ctx;
+  const { episode, previousEpisodes, nodes, entityTypeDescriptions } = ctx;
 
   const previousEpisodesText = formatPreviousEpisodes(previousEpisodes);
 
   const entitiesText = nodes
     .map((n) => {
       const factsText = n.facts.length > 0 ? JSON.stringify(n.facts) : '[]';
-      return `- id: ${n.id}, name: "${n.name}", existing_summary: "${n.summary}", facts: ${factsText}`;
+      const typePart = n.type ? `, type: "${n.type}"` : '';
+      return `- name: "${n.name}"${typePart}, existingSummary: "${n.existingSummary}", facts: ${factsText}`;
     })
     .join('\n');
 
-  const humanContent = `PREVIOUS EPISODES:\n${previousEpisodesText}\n\nCURRENT EPISODE:\n${episode.content}\n\nENTITIES:\n${entitiesText}`;
+  let humanContent = `Apply every rule from the system instructions when producing summaries for the entities below.
+
+<PREVIOUS EPISODES>
+${previousEpisodesText}
+</PREVIOUS EPISODES>
+
+<CURRENT EPISODE>
+${formatCurrentEpisode(episode)}
+</CURRENT EPISODE>`;
+
+  if (entityTypeDescriptions && Object.keys(entityTypeDescriptions).length > 0) {
+    const descriptionsText = Object.entries(entityTypeDescriptions)
+      .map(([label, description]) => `- ${label}: ${description}`)
+      .join('\n');
+    humanContent += `\n\n<ENTITY TYPE DESCRIPTIONS>\n${descriptionsText}\n</ENTITY TYPE DESCRIPTIONS>`;
+  }
+
+  humanContent += `\n\n<ENTITIES>\n${entitiesText}\n</ENTITIES>`;
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
 }

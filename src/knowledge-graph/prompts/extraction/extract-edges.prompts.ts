@@ -5,9 +5,16 @@ import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
 import { EntityNode, EpisodicNode } from '@/knowledge-graph/models';
 import { RelationshipTypeSchema } from '@/knowledge-graph/types';
 
-// Schemas
+import {
+  formatCurrentEpisode,
+  formatPreviousEpisodes,
+  formatPromptTimestamp,
+} from '../text-utils';
 
-export const ExtractedEdgeSchema = z.object({
+// Schema
+
+// TODO: Too much cognitive load for a model
+const ExtractedEdgeSchema = z.object({
   sourceEntityName: z
     .string()
     .describe('The name of the source entity from the ENTITIES list'),
@@ -36,19 +43,18 @@ export const ExtractedEdgeSchema = z.object({
     .describe(
       'The date and time when the relationship described by the edge fact stopped being true or ended. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)',
     ),
-  episodeIndices: z
-    .array(z.number())
-    .default([0])
-    .describe(
-      'List of episode numbers (0-indexed) that this fact was derived from. When processing a single episode, this should be [0].',
-    ),
+  // TODO: Multi-episode extraction per prompt
+  // episodeIndices: z
+  //   .array(z.number())
+  //   .default([0])
+  //   .describe(
+  //     'List of episode numbers (0-indexed) that this fact was derived from. When processing a single episode, this should be [0].',
+  //   ),
 });
 
-export const ExtractedEdgesSchema = z.object({
+const ExtractedEdgesSchema = z.object({
   edges: z.array(ExtractedEdgeSchema).describe('List of extracted relationship facts'),
 });
-
-export type ExtractedEdges = z.infer<typeof ExtractedEdgesSchema>;
 
 export const extractedEdgesJsonSchema = z.toJSONSchema(ExtractedEdgesSchema, {
   io: 'input',
@@ -56,12 +62,80 @@ export const extractedEdgesJsonSchema = z.toJSONSchema(ExtractedEdgesSchema, {
 
 // Prompt builder
 
-const SYSTEM_PROMPT =
-  'You are an expert fact extractor that extracts fact triples from text. ' +
-  '1. Extracted fact triples should also be extracted with relevant date information. ' +
-  '2. The CURRENT_MESSAGE may contain multiple episodes, each with its own timestamp. ' +
-  "Use each episode's timestamp to resolve temporal references within that episode. " +
-  'REFERENCE_TIME is a fallback for when no per-episode timestamp is available.';
+const SYSTEM_PROMPT = `You are an expert fact extractor. Extract factual relationships (edges)
+between the given ENTITIES from the CURRENT EPISODE.
+
+Primary goal:
+Extract every clearly stated or unambiguously implied relationship between two DISTINCT entities
+from the ENTITIES list that can be represented as an edge in a knowledge graph, paraphrased from
+the source text with all specific details preserved, and annotated with relevant date information.
+
+Source rules:
+- Only use facts grounded in the CURRENT EPISODE. The CURRENT EPISODE may contain multiple
+episodes, each with its own timestamp.
+- Use PREVIOUS EPISODES only to disambiguate references or support continuity, never as a source
+of new facts.
+- Use each episode's timestamp to resolve temporal references within that episode. REFERENCE TIME
+is a fallback for when no per-episode timestamp is available.
+
+EXTRACTION RULES:
+
+1. Entity Name Validation: 'sourceEntityName' and 'targetEntityName' MUST use only the 'name'
+values from the ENTITIES list provided in the human message.
+   - CRITICAL: Using names not in the list will cause the edge to be rejected.
+2. Each fact must involve two DISTINCT entities - 'sourceEntityName' and 'targetEntityName' NEVER
+refer to the same entity.
+3. Prefer facts that involve two distinct entities from the ENTITIES list. When a sentence
+describes a specific, concrete detail about a single entity (a brand name, a specific item, a
+physical description, a quantity, a location, a named activity), do NOT drop it. Instead, look for
+a second entity in the ENTITIES list that the detail relates to and form a proper edge (e.g.,
+Entity -> OWNS -> item-entity, Entity -> LIVES_IN -> place-entity,
+Entity -> HAS_ATTRIBUTE -> detail-entity). Only skip the fact when no second entity in the
+ENTITIES list can anchor the detail.
+   - BAD: "Alice feels happy" (vague single-entity state with no concrete detail - what is Alice happy about?)
+   - GOOD: "Alice feels happy about Bob's promotion" -> Alice -> FEELS_HAPPY_ABOUT -> Bob's promotion
+   - GOOD: "Nate plays games on a Gamecube" -> Nate -> PLAYS_GAMES_ON -> Gamecube (when "Gamecube" is in ENTITIES)
+   - GOOD: "Alice congratulated Bob" (relationship between two entities), "Alice lives in Paris" (relationship between entity and place)
+4. Do not emit semantically redundant facts, even across episodes within the CURRENT EPISODE.
+However, if a later episode adds specific details to a previously stated fact (e.g., adding a brand
+name, a count, a color, a location, or any concrete attribute), extract the more detailed version
+as a NEW fact - it is NOT a duplicate. Only treat facts as duplicates when they convey the same
+specificity.
+   - NOT a duplicate: "user plays video games" (Episode 0)
+   vs. "user plays games on a Gamecube" (Episode 1) -> extract the second, more detailed fact.
+   - IS a duplicate: "user plays games on a Gamecube" (Episode 0)
+   vs. "user plays Gamecube games" (Episode 1) -> extract once, list both episodes in 'episodeIndices'.
+5. The 'fact' MUST preserve all specific details from the source text: proper nouns, brand names,
+product names, model numbers, quantities, counts, colors, materials, physical descriptions,
+specific items, named locations, and named activities. Paraphrase the sentence structure but NEVER
+generalize:
+   - NEVER generalize "Gamecube" to "gaming console", "Ford Mustang" to "car", "wool coat" to
+"coat", "red and purple lighting" to "lighting", "cracked windshield" to "car damage", or "three
+screenplays" to "several screenplays".
+   - Do not verbatim quote the original text, but every concrete noun, number, and descriptor in
+the source should survive into the 'fact'.
+6. Facts should include entity names rather than pronouns whenever possible.
+7. NEVER hallucinate or infer temporal bounds from unrelated events.
+
+RELATION TYPE RULES:
+
+- If FACT TYPES are provided and the relationship matches one of the types (considering the entity
+type signature), use that factTypeName as the 'relationType'.
+- Otherwise, derive a 'relationType' from the relationship predicate in SCREAMING_SNAKE_CASE
+(e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH).
+
+DATETIME RULES:
+
+- Use ISO 8601 with "Z" suffix (UTC) (e.g., 2025-04-30T00:00:00Z).
+- If the fact is ongoing (present tense), set 'validAt' to the timestamp of the episode the fact
+originates from. If no per-episode timestamp is available, use REFERENCE TIME.
+- If a change/termination is expressed, set 'invalidAt' to the relevant timestamp.
+- Leave both fields null if no explicit or resolvable time is stated.
+- If only a date is mentioned (no time), assume 00:00:00.
+- If only a year is mentioned, use January 1st at 00:00:00.
+- Use REFERENCE TIME to resolve vague or relative temporal expressions (e.g., "last week"). When
+the CURRENT EPISODE contains multiple episodes with per-episode timestamps, prefer the timestamp
+of the specific episode the fact originates from.`;
 
 export function buildExtractEdgesMessages(ctx: {
   episode: EpisodicNode;
@@ -93,33 +167,21 @@ export function buildExtractEdgesMessages(ctx: {
 
   const edgeTypesContext = edgeTypes
     ? Object.entries(edgeTypes).map(([name, { description }]) => ({
-        fact_type_name: name,
-        fact_type_signatures: edgeTypeSignaturesMap[name] ?? ['Entity,Entity'],
-        fact_type_description: description,
+        factTypeName: name,
+        factTypeSignatures: edgeTypeSignaturesMap[name] ?? ['Entity,Entity'],
+        factTypeDescription: description,
       }))
     : [];
 
-  const edgeTypesSection =
-    edgeTypesContext.length > 0
-      ? `\n<FACT_TYPES>\n${JSON.stringify(edgeTypesContext, null, 2)}\n</FACT_TYPES>\n`
-      : '';
+  let humanContent = `Apply every rule from the system instructions when extracting facts from the CURRENT EPISODE below.
 
-  const humanContent = `
-<PREVIOUS_MESSAGES>
-${JSON.stringify(
-  previousEpisodes.map((e) => ({
-    name: e.name,
-    timestamp: e.validAt.toISOString(),
-    content: e.content,
-  })),
-  null,
-  2,
-)}
-</PREVIOUS_MESSAGES>
+<PREVIOUS EPISODES>
+${formatPreviousEpisodes(previousEpisodes)}
+</PREVIOUS EPISODES>
 
-<CURRENT_MESSAGE>
-${JSON.stringify({ name: episode.name, timestamp: episode.validAt.toISOString(), content: episode.content }, null, 2)}
-</CURRENT_MESSAGE>
+<CURRENT EPISODE>
+${formatCurrentEpisode(episode)}
+</CURRENT EPISODE>
 
 <ENTITIES>
 ${JSON.stringify(
@@ -129,55 +191,91 @@ ${JSON.stringify(
 )}
 </ENTITIES>
 
-<REFERENCE_TIME>
-${referenceTime.toISOString()}  # ISO 8601 (UTC); used to resolve relative time mentions
-</REFERENCE_TIME>
-${edgeTypesSection}
-# TASK
-Extract all factual relationships between the given ENTITIES based on the CURRENT MESSAGE.
-Only extract facts that:
-- involve two DISTINCT ENTITIES from the ENTITIES list,
-- are clearly stated or unambiguously implied in the CURRENT MESSAGE,
-    and can be represented as edges in a knowledge graph.
-- Facts should include entity names rather than pronouns whenever possible.
+<REFERENCE TIME>
+${formatPromptTimestamp(referenceTime)}  # ISO 8601 (UTC); used to resolve relative time mentions
+</REFERENCE TIME>`;
 
-You may use information from the PREVIOUS MESSAGES only to disambiguate references or support continuity.
+  if (edgeTypesContext.length > 0) {
+    humanContent += `
 
-${customInstructions ?? ''}
+<FACT TYPES>
+${JSON.stringify(edgeTypesContext, null, 2)}
+</FACT TYPES>`;
+  }
 
-# EXTRACTION RULES
-
-1. **Entity Name Validation**: \`sourceEntityName\` and \`targetEntityName\` must use only the \`name\` values from the ENTITIES list provided above.
-   - **CRITICAL**: Using names not in the list will cause the edge to be rejected
-2. Each fact must involve two **distinct** entities — \`sourceEntityName\` and \`targetEntityName\` NEVER refer to the same entity.
-3. Prefer facts that involve two distinct entities from the ENTITIES list. When a sentence describes a specific, concrete detail about a single entity (a brand name, a specific item, a physical description, a quantity, a location, a named activity), do NOT drop it. Instead, look for a second entity in the ENTITIES list that the detail relates to and form a proper triple (e.g., Entity -> OWNS -> item-entity, Entity -> LIVES_IN -> place-entity, Entity -> HAS_ATTRIBUTE -> detail-entity). Only skip the fact when no second entity in the ENTITIES list can anchor the detail.
-   - BAD: "Alice feels happy" (vague single-entity state with no concrete detail — what is Alice happy about?)
-   - GOOD: "Alice feels happy about Bob's promotion" → Alice -> FEELS_HAPPY_ABOUT -> Bob's promotion
-   - GOOD: "Nate plays games on a Gamecube" → Nate -> PLAYS_GAMES_ON -> Gamecube (when "Gamecube" is in ENTITIES)
-   - GOOD: "Alice congratulated Bob" (relationship between two entities), "Alice lives in Paris" (relationship between entity and place)
-4. Do not emit semantically redundant facts, even across episodes within the CURRENT_MESSAGE. However, if a later episode adds specific details to a previously stated fact (e.g., adding a brand name, a count, a color, a location, or any concrete attribute), extract the more detailed version as a NEW fact — it is NOT a duplicate. Only treat facts as duplicates when they convey the same specificity.
-   - NOT a duplicate: "user plays video games" (Episode 0) vs. "user plays games on a Gamecube" (Episode 1) → extract the second, more detailed fact.
-   - IS a duplicate: "user plays games on a Gamecube" (Episode 0) vs. "user plays Gamecube games" (Episode 1) → extract once, list both episodes in \`episodeIndices\`.
-5. The \`fact\` MUST preserve all specific details from the source text: proper nouns, brand names, product names, model numbers, quantities, counts, colors, materials, physical descriptions, specific items, named locations, and named activities. Paraphrase the sentence structure but NEVER generalize:
-   - NEVER generalize "Gamecube" to "gaming console", "Ford Mustang" to "car", "wool coat" to "coat", "red and purple lighting" to "lighting", "cracked windshield" to "car damage", or "three screenplays" to "several screenplays".
-   - Do not verbatim quote the original text, but every concrete noun, number, and descriptor in the source should survive into the \`fact\`.
-6. Use \`REFERENCE_TIME\` to resolve vague or relative temporal expressions (e.g., "last week"). When the CURRENT_MESSAGE contains multiple episodes with per-episode timestamps, prefer the timestamp of the specific episode the fact originates from.
-7. Do **not** hallucinate or infer temporal bounds from unrelated events.
-
-# RELATION TYPE RULES
-
-- If FACT_TYPES are provided and the relationship matches one of the types (considering the entity type signature), use that fact_type_name as the \`relationType\`.
-- Otherwise, derive a \`relationType\` from the relationship predicate in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH).
-
-# DATETIME RULES
-
-- Use ISO 8601 with "Z" suffix (UTC) (e.g., 2025-04-30T00:00:00Z).
-- If the fact is ongoing (present tense), set \`validAt\` to the timestamp of the episode the fact originates from. If no per-episode timestamp is available, use REFERENCE_TIME.
-- If a change/termination is expressed, set \`invalidAt\` to the relevant timestamp.
-- Leave both fields \`null\` if no explicit or resolvable time is stated.
-- If only a date is mentioned (no time), assume 00:00:00.
-- If only a year is mentioned, use January 1st at 00:00:00.
-`;
+  if (customInstructions) {
+    humanContent += `\n\n<CUSTOM INSTRUCTIONS>\n${customInstructions}\n</CUSTOM INSTRUCTIONS>`;
+  }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+// Per-edge timestamp fallback
+//
+// The main edge-extraction prompt above already emits validAt/invalidAt
+// inline on every edge. This second prompt is a single-edge fallback for
+// edges where the batch pass returned both fields as null - we re-ask the
+// model with just one fact and a reference time, which is cheaper and gives
+// the model less to juggle.
+//
+// Mirrors graphiti's `extract_edges.extract_timestamps` (Python
+// `graphiti_core/prompts/extract_edges.py`) called from
+// `edge_operations.py:_extract_edge_timestamps`. Caller:
+// `EpisodeService.extractEdgeTimestampsFallback`.
+
+const EdgeTimestampsSchema = z.object({
+  validAt: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'When the fact became true. ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z). Null if no temporal information.',
+    ),
+  invalidAt: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'When the fact stopped being true. ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z). Null if ongoing or unknown.',
+    ),
+});
+
+export const edgeTimestampsJsonSchema = z.toJSONSchema(EdgeTimestampsSchema, {
+  io: 'input',
+});
+
+const TIMESTAMPS_FALLBACK_SYSTEM_PROMPT = `You extract temporal bounds from facts. NEVER hallucinate dates.
+
+Given a FACT and its REFERENCE TIME, determine when the fact became true
+(validAt) and when it stopped being true (invalidAt).
+
+Rules:
+- Resolve relative expressions ("last week", "2 years ago", "yesterday") using REFERENCE TIME.
+- If the fact is ongoing (present tense), set validAt to REFERENCE TIME.
+- If a change or end is expressed, set invalidAt to the relevant time.
+- Leave both null if no time is stated or resolvable.
+- If only a date is mentioned (no time), assume 00:00:00.
+- Use ISO 8601 with Z suffix (e.g., 2025-04-30T00:00:00Z).
+- Do NOT hallucinate or infer dates from unrelated events.`;
+
+export function buildExtractTimestampsMessages(ctx: {
+  fact: string;
+  referenceTime: Date;
+}): BaseMessage[] {
+  const { fact, referenceTime } = ctx;
+
+  const humanContent = `Apply every rule from the system instructions when extracting timestamps for the fact below.
+
+<FACT>
+${fact}
+</FACT>
+
+<REFERENCE TIME>
+${formatPromptTimestamp(referenceTime)}
+</REFERENCE TIME>`;
+
+  return [
+    new SystemMessage(TIMESTAMPS_FALLBACK_SYSTEM_PROMPT),
+    new HumanMessage(humanContent),
+  ];
 }

@@ -1,23 +1,18 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
+import { formatPromptTimestamp } from '../text-utils';
+
+// Schema
+
 // Response schema is dynamic per call: the caller derives it from the matched
 // EdgeTypeMap entry's `schema` field at invocation time (see
-// EpisodeService.extractEdgeAttributesImpl), so no static schema is bound here.
+// EpisodeService.fillEdgeAttributesImpl), so no static schema is bound here.
 
-const SYSTEM_PROMPT =
-  'You are a fact attribute extraction specialist. ' +
-  'You ONLY emit attribute values that are explicitly stated in the FACT or ' +
-  'already present in EXISTING ATTRIBUTES. You output strictly the JSON specified ' +
-  'by the response schema - no reasoning, no explanation, no commentary in any field.';
+// Prompt builder
 
-export function buildExtractEdgeAttributesMessages(ctx: {
-  fact: string;
-  referenceTime: Date;
-  existingAttributes: Record<string, unknown>;
-}): BaseMessage[] {
-  const { fact, referenceTime, existingAttributes } = ctx;
-
-  const humanContent = `Given the following FACT, its REFERENCE TIME, and any EXISTING ATTRIBUTES, update the attributes.
+const SYSTEM_PROMPT = `You are a fact attribute extraction specialist. You ONLY emit attribute values
+that are explicitly stated in the FACT or already present in EXISTING ATTRIBUTES. You output strictly
+the JSON specified by the response schema - no reasoning, no explanation, no commentary in any field.
 
 HARD RULES - violating any of these is a failure:
 
@@ -46,14 +41,23 @@ HARD RULES - violating any of these is a failure:
 
 6. Use REFERENCE TIME to resolve any relative temporal expressions in the fact.
 
-7. Preserve existing attribute values unless the FACT explicitly provides a new value.
+7. Preserve existing attribute values unless the FACT explicitly provides a new value.`;
+
+export function buildFillEdgeAttributesMessages(ctx: {
+  fact: string;
+  referenceTime: Date;
+  existingAttributes: Record<string, unknown>;
+}): BaseMessage[] {
+  const { fact, referenceTime, existingAttributes } = ctx;
+
+  const humanContent = `Apply every rule from the system instructions when updating the attributes for the fact below.
 
 <FACT>
 ${fact}
 </FACT>
 
 <REFERENCE TIME>
-${referenceTime.toISOString()}
+${formatPromptTimestamp(referenceTime)}
 </REFERENCE TIME>
 
 <EXISTING ATTRIBUTES>

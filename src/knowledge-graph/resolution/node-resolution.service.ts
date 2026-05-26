@@ -121,12 +121,17 @@ export class NodeResolutionService {
     if (llmCandidates.size > 0) {
       const llmExtractedWithIdx = extractedNodes
         .filter((n) => llmCandidates.has(n.id))
-        .map((n, idx) => ({ id: idx, name: n.name, entityId: n.id }));
+        .map((n, idx) => ({
+          id: idx,
+          name: n.name,
+          labels: n.labels,
+          entityId: n.id,
+        }));
 
       const idxToEntityId = new Map(llmExtractedWithIdx.map((e) => [e.id, e.entityId]));
 
       // Collect unique candidate nodes across all batches, assigning a stable
-      // integer candidate_id so the LLM can reference them unambiguously.
+      // integer candidateId so the LLM can reference them unambiguously.
       // String-name references are hallucination-prone; integer ids cannot be
       // invented (the LLM either picks one we sent or -1 for "no match").
       const candidateSet = new Map<Uuid, EntityNode>();
@@ -142,14 +147,16 @@ export class NodeResolutionService {
       const allCandidates = candidatesList.map((n, idx) => ({
         candidateId: idx,
         name: n.name,
+        labels: n.labels,
       }));
 
       const messages = buildDedupeNodesMessages({
         episode,
         previousEpisodes,
-        extractedNodes: llmExtractedWithIdx.map(({ id, name }) => ({
+        extractedNodes: llmExtractedWithIdx.map(({ id, name, labels }) => ({
           id,
           name,
+          labels,
         })),
         candidateNodes: allCandidates,
         customInstructions,
@@ -163,14 +170,14 @@ export class NodeResolutionService {
           tags: ['knowledge-graph', 'resolution.node'],
         });
 
-      const resolutions = raw.entity_resolutions;
+      const resolutions = raw.entityResolutions;
 
       for (const resolution of resolutions) {
         const extractedId = idxToEntityId.get(resolution.id);
         if (!extractedId) continue;
 
-        if (resolution.duplicate_candidate_id >= 0) {
-          const canonical = candidateIdToEntity.get(resolution.duplicate_candidate_id);
+        if (resolution.duplicateCandidateId >= 0) {
+          const canonical = candidateIdToEntity.get(resolution.duplicateCandidateId);
           if (canonical) {
             idMap.set(extractedId, canonical.id);
             duplicatePairs.push({

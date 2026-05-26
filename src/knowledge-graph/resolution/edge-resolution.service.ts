@@ -108,12 +108,12 @@ export class EdgeResolutionService {
     const invalidatedEdgesMap = new Map<Uuid, EntityEdge>();
 
     for (const edge of deduped) {
-      // Find same-endpoint existing edges
+      // Find same-endpoint existing edges (same direction only). Reversed-direction
+      // duplicates are left to cosine/keyword retrieval to surface as similar-topic
+      // candidates - the prompt no longer reasons about endpoint direction.
       const endpointEdges = existingEdges.filter(
         (e) =>
-          (e.sourceNodeId === edge.sourceNodeId &&
-            e.targetNodeId === edge.targetNodeId) ||
-          (e.sourceNodeId === edge.targetNodeId && e.targetNodeId === edge.sourceNodeId),
+          e.sourceNodeId === edge.sourceNodeId && e.targetNodeId === edge.targetNodeId,
       );
 
       // Find similar-fact edges (cosine) excluding same-endpoint already found
@@ -169,9 +169,7 @@ export class EdgeResolutionService {
       );
 
       // A fact is duplicate only if it matches an endpoint-range index
-      const isDuplicate = dedupe.duplicate_facts.some(
-        (idx) => idx < endpointEdges.length,
-      );
+      const isDuplicate = dedupe.duplicateFacts.some((idx) => idx < endpointEdges.length);
 
       if (!isDuplicate) {
         if (edge.invalidAt && !edge.expiredAt) {
@@ -181,7 +179,7 @@ export class EdgeResolutionService {
         // Self-expiration - if any contradiction candidate postdates this edge,
         // the edge is superseded by information already in the graph.
         if (!edge.expiredAt) {
-          const contradictionCandidates = dedupe.contradicted_facts
+          const contradictionCandidates = dedupe.contradictedFacts
             .map((idx) => idxToEdge.get(idx))
             .filter((e): e is EntityEdge => e !== undefined)
             .filter((c) => c.validAt !== null)
@@ -201,7 +199,7 @@ export class EdgeResolutionService {
         // Append this episode's ID to the matching existing endpoint edge(s)
         // and include them in resolvedEdges so they are re-saved with updated episodes.
         // Mirrors Python edge_operations.py:523-524 and 581-582.
-        for (const idx of dedupe.duplicate_facts) {
+        for (const idx of dedupe.duplicateFacts) {
           if (idx < endpointEdges.length) {
             const existingEdge = idxToEdge.get(idx);
             if (existingEdge && !resolvedExistingIds.has(existingEdge.id)) {
@@ -218,7 +216,7 @@ export class EdgeResolutionService {
       // Only invalidate existing edges that genuinely overlap with the new edge's
       // validity window and predate it. Mirrors Python resolve_edge_contradictions
       // (edge_operations.py:425-460).
-      for (const idx of dedupe.contradicted_facts) {
+      for (const idx of dedupe.contradictedFacts) {
         const existing = idxToEdge.get(idx);
         if (!existing || invalidatedEdgesMap.has(existing.id)) continue;
 
@@ -335,10 +333,8 @@ export class EdgeResolutionService {
       for (const peer of allEdges) {
         if (peer.id === edge.id) continue;
         const sameEndpoints =
-          (peer.sourceNodeId === edge.sourceNodeId &&
-            peer.targetNodeId === edge.targetNodeId) ||
-          (peer.sourceNodeId === edge.targetNodeId &&
-            peer.targetNodeId === edge.sourceNodeId);
+          peer.sourceNodeId === edge.sourceNodeId &&
+          peer.targetNodeId === edge.targetNodeId;
         if (sameEndpoints) {
           endpointEdges.push(peer);
           continue;
@@ -382,7 +378,7 @@ export class EdgeResolutionService {
         // (bulk_utils.py:521-524) which never surfaces non-endpoint duplicates.
         const endpointCount = t.endpointEdges.length;
         const localPairs: [Uuid, Uuid][] = [];
-        for (const idx of dedupe.duplicate_facts) {
+        for (const idx of dedupe.duplicateFacts) {
           if (idx >= endpointCount) continue;
           const peer = idxToEdge.get(idx);
           if (peer) localPairs.push([t.edge.id, peer.id]);
@@ -446,7 +442,7 @@ export class EdgeResolutionService {
   // Shared LLM-driven dedup call used by both per-episode `resolveEdges` and
   // batch-wide `dedupeAcrossBatch`. Builds the integer-indexed candidate list,
   // invokes the structured-output prompt, and returns the raw decisions plus
-  // the idx → edge map so callers can act on duplicate_facts / contradicted_facts.
+  // the idx → edge map so callers can act on duplicateFacts / contradictedFacts.
   private async dedupeEdgeViaLlm(
     model: BaseChatModel,
     edge: EntityEdge,
@@ -458,46 +454,35 @@ export class EdgeResolutionService {
     customInstructions: string | undefined,
     ctx: LlmContext | undefined,
   ): Promise<{
-    dedupe: { duplicate_facts: number[]; contradicted_facts: number[] };
+    dedupe: { duplicateFacts: number[]; contradictedFacts: number[] };
     idxToEdge: Map<number, EntityEdge>;
   }> {
-    // Split endpoint candidates by direction so the LLM can treat reversed
-    // pairs as duplicates only for symmetric relations. Indices stay
-    // continuous: same → reversed → similar.
-    const sameDirection = endpointEdges.filter(
-      (e) => e.sourceNodeId === edge.sourceNodeId,
-    );
-    const reversedDirection = endpointEdges.filter(
-      (e) => e.sourceNodeId !== edge.sourceNodeId,
-    );
+    // TODO: reversed-direction duplicates can slip through. Endpoint matching
+    // is same-direction only (matches Graphiti), so a fact like "Acme employs
+    // Alice" won't collide with an existing "Alice works at Acme" via the
+    // endpoint bucket. It only surfaces if cosine/keyword retrieval lifts it
+    // into similarEdges - and even then the duplicate guard ignores matches
+    // outside the endpoint range, so the LLM can only flag it as a
+    // contradiction (or miss it entirely). Revisit once we have an eval set.
 
-    const sameWithIdx = sameDirection.map((e, i) => ({ idx: i, edge: e }));
-    const reversedOffset = sameDirection.length;
-    const reversedWithIdx = reversedDirection.map((e, i) => ({
-      idx: reversedOffset + i,
-      edge: e,
-    }));
-    const similarOffset = reversedOffset + reversedDirection.length;
+    // Continuous indices: endpoint → similar. The duplicate guard in callers
+    // relies on idx < endpointEdges.length, so order matters.
+    const endpointWithIdx = endpointEdges.map((e, i) => ({ idx: i, edge: e }));
+    const similarOffset = endpointEdges.length;
     const similarWithIdx = similarEdges.map((e, i) => ({
       idx: similarOffset + i,
       edge: e,
     }));
 
     const idxToEdge = new Map<number, EntityEdge>();
-    for (const { idx, edge: e } of sameWithIdx) idxToEdge.set(idx, e);
-    for (const { idx, edge: e } of reversedWithIdx) idxToEdge.set(idx, e);
+    for (const { idx, edge: e } of endpointWithIdx) idxToEdge.set(idx, e);
     for (const { idx, edge: e } of similarWithIdx) idxToEdge.set(idx, e);
 
     const messages = buildDedupeEdgesMessages({
       episode,
       previousEpisodes,
       newEdge: { name: edge.name, fact: edge.fact },
-      sameDirectionEdges: sameWithIdx.map(({ idx, edge: e }) => ({
-        idx,
-        name: e.name,
-        fact: e.fact,
-      })),
-      reversedDirectionEdges: reversedWithIdx.map(({ idx, edge: e }) => ({
+      endpointEdges: endpointWithIdx.map(({ idx, edge: e }) => ({
         idx,
         name: e.name,
         fact: e.fact,
