@@ -1,6 +1,5 @@
 import { Uuid } from '@/common/schemas';
 
-import { RelationshipTypeSchema } from '../types';
 import {
   buildDirectedIdMap,
   compressIdMap,
@@ -8,6 +7,7 @@ import {
   UnionFind,
   withConcurrency,
 } from './batch-utils';
+import { RelationshipTypeSchema } from './types';
 
 const u = (s: string) => s as Uuid;
 

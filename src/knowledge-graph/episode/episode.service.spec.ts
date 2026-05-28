@@ -81,18 +81,20 @@ describe('EpisodeService', () => {
     mockEpisodicNodeRepo.retrieveEpisodes.mockResolvedValue([]);
     mockEpisodicNodeRepo.saveBulk.mockResolvedValue(undefined);
     mockNodeExtraction.extractNodes.mockResolvedValue([]);
-    mockEntityNodeRepo.searchByName.mockResolvedValue([]);
-    mockEntityNodeRepo.searchBySimilarity.mockResolvedValue([]);
-    mockEmbeddingService.embedNodes.mockResolvedValue([]);
+    mockNodeExtraction.fillEntityAttributes.mockResolvedValue(undefined);
+    mockNodeExtraction.summarizeNodes.mockResolvedValue(undefined);
+    mockNodeResolution.collectCandidates.mockResolvedValue([]);
     mockNodeResolution.resolveNodes.mockResolvedValue({
       resolvedNodes: [],
       idMap: new Map(),
       duplicatePairs: [],
     });
+    mockNodeResolution.dedupeAcrossBatch.mockReturnValue([]);
+    mockEmbeddingService.embedNodes.mockResolvedValue([]);
     mockEdgeExtraction.extractEdges.mockResolvedValue([]);
-    mockEntityEdgeRepo.searchByFact.mockResolvedValue([]);
-    mockEntityEdgeRepo.searchBySimilarity.mockResolvedValue([]);
-    mockEntityEdgeRepo.getBetweenNodes.mockResolvedValue([]);
+    mockEdgeExtraction.fillEdgeAttributes.mockResolvedValue(undefined);
+    mockEdgeExtraction.extractEdgeTimestampsFallback.mockResolvedValue(undefined);
+    mockEdgeResolution.collectCandidates.mockResolvedValue([]);
     mockEmbeddingService.embedEdges.mockResolvedValue([]);
     mockEdgeResolution.resolveEdges.mockResolvedValue({
       resolvedEdges: [],
@@ -107,7 +109,6 @@ describe('EpisodeService', () => {
     mockEpisodicEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityNodeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityEdgeRepo.saveBulk.mockResolvedValue(undefined);
-    mockRunnable.invoke.mockResolvedValue({ summaries: [] });
     mockCommunityService.buildCommunities.mockResolvedValue(undefined);
   });
 
@@ -177,7 +178,7 @@ describe('EpisodeService', () => {
 
       mockNodeExtraction.extractNodes.mockResolvedValue([extracted]);
       mockEmbeddingService.embedNodes.mockResolvedValue([embedded]);
-      mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
+      mockNodeResolution.collectCandidates.mockResolvedValue([existing]);
 
       await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
@@ -208,7 +209,7 @@ describe('EpisodeService', () => {
         { ...resolved, nameEmbedding: null },
         { ...alias, nameEmbedding: null },
       ]);
-      mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
+      mockNodeResolution.collectCandidates.mockResolvedValue([existing]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [resolved],
         idMap: new Map([[alias.id, existing.id]]),
@@ -276,7 +277,7 @@ describe('EpisodeService', () => {
 
       mockEdgeExtraction.extractEdges.mockResolvedValue([edge]);
       mockEmbeddingService.embedEdges.mockResolvedValue([embeddedEdge]);
-      mockEntityEdgeRepo.searchByFact.mockResolvedValue([existingEdge]);
+      mockEdgeResolution.collectCandidates.mockResolvedValue([existingEdge]);
 
       await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
@@ -323,7 +324,7 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedNodes.mockResolvedValue([
         { ...resolved, nameEmbedding: null },
       ]);
-      mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
+      mockNodeResolution.collectCandidates.mockResolvedValue([existing]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
         resolvedNodes: [resolved],
         idMap: new Map([[u('some-id'), existing.id]]),
@@ -391,7 +392,7 @@ describe('EpisodeService', () => {
         graphId: KG_TEST_GRAPH_ID,
       });
 
-      mockEntityNodeRepo.searchByName.mockResolvedValue([existingCanonical]);
+      mockNodeResolution.collectCandidates.mockResolvedValue([existingCanonical]);
       mockNodeExtraction.extractNodes.mockResolvedValue([alias]);
       mockEmbeddingService.embedNodes.mockResolvedValue([alias]);
       mockNodeResolution.resolveNodes.mockResolvedValue({
@@ -445,36 +446,39 @@ describe('EpisodeService', () => {
     });
   });
 
-  // ─── Pass-2: within-batch exact-name + cosine similarity dedup ─────────────
+  // ─── Pass-2: within-batch dedup is delegated to NodeResolutionService ──────
+  // Logic-level unit tests for the dedup itself live in
+  // node-resolution.service.spec.ts ('dedupeAcrossBatch'). The orchestration
+  // test below verifies that pairs returned by the service participate in the
+  // final canonical projection.
 
-  describe('addEpisodes - pass-2 dedup (within-batch)', () => {
-    it('two nodes with identical embeddings → exactly one survives across the batch', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
+  describe('addEpisodes - pass-2 dedup (orchestration)', () => {
+    it('pairs returned by dedupeAcrossBatch are folded into finalIdMap, collapsing the alias', async () => {
+      const canonical = KgNodeFactory.createEntityNode({
         name: 'Alice',
         graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0],
       });
-      const nodeB = KgNodeFactory.createEntityNode({
+      const alias = KgNodeFactory.createEntityNode({
         name: 'Alicia',
         graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0], // cosine([1,0],[1,0]) = 1.0 ≥ 0.9 threshold
       });
 
       mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
+        .mockResolvedValueOnce([canonical])
+        .mockResolvedValueOnce([alias]);
+      mockEmbeddingService.embedNodes.mockResolvedValue([canonical, alias]);
       mockNodeResolution.resolveNodes
         .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
+          resolvedNodes: [canonical],
+          idMap: new Map([[canonical.id, canonical.id]]),
           duplicatePairs: [],
         })
         .mockResolvedValueOnce({
-          resolvedNodes: [nodeB],
-          idMap: new Map([[nodeB.id, nodeB.id]]),
+          resolvedNodes: [alias],
+          idMap: new Map([[alias.id, alias.id]]),
           duplicatePairs: [],
         });
+      mockNodeResolution.dedupeAcrossBatch.mockReturnValue([[alias.id, canonical.id]]);
 
       const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
@@ -482,217 +486,8 @@ describe('EpisodeService', () => {
       });
 
       const allNodes = result.flatMap((r) => r.nodes);
-      const hasA = allNodes.some((n) => n.id === nodeA.id);
-      const hasB = allNodes.some((n) => n.id === nodeB.id);
-      expect(hasA || hasB).toBe(true);
-      expect(hasA && hasB).toBe(false);
-    });
-
-    it('two nodes with orthogonal embeddings → both kept (below threshold)', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0],
-      });
-      const nodeB = KgNodeFactory.createEntityNode({
-        name: 'Bob',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [0, 1],
-      });
-
-      mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
-      mockNodeResolution.resolveNodes
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
-          duplicatePairs: [],
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeB],
-          idMap: new Map([[nodeB.id, nodeB.id]]),
-          duplicatePairs: [],
-        });
-
-      const result = await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
-      });
-
-      const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
-      expect(allNodes.find((n) => n.id === nodeB.id)).toBeDefined();
-    });
-
-    it('identical names with null embeddings → deduplicated by exact match', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: null,
-      });
-      const nodeB = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: null,
-      });
-
-      mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
-      mockNodeResolution.resolveNodes
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
-          duplicatePairs: [],
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeB],
-          idMap: new Map([[nodeB.id, nodeB.id]]),
-          duplicatePairs: [],
-        });
-
-      const result = await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
-      });
-
-      const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
-      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
-    });
-
-    it('null embedding + same name as an embedded node → deduplicated by exact match', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0],
-      });
-      const nodeB = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: null,
-      });
-
-      mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
-      mockNodeResolution.resolveNodes
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
-          duplicatePairs: [],
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeB],
-          idMap: new Map([[nodeB.id, nodeB.id]]),
-          duplicatePairs: [],
-        });
-
-      const result = await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
-      });
-
-      const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
-      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
-    });
-
-    it('different names with null embeddings → both kept', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: null,
-      });
-      const nodeB = KgNodeFactory.createEntityNode({
-        name: 'Bob',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: null,
-      });
-
-      mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB]);
-      mockNodeResolution.resolveNodes
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
-          duplicatePairs: [],
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeB],
-          idMap: new Map([[nodeB.id, nodeB.id]]),
-          duplicatePairs: [],
-        });
-
-      const result = await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
-      });
-
-      const allNodes = result.flatMap((r) => r.nodes);
-      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
-      expect(allNodes.find((n) => n.id === nodeB.id)).toBeDefined();
-    });
-  });
-
-  // ─── Combined pass-1 + pass-2 ─────────────────────────────────────────────
-
-  describe('addEpisodes - combined pass-1 and pass-2', () => {
-    it('only the canonical survives when one node is a pass-1 alias and another is a pass-2 alias', async () => {
-      const nodeA = KgNodeFactory.createEntityNode({
-        name: 'Alice',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0],
-      });
-      const nodeB = KgNodeFactory.createEntityNode({
-        name: 'Alice Smith',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [0, 1], // not a pass-2 pair
-      });
-      const nodeC = KgNodeFactory.createEntityNode({
-        name: 'Alicia',
-        graphId: KG_TEST_GRAPH_ID,
-        nameEmbedding: [1, 0], // pass-2 pair with nodeA
-      });
-
-      mockNodeExtraction.extractNodes
-        .mockResolvedValueOnce([nodeA])
-        .mockResolvedValueOnce([nodeB])
-        .mockResolvedValueOnce([nodeC]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([nodeA, nodeB, nodeC]);
-      mockNodeResolution.resolveNodes
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeA],
-          idMap: new Map([[nodeA.id, nodeA.id]]),
-          duplicatePairs: [],
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [],
-          duplicatePairs: [{ extractedId: nodeB.id, canonicalId: nodeA.id }],
-          idMap: new Map([[nodeB.id, nodeA.id]]),
-        })
-        .mockResolvedValueOnce({
-          resolvedNodes: [nodeC],
-          idMap: new Map([[nodeC.id, nodeC.id]]),
-          duplicatePairs: [],
-        });
-
-      const result = await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1'), makeEpisode('ep2'), makeEpisode('ep3')],
-      });
-
-      const allNodes = result.flatMap((r) => r.nodes);
-      // nodeB is excluded by pass-1; nodeC is pass-2 alias of nodeA (first-seen wins).
-      expect(allNodes.find((n) => n.id === nodeB.id)).toBeUndefined();
-      expect(allNodes.find((n) => n.id === nodeA.id)).toBeDefined();
-      expect(allNodes.find((n) => n.id === nodeC.id)).toBeUndefined();
+      expect(allNodes.find((n) => n.id === canonical.id)).toBeDefined();
+      expect(allNodes.find((n) => n.id === alias.id)).toBeUndefined();
     });
   });
 
@@ -802,44 +597,6 @@ describe('EpisodeService', () => {
         KG_TEST_USER_ID,
         otherGraphId,
       );
-    });
-  });
-
-  // ─── Node summaries ───────────────────────────────────────────────────────
-
-  describe('addEpisodes - node summaries', () => {
-    it('invokes structured output and applies returned summaries to canonical nodes', async () => {
-      const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
-      mockNodeExtraction.extractNodes.mockResolvedValue([node]);
-      mockEmbeddingService.embedNodes.mockResolvedValue([node]);
-      mockNodeResolution.resolveNodes.mockResolvedValue({
-        resolvedNodes: [node],
-        idMap: new Map([[node.id, node.id]]),
-        duplicatePairs: [],
-      });
-      mockRunnable.invoke.mockResolvedValue({
-        summaries: [{ name: node.name, summary: 'Alice is an engineer' }],
-      });
-
-      await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1')],
-      });
-
-      expect(mockModel.withStructuredOutput).toHaveBeenCalled();
-      const savedNodes = mockEntityNodeRepo.saveBulk.mock.calls[0]?.[0];
-      expect(savedNodes.find((n) => n.id === node.id)?.summary).toBe(
-        'Alice is an engineer',
-      );
-    });
-
-    it('does not invoke structured output when there are no new canonical nodes', async () => {
-      await service.addTextEpisodes({
-        userId: KG_TEST_USER_ID,
-        episodes: [makeEpisode('ep1')],
-      });
-
-      expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,8 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
+import { z } from 'zod';
 
+import { Uuid } from '@/common/schemas';
 import {
   LLM_TRACER,
   type LlmContext,
@@ -10,10 +12,20 @@ import {
   type SpanMetrics,
 } from '@/observability';
 
+import { LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
+import { getApplicableEdgeTypes } from '../episode/episode-utils';
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
 import { invokeStructured } from '../llm';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
-import { buildExtractEdgesMessages, ExtractedEdgesSchema } from '../prompts';
+import {
+  buildExtractEdgesMessages,
+  buildExtractTimestampsMessages,
+  buildFillEdgeAttributesMessages,
+  EdgeTimestampsSchema,
+  ExtractedEdgesSchema,
+} from '../prompts';
+
+export type EdgeReferenceTimeContext = Map<Uuid, { referenceTime: Date }>;
 
 @Injectable()
 export class EdgeExtractionService {
@@ -106,6 +118,143 @@ export class EdgeExtractionService {
         'edges.dropped.count': result.edges.length - edges.length,
         'edges.extracted.count': edges.length,
       },
+    };
+  }
+
+  async fillEdgeAttributes(
+    model: BaseChatModel,
+    resolvedEdges: EntityEdge[],
+    canonicalNodes: EntityNode[],
+    edgeTypes: EdgeTypeMap | undefined,
+    edgeTypeMappings: EdgeTypeMappings | undefined,
+    edgeContext: EdgeReferenceTimeContext,
+    ctx?: LlmContext,
+  ): Promise<void> {
+    await this.fillEdgeAttributesImpl(
+      model,
+      resolvedEdges,
+      canonicalNodes,
+      edgeTypes,
+      edgeTypeMappings,
+      edgeContext,
+      ctx,
+    );
+  }
+
+  @Span('fillEdgeAttributes', { onResult: metricsOnResult })
+  private async fillEdgeAttributesImpl(
+    model: BaseChatModel,
+    resolvedEdges: EntityEdge[],
+    canonicalNodes: EntityNode[],
+    edgeTypes: EdgeTypeMap | undefined,
+    edgeTypeMappings: EdgeTypeMappings | undefined,
+    edgeContext: EdgeReferenceTimeContext,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const baseMetrics: SpanMetrics = {
+      'edges.count': resolvedEdges.length,
+      'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
+    };
+
+    if (!edgeTypes || !edgeTypeMappings) {
+      return { metrics: { ...baseMetrics, 'extracted.count': 0 } };
+    }
+    const idToNode = new Map<Uuid, EntityNode>(canonicalNodes.map((n) => [n.id, n]));
+
+    type EdgeAttrTask = {
+      edge: EntityEdge;
+      schema: z.ZodType;
+      referenceTime: Date;
+    };
+    const tasks: EdgeAttrTask[] = [];
+
+    for (const edge of resolvedEdges) {
+      const src = idToNode.get(edge.sourceNodeId);
+      const tgt = idToNode.get(edge.targetNodeId);
+      if (!src || !tgt) continue;
+      const applicable = getApplicableEdgeTypes(
+        src.labels,
+        tgt.labels,
+        edgeTypes,
+        edgeTypeMappings,
+      );
+      const typeDef = applicable[edge.name];
+      if (!typeDef) continue;
+
+      const edgeCtx = edgeContext.get(edge.id);
+      if (!edgeCtx) continue;
+      tasks.push({ edge, schema: typeDef.schema, referenceTime: edgeCtx.referenceTime });
+    }
+
+    await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      tasks.map(({ edge, schema, referenceTime }) => async () => {
+        const attrs = (await invokeStructured(
+          model,
+          schema,
+          buildFillEdgeAttributesMessages({
+            fact: edge.fact,
+            referenceTime,
+            existingAttributes: edge.attributes ?? {},
+          }),
+          {
+            callbacks: this.llmTracer.getCallbacks(ctx),
+            runName: 'fill-edge-attributes',
+            tags: ['knowledge-graph', 'attributes.edge'],
+          },
+        )) as Record<string, unknown>;
+        edge.attributes = { ...edge.attributes, ...attrs };
+      }),
+    );
+    return { metrics: { ...baseMetrics, 'extracted.count': tasks.length } };
+  }
+
+  // Per-edge fallback: when the batch extraction prompt leaves an edge with
+  // both validAt and invalidAt null, ask the LLM specifically for the temporal
+  // window of that single fact. Mirrors graphiti's `_extract_edge_timestamps`
+  // (edge_operations.py:576).
+  async extractEdgeTimestampsFallback(
+    model: BaseChatModel,
+    edges: EntityEdge[],
+    edgeContext: EdgeReferenceTimeContext,
+    ctx?: LlmContext,
+  ): Promise<void> {
+    await this.extractEdgeTimestampsFallbackImpl(model, edges, edgeContext, ctx);
+  }
+
+  @Span('extractEdgeTimestampsFallback', { onResult: metricsOnResult })
+  private async extractEdgeTimestampsFallbackImpl(
+    model: BaseChatModel,
+    edges: EntityEdge[],
+    edgeContext: EdgeReferenceTimeContext,
+    ctx?: LlmContext,
+  ): Promise<{ metrics: SpanMetrics }> {
+    const candidates = edges.filter(
+      (e) => e.validAt === null && e.invalidAt === null && edgeContext.has(e.id),
+    );
+
+    await withConcurrency(
+      LLM_CONCURRENCY_LIMIT,
+      candidates.map((edge) => async () => {
+        const referenceTime = edgeContext.get(edge.id)!.referenceTime;
+        const result = await invokeStructured(
+          model,
+          EdgeTimestampsSchema,
+          buildExtractTimestampsMessages({ fact: edge.fact, referenceTime }),
+          {
+            callbacks: this.llmTracer.getCallbacks(ctx),
+            runName: 'extract-edge-timestamps-fallback',
+            tags: ['knowledge-graph', 'timestamps.edge.fallback'],
+          },
+        );
+
+        if (result.validAt) edge.validAt = new Date(result.validAt);
+        if (result.invalidAt) edge.invalidAt = new Date(result.invalidAt);
+      }),
+    );
+
+    return {
+      metrics: { 'edges.count': edges.length, 'candidates.count': candidates.length },
     };
   }
 }

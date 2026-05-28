@@ -8,6 +8,7 @@ export const FACT_SIMILARITY_THRESHOLD = 0.85;
 export const LOW_ENTROPY_THRESHOLD = 1.5;
 export const MAX_CANDIDATES = 10;
 export const MAX_KEYWORD_CANDIDATES = 10;
+export const CANDIDATE_LIMIT = 10;
 
 export function normalizeString(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');

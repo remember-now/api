@@ -18,8 +18,6 @@ import {
 // Constants
 
 export const PREVIOUS_EPISODES_WINDOW = 20;
-export const MAX_NODES_PER_SUMMARY_BATCH = 30;
-export const CANDIDATE_LIMIT = 10;
 
 // ─── Per-ingestion-path input schemas ──────────────────────────────────────
 //
@@ -79,7 +77,7 @@ const MessageEpisodeInputSchema = EpisodeInputBaseSchema.extend({
     .describe('Conversation turns in chronological order.'),
 });
 
-// prepareChunks in content-chunking.ts relies on this refine
+// prepareChunks in extraction/content-chunking.ts relies on this refine
 const JsonEpisodeInputSchema = EpisodeInputBaseSchema.extend({
   content: z
     .string()

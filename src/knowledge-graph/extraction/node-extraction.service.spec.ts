@@ -2,9 +2,11 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { mockDeep } from 'jest-mock-extended';
 import { z } from 'zod';
 
+import { Uuid } from '@/common/schemas';
 import { NoOpLlmTracer } from '@/observability';
-import { KG_TEST_GRAPH_ID, KgNodeFactory } from '@/test/factories';
+import { KG_TEST_GRAPH_ID, KgEdgeFactory, KgNodeFactory, u } from '@/test/factories';
 
+import { EpisodicNode } from '../models';
 import { NodeExtractionService } from './node-extraction.service';
 
 const baseEpisode = KgNodeFactory.createEpisodicNode({
@@ -137,5 +139,123 @@ describe('NodeExtractionService', () => {
     await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
 
     expect(mockModel.withStructuredOutput).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── summarizeNodes ────────────────────────────────────────────────────────
+
+  describe('summarizeNodes', () => {
+    function makeNodeContext(
+      node: { id: Uuid },
+      episode: EpisodicNode,
+      previousEpisodes: EpisodicNode[] = [],
+    ) {
+      return new Map([[node.id, { episode, previousEpisodes }]]);
+    }
+
+    it('invokes structured output and applies returned summaries to canonical nodes', async () => {
+      const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
+      mockRunnable.invoke.mockResolvedValue({
+        summaries: [{ name: node.name, summary: 'Alice is an engineer' }],
+      });
+
+      await service.summarizeNodes(
+        mockModel,
+        [node],
+        [],
+        undefined,
+        makeNodeContext(node, baseEpisode),
+      );
+
+      expect(mockModel.withStructuredOutput).toHaveBeenCalled();
+      expect(node.summary).toBe('Alice is an engineer');
+    });
+
+    it('does not invoke structured output when there are no nodes', async () => {
+      await service.summarizeNodes(mockModel, [], [], undefined, new Map());
+
+      expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── fillEntityAttributes ──────────────────────────────────────────────────
+
+  describe('fillEntityAttributes', () => {
+    it('does nothing when entityTypes is undefined', async () => {
+      const node = KgNodeFactory.createEntityNode({ name: 'Alice' });
+
+      await service.fillEntityAttributes(
+        mockModel,
+        [node],
+        [],
+        undefined,
+        new Map([[node.id, { episode: baseEpisode, previousEpisodes: [] }]]),
+      );
+
+      expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    });
+
+    it('merges LLM-returned attributes onto the node', async () => {
+      const entityTypes = {
+        Person: {
+          description: 'A human individual',
+          schema: z.object({ age: z.number().optional() }),
+        },
+      };
+      const node = KgNodeFactory.createEntityNode({
+        name: 'Alice',
+        labels: ['Entity', 'Person'],
+      });
+      const edge = KgEdgeFactory.createEntityEdge({
+        sourceNodeId: node.id,
+        targetNodeId: u('other'),
+        name: 'KNOWS',
+        fact: 'Alice knows Bob',
+      });
+      mockRunnable.invoke.mockResolvedValue({ age: 30 });
+
+      await service.fillEntityAttributes(
+        mockModel,
+        [node],
+        [edge],
+        entityTypes,
+        new Map([[node.id, { episode: baseEpisode, previousEpisodes: [] }]]),
+      );
+
+      expect(node.attributes).toEqual({ age: 30 });
+    });
+
+    it('skips nodes whose label is not in entityTypes', async () => {
+      const entityTypes = {
+        Person: { description: 'A human individual', schema: z.object({}) },
+      };
+      const node = KgNodeFactory.createEntityNode({
+        name: 'Acme',
+        labels: ['Entity', 'Organization'],
+      });
+
+      await service.fillEntityAttributes(
+        mockModel,
+        [node],
+        [],
+        entityTypes,
+        new Map([[node.id, { episode: baseEpisode, previousEpisodes: [] }]]),
+      );
+
+      expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    });
+
+    it('skips nodes missing from nodeContext', async () => {
+      const entityTypes = {
+        Person: { description: 'A human individual', schema: z.object({}) },
+      };
+      const node = KgNodeFactory.createEntityNode({
+        name: 'Alice',
+        labels: ['Entity', 'Person'],
+      });
+
+      await service.fillEntityAttributes(mockModel, [node], [], entityTypes, new Map());
+
+      expect(mockModel.withStructuredOutput).not.toHaveBeenCalled();
+    });
   });
 });

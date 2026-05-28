@@ -14,7 +14,10 @@ import {
 import { invokeStructured } from '../llm';
 import { EntityNode, EpisodicNode } from '../models';
 import { buildDedupeNodesMessages, NodeResolutionsSchema } from '../prompts';
+import { EntityNodeRepository } from '../repository/repositories';
+import { SearchBySimilarityParamsSchema, SearchByTextParamsSchema } from '../types';
 import {
+  CANDIDATE_LIMIT,
   COSINE_SIMILARITY_THRESHOLD,
   cosineSimilarity,
   LOW_ENTROPY_THRESHOLD,
@@ -25,9 +28,63 @@ import {
 } from './resolution-utils';
 import { NodeResolutionResult } from './types';
 
+const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
+
 @Injectable()
 export class NodeResolutionService {
-  constructor(@Inject(LLM_TRACER) private readonly llmTracer: LlmTracer) {}
+  constructor(
+    private readonly entityNodeRepository: EntityNodeRepository,
+    @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
+  ) {}
+
+  async collectCandidates(nodes: EntityNode[], graphId: Uuid): Promise<EntityNode[]> {
+    const { candidates } = await this.collectCandidatesImpl(nodes, graphId);
+    return candidates;
+  }
+
+  @Span('collectNodeCandidates', {
+    attributes: RETRIEVER_ATTRS,
+    onResult: metricsOnResult,
+  })
+  private async collectCandidatesImpl(
+    nodes: EntityNode[],
+    graphId: Uuid,
+  ): Promise<{ candidates: EntityNode[]; metrics: SpanMetrics }> {
+    const results = await Promise.all(
+      nodes.flatMap((n) => [
+        this.entityNodeRepository.searchByName(
+          SearchByTextParamsSchema.parse({
+            query: n.name,
+            graphIds: [graphId],
+            limit: CANDIDATE_LIMIT,
+          }),
+        ),
+        n.nameEmbedding !== null
+          ? this.entityNodeRepository.searchBySimilarity(
+              SearchBySimilarityParamsSchema.parse({
+                embedding: n.nameEmbedding,
+                graphIds: [graphId],
+                limit: CANDIDATE_LIMIT,
+              }),
+            )
+          : Promise.resolve([] as EntityNode[]),
+      ]),
+    );
+    const seen = new Set<Uuid>();
+    const candidates = results.flat().filter((n) => {
+      if (seen.has(n.id)) return false;
+      seen.add(n.id);
+      return true;
+    });
+    return {
+      candidates,
+      metrics: {
+        'input.count': nodes.length,
+        'graph.id': graphId,
+        'candidates.count': candidates.length,
+      },
+    };
+  }
 
   async resolveNodes(
     model: BaseChatModel,
@@ -212,6 +269,55 @@ export class NodeResolutionService {
         'existing.count': existingNodes.length,
         'resolved.count': resolvedNodes.length,
         'duplicates.count': duplicatePairs.length,
+      },
+    };
+  }
+
+  // Within-batch dedup. The canonical pool is seeded with matched-existing
+  // nodes from `resolveNodes` so a new node Y in one episode can be collapsed
+  // onto existing X even when X wasn't in Y's own candidate set (it was
+  // surfaced only by another episode's search). Without this, Y would silently
+  // persist as a duplicate row alongside X. Mirrors upstream `dedupe_nodes_bulk`
+  // (bulk_utils.py:414). New-vs-new keeps first-seen as canonical.
+  dedupeAcrossBatch(
+    newNodes: EntityNode[],
+    matchedExistingNodes: EntityNode[],
+  ): [Uuid, Uuid][] {
+    const { pairs } = this.dedupeAcrossBatchImpl(newNodes, matchedExistingNodes);
+    return pairs;
+  }
+
+  @Span('dedupeNodesAcrossBatch', { onResult: metricsOnResult })
+  private dedupeAcrossBatchImpl(
+    newNodes: EntityNode[],
+    matchedExistingNodes: EntityNode[],
+  ): { pairs: [Uuid, Uuid][]; metrics: SpanMetrics } {
+    const isDuplicateNode = (a: EntityNode, b: EntityNode): boolean => {
+      if (normalizeString(a.name) === normalizeString(b.name)) return true;
+      return (
+        a.nameEmbedding !== null &&
+        b.nameEmbedding !== null &&
+        cosineSimilarity(a.nameEmbedding, b.nameEmbedding) >= COSINE_SIMILARITY_THRESHOLD
+      );
+    };
+
+    const pairs: [Uuid, Uuid][] = [];
+    const canonicalPool: EntityNode[] = [...matchedExistingNodes];
+    for (const newNode of newNodes) {
+      const match = canonicalPool.find((c) => isDuplicateNode(newNode, c));
+      if (match) {
+        pairs.push([newNode.id, match.id]);
+      } else {
+        canonicalPool.push(newNode);
+      }
+    }
+
+    return {
+      pairs,
+      metrics: {
+        'new.count': newNodes.length,
+        'matched.count': matchedExistingNodes.length,
+        'pairs.found': pairs.length,
       },
     };
   }

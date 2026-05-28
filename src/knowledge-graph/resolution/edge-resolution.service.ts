@@ -11,17 +11,14 @@ import {
   type SpanMetrics,
 } from '@/observability';
 
-import {
-  compressIdMap,
-  LLM_CONCURRENCY_LIMIT,
-  withConcurrency,
-} from '../episode/batch-utils';
+import { compressIdMap, LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
 import { invokeStructured } from '../llm';
 import { EntityEdge, EpisodicNode } from '../models';
 import { buildDedupeEdgesMessages, EdgeDedupeSchema } from '../prompts';
 import { EntityEdgeRepository } from '../repository/repositories';
-import { SearchByTextParamsSchema } from '../types';
+import { SearchBySimilarityParamsSchema, SearchByTextParamsSchema } from '../types';
 import {
+  CANDIDATE_LIMIT,
   cosineSimilarity,
   FACT_SIMILARITY_THRESHOLD,
   MAX_CANDIDATES,
@@ -30,12 +27,69 @@ import {
 } from './resolution-utils';
 import { EdgeResolutionResult } from './types';
 
+const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
+
 @Injectable()
 export class EdgeResolutionService {
   constructor(
     private readonly edgeRepo: EntityEdgeRepository,
     @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
+
+  async collectCandidates(edges: EntityEdge[], graphId: Uuid): Promise<EntityEdge[]> {
+    const { candidates } = await this.collectCandidatesImpl(edges, graphId);
+    return candidates;
+  }
+
+  @Span('collectEdgeCandidates', {
+    attributes: RETRIEVER_ATTRS,
+    onResult: metricsOnResult,
+  })
+  private async collectCandidatesImpl(
+    edges: EntityEdge[],
+    graphId: Uuid,
+  ): Promise<{ candidates: EntityEdge[]; metrics: SpanMetrics }> {
+    // Same-endpoint edges (`getBetweenNodes`) are fetched explicitly per edge:
+    // text + similarity searches may not surface an existing edge whose fact
+    // differs textually from the new one, but a duplicate or contradiction
+    // between the same two nodes still needs to be considered during dedup.
+    // Mirrors upstream `EntityEdge.get_between_nodes` in edge_operations.py.
+    const results = await Promise.all(
+      edges.flatMap((e) => [
+        this.edgeRepo.searchByFact(
+          SearchByTextParamsSchema.parse({
+            query: e.fact,
+            graphIds: [graphId],
+            limit: CANDIDATE_LIMIT,
+          }),
+        ),
+        e.factEmbedding !== null
+          ? this.edgeRepo.searchBySimilarity(
+              SearchBySimilarityParamsSchema.parse({
+                embedding: e.factEmbedding,
+                graphIds: [graphId],
+                limit: CANDIDATE_LIMIT,
+              }),
+            )
+          : Promise.resolve([] as EntityEdge[]),
+        this.edgeRepo.getBetweenNodes(e.sourceNodeId, e.targetNodeId),
+      ]),
+    );
+    const seen = new Set<Uuid>();
+    const candidates = results.flat().filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+    return {
+      candidates,
+      metrics: {
+        'input.count': edges.length,
+        'graph.id': graphId,
+        'candidates.count': candidates.length,
+      },
+    };
+  }
 
   async resolveEdges(
     model: BaseChatModel,
