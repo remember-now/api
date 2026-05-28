@@ -152,27 +152,18 @@ function chunkJsonParts(
   const empty = open + close;
   if (parts.length === 0) return [empty];
 
-  const chunks: string[] = [];
-  let current: string[] = [];
-  let currentSize = 2;
+  const chunks = accumulateChunks({
+    items: parts,
+    chunkSizeChars,
+    baseSize: 2,
+    separatorSize: 1,
+    format: (ps) => open + ps.join(',') + close,
+    seedNextChunk: (flushed) => {
+      const items = takeTrailingItems(flushed, overlapChars, 2, 1);
+      return { items, size: joinedJsonSize(items) };
+    },
+  });
 
-  for (const part of parts) {
-    let sep = current.length === 0 ? 0 : 1;
-
-    if (current.length > 0 && currentSize + sep + part.length > chunkSizeChars) {
-      chunks.push(open + current.join(',') + close);
-      current = takeOverlapParts(current, overlapChars);
-      currentSize = joinedJsonSize(current);
-      sep = current.length === 0 ? 0 : 1;
-    }
-
-    currentSize += sep + part.length;
-    current.push(part);
-  }
-
-  if (current.length > 0) {
-    chunks.push(open + current.join(',') + close);
-  }
   return chunks.length > 0 ? chunks : [empty];
 }
 
@@ -181,21 +172,6 @@ function joinedJsonSize(parts: string[]): number {
   let size = 2 + (parts.length - 1);
   for (const p of parts) size += p.length;
   return size;
-}
-
-function takeOverlapParts(parts: string[], overlapChars: number): string[] {
-  if (parts.length === 0) return [];
-  const overlap: string[] = [];
-  let size = 2;
-
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const p = parts[i];
-    const sep = overlap.length === 0 ? 0 : 1;
-    if (size + sep + p.length > overlapChars) break;
-    overlap.unshift(p);
-    size += sep + p.length;
-  }
-  return overlap;
 }
 
 /**
@@ -212,48 +188,25 @@ export function chunkTextContent(
 
   if (content.length <= chunkSizeChars) return [content];
 
-  const paragraphs = content.split(/\n\s*\n/);
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
 
-  const chunks: string[] = [];
-  let currentChunk: string[] = [];
-  let currentSize = 0;
-
-  for (let paragraph of paragraphs) {
-    paragraph = paragraph.trim();
-    if (!paragraph) continue;
-
-    const paraSize = paragraph.length;
-
-    if (paraSize > chunkSizeChars) {
-      if (currentChunk.length > 0) {
-        chunks.push(currentChunk.join('\n\n'));
-        currentChunk = [];
-        currentSize = 0;
-      }
-      const sentenceChunks = chunkBySentences(paragraph, chunkSizeChars, overlapChars);
-      chunks.push(...sentenceChunks);
-      continue;
-    }
-
-    if (currentChunk.length > 0 && currentSize + paraSize + 2 > chunkSizeChars) {
-      chunks.push(currentChunk.join('\n\n'));
-      const overlapText = getOverlapText(currentChunk.join('\n\n'), overlapChars);
-      if (overlapText) {
-        currentChunk = [overlapText];
-        currentSize = overlapText.length;
-      } else {
-        currentChunk = [];
-        currentSize = 0;
-      }
-    }
-
-    currentChunk.push(paragraph);
-    currentSize += paraSize + 2;
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join('\n\n'));
-  }
+  const chunks = accumulateChunks({
+    items: paragraphs,
+    chunkSizeChars,
+    baseSize: 0,
+    separatorSize: 2,
+    format: (ps) => ps.join('\n\n'),
+    seedNextChunk: (flushed) => {
+      const overlapText = getOverlapText(flushed.join('\n\n'), overlapChars);
+      return overlapText
+        ? { items: [overlapText], size: overlapText.length }
+        : { items: [], size: 0 };
+    },
+    handleOversized: (p) => chunkBySentences(p, chunkSizeChars, overlapChars),
+  });
 
   return chunks.length > 0 ? chunks : [content];
 }
@@ -285,50 +238,24 @@ function chunkBySentences(
   chunkSizeChars: number,
   overlapChars: number,
 ): string[] {
-  const sentences = splitIntoSentences(text);
+  const sentences = splitIntoSentences(text)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 
-  const chunks: string[] = [];
-  let currentChunk: string[] = [];
-  let currentSize = 0;
-
-  for (let sentence of sentences) {
-    sentence = sentence.trim();
-    if (!sentence) continue;
-
-    const sentSize = sentence.length;
-
-    if (sentSize > chunkSizeChars) {
-      if (currentChunk.length > 0) {
-        chunks.push(currentChunk.join(' '));
-        currentChunk = [];
-        currentSize = 0;
-      }
-      const fixedChunks = chunkBySize(sentence, chunkSizeChars, overlapChars);
-      chunks.push(...fixedChunks);
-      continue;
-    }
-
-    if (currentChunk.length > 0 && currentSize + sentSize + 1 > chunkSizeChars) {
-      chunks.push(currentChunk.join(' '));
-      const overlapText = getOverlapText(currentChunk.join(' '), overlapChars);
-      if (overlapText) {
-        currentChunk = [overlapText];
-        currentSize = overlapText.length;
-      } else {
-        currentChunk = [];
-        currentSize = 0;
-      }
-    }
-
-    currentChunk.push(sentence);
-    currentSize += sentSize + 1;
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(' '));
-  }
-
-  return chunks;
+  return accumulateChunks({
+    items: sentences,
+    chunkSizeChars,
+    baseSize: 0,
+    separatorSize: 1,
+    format: (sents) => sents.join(' '),
+    seedNextChunk: (flushed) => {
+      const overlapText = getOverlapText(flushed.join(' '), overlapChars);
+      return overlapText
+        ? { items: [overlapText], size: overlapText.length }
+        : { items: [], size: 0 };
+    },
+    handleOversized: (s) => chunkBySize(s, chunkSizeChars, overlapChars),
+  });
 }
 
 function chunkBySize(
@@ -403,54 +330,88 @@ function chunkSpeakerMessages(
 
   if (messages.length === 0) return [content];
 
-  const chunks: string[] = [];
-  let currentMessages: string[] = [];
-  let currentSize = 0;
-
-  for (const message of messages) {
-    const msgSize = message.length;
-
-    if (msgSize > chunkSizeChars) {
-      if (currentMessages.length > 0) {
-        chunks.push(currentMessages.join('\n'));
-        currentMessages = [];
-        currentSize = 0;
-      }
-      chunks.push(message);
-      continue;
-    }
-
-    if (currentMessages.length > 0 && currentSize + msgSize + 1 > chunkSizeChars) {
-      chunks.push(currentMessages.join('\n'));
-      const overlapMessages = getOverlapMessages(currentMessages, overlapChars);
-      currentMessages = overlapMessages;
-      currentSize =
-        currentMessages.reduce((sum, m) => sum + m.length, 0) +
-        Math.max(0, currentMessages.length - 1);
-    }
-
-    currentMessages.push(message);
-    currentSize += msgSize + 1;
-  }
-
-  if (currentMessages.length > 0) {
-    chunks.push(currentMessages.join('\n'));
-  }
+  const chunks = accumulateChunks({
+    items: messages,
+    chunkSizeChars,
+    baseSize: 0,
+    separatorSize: 1,
+    format: (ms) => ms.join('\n'),
+    seedNextChunk: (flushed) => {
+      const items = takeTrailingItems(flushed, overlapChars, 0, 1);
+      const size =
+        items.reduce((sum, m) => sum + m.length, 0) + Math.max(0, items.length - 1);
+      return { items, size };
+    },
+    handleOversized: (m) => [m],
+  });
 
   return chunks.length > 0 ? chunks : [content];
 }
 
-function getOverlapMessages(messages: string[], overlapChars: number): string[] {
-  if (messages.length === 0) return [];
+type ChunkConfig = {
+  items: string[];
+  chunkSizeChars: number;
+  baseSize: number;
+  separatorSize: number;
+  format: (items: string[]) => string;
+  seedNextChunk: (flushed: string[]) => { items: string[]; size: number };
+  handleOversized?: (item: string) => string[];
+};
 
-  const overlap: string[] = [];
-  let currentSize = 0;
+function accumulateChunks(cfg: ChunkConfig): string[] {
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let currentSize = cfg.baseSize;
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msgSize = messages[i].length + 1;
-    if (currentSize + msgSize > overlapChars) break;
-    overlap.unshift(messages[i]);
-    currentSize += msgSize;
+  for (const item of cfg.items) {
+    if (cfg.handleOversized && item.length > cfg.chunkSizeChars) {
+      if (current.length > 0) {
+        chunks.push(cfg.format(current));
+        current = [];
+        currentSize = cfg.baseSize;
+      }
+      chunks.push(...cfg.handleOversized(item));
+      continue;
+    }
+
+    const sepBefore = current.length === 0 ? 0 : cfg.separatorSize;
+    if (
+      current.length > 0 &&
+      currentSize + sepBefore + item.length > cfg.chunkSizeChars
+    ) {
+      chunks.push(cfg.format(current));
+      const seed = cfg.seedNextChunk(current);
+      current = seed.items;
+      currentSize = seed.size;
+    }
+
+    const sep = current.length === 0 ? 0 : cfg.separatorSize;
+    current.push(item);
+    currentSize += sep + item.length;
   }
-  return overlap;
+
+  if (current.length > 0) {
+    chunks.push(cfg.format(current));
+  }
+  return chunks;
+}
+
+function takeTrailingItems(
+  items: string[],
+  budget: number,
+  baseSize = 0,
+  separatorSize = 1,
+): string[] {
+  if (items.length === 0) return [];
+  const result: string[] = [];
+  let size = baseSize;
+
+  for (let i = items.length - 1; i >= 0; i--) {
+    const itemSize = items[i].length;
+    const sep = result.length === 0 ? 0 : separatorSize;
+    if (size + sep + itemSize > budget) break;
+    result.unshift(items[i]);
+    size += sep + itemSize;
+  }
+  return result;
 }
