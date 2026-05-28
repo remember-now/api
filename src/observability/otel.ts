@@ -17,11 +17,12 @@ import { setLangfuseEnabled } from './langfuse-state';
 
 const REMEMBER_NOW_SCOPE = 'remember-now';
 const PRISMA_SCOPE = 'prisma';
+const OBSERVATION_LEVEL_ATTR = 'langfuse.observation.level';
 
 /**
- * Tracks which trace ids contain at least one in-flight `remember-now` span.
- * Ref-counted so nested `@Span`s in the same trace don't prematurely evict
- * the trace id when an inner span ends.
+ * Ref-counts in-flight `remember-now` spans per trace id so `shouldExportSpan`
+ * can gate Prisma spans on remember-now-rooted traces, and tags Prisma spans
+ * with `level=DEBUG` so Langfuse hides them behind the DEBUG filter.
  */
 class RememberNowTraceTracker implements SpanProcessor {
   private readonly counts = new Map<string, number>();
@@ -31,7 +32,12 @@ class RememberNowTraceTracker implements SpanProcessor {
   }
 
   onStart(span: SdkSpan): void {
-    if (span.instrumentationScope.name !== REMEMBER_NOW_SCOPE) return;
+    const scope = span.instrumentationScope.name;
+    if (scope === PRISMA_SCOPE) {
+      span.setAttribute(OBSERVATION_LEVEL_ATTR, 'DEBUG');
+      return;
+    }
+    if (scope !== REMEMBER_NOW_SCOPE) return;
     const traceId = span.spanContext().traceId;
     this.counts.set(traceId, (this.counts.get(traceId) ?? 0) + 1);
   }
