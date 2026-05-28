@@ -135,7 +135,7 @@ export class EpisodicNodeRepository {
       labels: (row.labels ?? []) as NodeLabels,
       createdAt: row.createdAt,
       source: (row.source as EpisodeType) ?? EpisodeType.text,
-      sourceDescription: row.sourceDescription ?? '',
+      sourceDescription: row.sourceDescription,
       content: row.content ?? '',
       validAt: row.validAt,
     };

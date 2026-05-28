@@ -119,7 +119,7 @@ describe('EpisodeService', () => {
 
   describe('addEpisodes - pipeline orchestration', () => {
     it('saves episodic nodes via saveBulk before extraction', async () => {
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -138,7 +138,7 @@ describe('EpisodeService', () => {
       });
       mockEpisodicNodeRepo.retrieveEpisodes.mockResolvedValue([prevEpisode]);
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -161,7 +161,7 @@ describe('EpisodeService', () => {
         .mockResolvedValueOnce([nodeA])
         .mockResolvedValueOnce([nodeB]);
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -179,7 +179,7 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedNodes.mockResolvedValue([embedded]);
       mockEntityNodeRepo.searchByName.mockResolvedValue([existing]);
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -215,7 +215,7 @@ describe('EpisodeService', () => {
         duplicatePairs: [{ extractedId: alias.id, canonicalId: existing.id }],
       });
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -250,7 +250,7 @@ describe('EpisodeService', () => {
         .mockResolvedValueOnce([edgeA])
         .mockResolvedValueOnce([edgeB]);
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -278,7 +278,7 @@ describe('EpisodeService', () => {
       mockEmbeddingService.embedEdges.mockResolvedValue([embeddedEdge]);
       mockEntityEdgeRepo.searchByFact.mockResolvedValue([existingEdge]);
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -297,7 +297,7 @@ describe('EpisodeService', () => {
     });
 
     it('returns one result entry per input episode', async () => {
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2'), makeEpisode('ep3')],
       });
@@ -330,7 +330,7 @@ describe('EpisodeService', () => {
         duplicatePairs: [{ extractedId: u('some-id'), canonicalId: existing.id }],
       });
 
-      const [entry] = await service.addEpisodes({
+      const [entry] = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -371,7 +371,7 @@ describe('EpisodeService', () => {
           idMap: new Map([[alias.id, canonical.id]]),
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -400,7 +400,7 @@ describe('EpisodeService', () => {
         idMap: new Map([[alias.id, existingCanonical.id]]),
       });
 
-      const [entry] = await service.addEpisodes({
+      const [entry] = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -435,7 +435,7 @@ describe('EpisodeService', () => {
           idMap: new Map([[alias.id, canonical.id]]),
         });
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -476,7 +476,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -516,7 +516,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -554,7 +554,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -592,7 +592,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -630,7 +630,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2')],
       });
@@ -683,7 +683,7 @@ describe('EpisodeService', () => {
           duplicatePairs: [],
         });
 
-      const result = await service.addEpisodes({
+      const result = await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1'), makeEpisode('ep2'), makeEpisode('ep3')],
       });
@@ -703,7 +703,7 @@ describe('EpisodeService', () => {
       const ep = makeEpisode('ep1');
       ep.sagaId = KG_TEST_SAGA_ID;
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [ep],
       });
@@ -723,7 +723,7 @@ describe('EpisodeService', () => {
     });
 
     it('skips saga handling when sagaId is omitted', async () => {
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -740,7 +740,7 @@ describe('EpisodeService', () => {
       const ep3 = makeEpisode('ep3');
       ep3.sagaId = KG_TEST_SAGA_ID;
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [ep1, ep2, ep3],
       });
@@ -756,7 +756,7 @@ describe('EpisodeService', () => {
 
   describe('addEpisodes - community building', () => {
     it('does not call buildCommunities by default', async () => {
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -765,7 +765,7 @@ describe('EpisodeService', () => {
     });
 
     it('calls buildCommunities after persist when updateCommunities is true', async () => {
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
         updateCommunities: true,
@@ -787,7 +787,7 @@ describe('EpisodeService', () => {
       const ep2 = makeEpisode('ep2');
       const ep3 = { ...makeEpisode('ep3'), graphId: otherGraphId };
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [ep1, ep2, ep3],
         updateCommunities: true,
@@ -821,7 +821,7 @@ describe('EpisodeService', () => {
         summaries: [{ name: node.name, summary: 'Alice is an engineer' }],
       });
 
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
@@ -834,7 +834,7 @@ describe('EpisodeService', () => {
     });
 
     it('does not invoke structured output when there are no new canonical nodes', async () => {
-      await service.addEpisodes({
+      await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });

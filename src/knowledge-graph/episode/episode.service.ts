@@ -51,6 +51,7 @@ import {
   normalizeString,
 } from '../resolution/resolution-utils';
 import {
+  EpisodeType,
   NodeNameSchema,
   RetrieveEpisodesParamsInput,
   RetrieveEpisodesParamsSchema,
@@ -64,18 +65,22 @@ import {
   resolveEdgePointers,
   withConcurrency,
 } from './batch-utils';
-import { chunkContent, shouldChunk } from './content-chunking';
+import { prepareChunks } from './content-chunking';
 import { getApplicableEdgeTypes, getEffectiveTypeMappings } from './episode-utils';
 import {
-  AddEpisodeOptions,
-  AddEpisodeOptionsInput,
-  AddEpisodeOptionsSchema,
   AddEpisodeResult,
+  AddJsonEpisodesOptionsInput,
+  AddJsonEpisodesOptionsSchema,
+  AddMessageEpisodesOptionsInput,
+  AddMessageEpisodesOptionsSchema,
+  AddTextEpisodesOptionsInput,
+  AddTextEpisodesOptionsSchema,
   CANDIDATE_LIMIT,
   EdgeTypeMap,
   EdgeTypeMappings,
   EntityTypeMap,
   MAX_NODES_PER_SUMMARY_BATCH,
+  NormalizedAddEpisodeOptions,
   PREVIOUS_EPISODES_WINDOW,
 } from './types';
 
@@ -99,6 +104,22 @@ export class EpisodeService {
     private readonly hasEpisodeEdgeRepository: HasEpisodeEdgeRepository,
     @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
+
+  private static makeCtx(parsed: NormalizedAddEpisodeOptions): LlmContext {
+    const uniqueGraphIds = [...new Set(parsed.episodes.map((e) => e.graphId))];
+    return {
+      userId: parsed.userId,
+      sessionId: parsed.userId,
+      tags: [
+        'knowledge-graph',
+        'ingestion',
+        ...uniqueGraphIds.map((id) => `graph:${id}`),
+      ],
+      metadata: {
+        episodeCount: String(parsed.episodes.length),
+      },
+    };
+  }
 
   @Span('getEpisodes')
   async getEpisodes(options: RetrieveEpisodesParamsInput): Promise<EpisodicNode[]> {
@@ -251,30 +272,67 @@ export class EpisodeService {
     };
   }
 
-  async addEpisodes(options: AddEpisodeOptionsInput): Promise<AddEpisodeResult[]> {
-    const parsed: AddEpisodeOptions = AddEpisodeOptionsSchema.parse(options);
-    const uniqueGraphIds = [...new Set(parsed.episodes.map((e) => e.graphId))];
-
-    const ctx: LlmContext = {
-      userId: parsed.userId,
-      sessionId: parsed.userId,
-      tags: [
-        'knowledge-graph',
-        'ingestion',
-        ...uniqueGraphIds.map((id) => `graph:${id}`),
-      ],
-      metadata: {
-        episodeCount: String(parsed.episodes.length),
-      },
+  async addTextEpisodes(
+    options: AddTextEpisodesOptionsInput,
+  ): Promise<AddEpisodeResult[]> {
+    const parsed = AddTextEpisodesOptionsSchema.parse(options);
+    const normalized: NormalizedAddEpisodeOptions = {
+      ...parsed,
+      episodes: parsed.episodes.map((ep) => ({
+        ...ep,
+        source: EpisodeType.text,
+        referenceTime: new Date(ep.referenceTime),
+      })),
     };
+    const { results } = await this.addEpisodesImpl(
+      normalized,
+      EpisodeService.makeCtx(normalized),
+    );
+    return results;
+  }
 
-    const { results } = await this.addEpisodesImpl(parsed, ctx);
+  async addMessageEpisodes(
+    options: AddMessageEpisodesOptionsInput,
+  ): Promise<AddEpisodeResult[]> {
+    const parsed = AddMessageEpisodesOptionsSchema.parse(options);
+    const normalized: NormalizedAddEpisodeOptions = {
+      ...parsed,
+      episodes: parsed.episodes.map((ep) => ({
+        ...ep,
+        source: EpisodeType.message,
+        referenceTime: new Date(ep.referenceTime),
+        content: ep.content.map((t) => `${t.speakerName}: ${t.message}`).join('\n'),
+      })),
+    };
+    const { results } = await this.addEpisodesImpl(
+      normalized,
+      EpisodeService.makeCtx(normalized),
+    );
+    return results;
+  }
+
+  async addJsonEpisodes(
+    options: AddJsonEpisodesOptionsInput,
+  ): Promise<AddEpisodeResult[]> {
+    const parsed = AddJsonEpisodesOptionsSchema.parse(options);
+    const normalized: NormalizedAddEpisodeOptions = {
+      ...parsed,
+      episodes: parsed.episodes.map((ep) => ({
+        ...ep,
+        source: EpisodeType.json,
+        referenceTime: new Date(ep.referenceTime),
+      })),
+    };
+    const { results } = await this.addEpisodesImpl(
+      normalized,
+      EpisodeService.makeCtx(normalized),
+    );
     return results;
   }
 
   @Span('addEpisodes', { onResult: metricsOnResult })
   private async addEpisodesImpl(
-    parsed: AddEpisodeOptions,
+    parsed: NormalizedAddEpisodeOptions,
     ctx: LlmContext,
   ): Promise<{ results: AddEpisodeResult[]; metrics: SpanMetrics }> {
     const startMs = performance.now();
@@ -759,52 +817,38 @@ export class EpisodeService {
   ): Promise<{ extractedNodes: EntityNode[]; metrics: SpanMetrics }> {
     const baseMetrics: SpanMetrics = { 'episode.id': episode.id };
 
-    let extractedNodes: EntityNode[];
-    let chunksCount: number | undefined;
-
-    if (shouldChunk(episode.content)) {
-      const chunks = await chunkContent(episode.content, episode.source);
-      const perChunk = await Promise.all(
-        chunks.map((chunk) =>
-          this.nodeExtractionService.extractNodes(
-            model,
-            { ...episode, content: chunk },
-            previousEpisodesForEpisode,
-            entityTypes,
-            customInstructions,
-            excludedEntityTypes,
-            ctx,
-          ),
+    const chunks = prepareChunks(episode.content, episode.source);
+    const perChunk = await Promise.all(
+      chunks.map((chunk) =>
+        this.nodeExtractionService.extractNodes(
+          model,
+          { ...episode, content: chunk },
+          previousEpisodesForEpisode,
+          entityTypes,
+          customInstructions,
+          excludedEntityTypes,
+          ctx,
         ),
-      );
-      // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins)
-      const nodesByName = new Map<string, EntityNode>();
-      for (const nodes of perChunk) {
-        for (const node of nodes) {
-          const key = node.name.toLowerCase();
-          if (!nodesByName.has(key)) nodesByName.set(key, node);
-        }
+      ),
+    );
+
+    // Deduplicate nodes across chunks by case-insensitive name (first occurrence wins).
+    // No-op when there's a single chunk.
+    const nodesByName = new Map<string, EntityNode>();
+    for (const nodes of perChunk) {
+      for (const node of nodes) {
+        const key = node.name.toLowerCase();
+        if (!nodesByName.has(key)) nodesByName.set(key, node);
       }
-      extractedNodes = [...nodesByName.values()];
-      chunksCount = chunks.length;
-    } else {
-      extractedNodes = await this.nodeExtractionService.extractNodes(
-        model,
-        episode,
-        previousEpisodesForEpisode,
-        entityTypes,
-        customInstructions,
-        excludedEntityTypes,
-        ctx,
-      );
     }
+    const extractedNodes = [...nodesByName.values()];
 
     return {
       extractedNodes,
       metrics: {
         ...baseMetrics,
         'extracted.count': extractedNodes.length,
-        'chunks.count': chunksCount,
+        'chunks.count': chunks.length,
       },
     };
   }

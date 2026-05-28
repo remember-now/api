@@ -1,104 +1,456 @@
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-
 import { EpisodeType } from '@/knowledge-graph/models';
 
+import { isSentenceEnd } from '../prompts/text-utils';
+
+// Density-based chunking: only chunk high-density content (many entities per token)
+// This targets the failure case (large entity-dense inputs) while preserving
+// context for prose/narrative content
 export const CHUNK_TOKEN_SIZE = 3000;
 export const CHUNK_OVERLAP_TOKENS = 200;
+// Minimum tokens before considering chunking - short content processes fine regardless of density
 export const CHUNK_MIN_TOKENS = 1000;
-export const CHUNK_DENSITY_THRESHOLD = 0.15; // entities per token
+// Entity density threshold: chunk if estimated density > this value
+// For JSON: elements per 1000 tokens > threshold * 1000 (e.g., 0.15 = 150 elements/1000 tokens)
+// For Text: capitalized words per 1000 tokens > threshold * 500 (e.g., 0.15 = 75 caps/1000 tokens)
+// Higher values = more conservative (less chunking), targets P95+ density cases
+// Examples that trigger chunking at 0.15: AWS cost data (12mo), bulk data imports, entity-dense JSON
+// Examples that DON'T chunk at 0.15: meeting transcripts, news articles, documentation
+export const CHUNK_DENSITY_THRESHOLD = 0.15;
 
-// TODO: For accurate token counting matching Python's tiktoken, install
-// `js-tiktoken` (npm) and use `cl100k_base` encoding.
-// This implementation uses a chars-per-token approximation (4 chars ≈ 1 token),
-// which is sufficient for chunking decisions but not exact for model billing.
+// Approximate characters per token (conservative estimate).
 const CHARS_PER_TOKEN = 4;
 
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / CHARS_PER_TOKEN);
+  return Math.floor(text.length / CHARS_PER_TOKEN);
 }
 
-export function shouldChunk(content: string): boolean {
-  return estimateTokens(content) > CHUNK_TOKEN_SIZE;
+function tokensToChars(tokens: number): number {
+  return tokens * CHARS_PER_TOKEN;
+}
+
+/** Returns [content] when chunking isn't warranted (small or low-density); otherwise returns
+ *  type-specific chunks. Always non-empty so callers can iterate uniformly. */
+export function prepareChunks(content: string, source: EpisodeType): string[] {
+  const tokens = estimateTokens(content);
+  if (tokens < CHUNK_MIN_TOKENS) return [content];
+
+  if (source === EpisodeType.json) {
+    // Schema refine on JsonEpisodeInputSchema guarantees parseable JSON.
+    const data: unknown = JSON.parse(content);
+    return jsonLikelyDense(data, tokens) ? chunkJsonData(data) : [content];
+  }
+
+  if (!textLikelyDense(content, tokens)) return [content];
+  return source === EpisodeType.message
+    ? chunkMessageContent(content)
+    : chunkTextContent(content);
+}
+
+export function jsonLikelyDense(data: unknown, tokens: number): boolean {
+  if (tokens === 0) return false;
+
+  // Scalars (number/string/bool/null) yield count 0 -> density 0 -> below threshold.
+  const count = Array.isArray(data)
+    ? data.length
+    : data !== null && typeof data === 'object'
+      ? countJsonKeys(data, 2)
+      : 0;
+
+  const density = (count / tokens) * 1000;
+  return density > CHUNK_DENSITY_THRESHOLD * 1000;
+}
+
+// Arrays are transparent to the depth budget - only object levels consume it.
+export function countJsonKeys(data: unknown, maxDepth: number, currentDepth = 0): number {
+  if (Array.isArray(data)) {
+    let count = 0;
+    for (const item of data) count += countJsonKeys(item, maxDepth, currentDepth);
+    return count;
+  }
+  if (data === null || typeof data !== 'object') return 0;
+  if (currentDepth >= maxDepth) return 0;
+
+  let count = Object.keys(data).length;
+  for (const value of Object.values(data)) {
+    count += countJsonKeys(value, maxDepth, currentDepth + 1);
+  }
+  return count;
+}
+
+export function textLikelyDense(content: string, tokens: number): boolean {
+  if (tokens === 0) return false;
+  const words = content.match(/\S+/g) ?? [];
+  if (words.length === 0) return false;
+
+  let capitalizedCount = 0;
+  for (let i = 0; i < words.length; i++) {
+    if (i === 0) continue;
+    const lastChar = words[i - 1].slice(-1);
+    if (lastChar === '.' || lastChar === '!' || lastChar === '?') continue;
+
+    // Check if capitalized (first char upper, not all caps)
+    const cleaned = words[i].replace(/^[.,!?;:'"()[\]{}]+|[.,!?;:'"()[\]{}]+$/g, '');
+    if (cleaned && /^[A-Z]/.test(cleaned) && cleaned !== cleaned.toUpperCase()) {
+      capitalizedCount++;
+    }
+  }
+  // Calculate density: capitalized words per 1000 tokens
+  const density = (capitalizedCount / tokens) * 1000;
+
+  // Text density threshold is typically lower than JSON
+  // A well-written article might have 5-10% named entities
+  // Half the JSON threshold applied
+  return density > CHUNK_DENSITY_THRESHOLD * 500;
 }
 
 /**
- * Splits text into overlapping chunks using LangChain's RecursiveCharacterTextSplitter.
- * Respects paragraph → sentence → word → character boundaries in that order.
+ * Split a JSON value into chunks while preserving structure.
+ * Arrays split at element boundaries; objects split at top-level key boundaries.
  */
-export async function chunkText(
-  text: string,
-  chunkSize = CHUNK_TOKEN_SIZE,
-  overlap = CHUNK_OVERLAP_TOKENS,
-): Promise<string[]> {
-  if (estimateTokens(text) <= chunkSize) return [text];
+export function chunkJsonData(
+  data: unknown,
+  chunkSizeTokens?: number,
+  overlapTokens?: number,
+): string[] {
+  const chunkSizeChars = tokensToChars(chunkSizeTokens ?? CHUNK_TOKEN_SIZE);
+  const overlapChars = tokensToChars(overlapTokens ?? CHUNK_OVERLAP_TOKENS);
 
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: chunkSize * CHARS_PER_TOKEN,
-    chunkOverlap: overlap * CHARS_PER_TOKEN,
-    separators: ['\n\n', '\n', '. ', '! ', '? ', ' ', ''],
-  });
-
-  const docs = await splitter.createDocuments([text]);
-  return docs.map((d) => d.pageContent);
+  if (Array.isArray(data)) {
+    return chunkJsonArray(data, chunkSizeChars, overlapChars);
+  }
+  // jsonLikelyDense gates scalars out; only objects reach here.
+  return chunkJsonObject(data as Record<string, unknown>, chunkSizeChars, overlapChars);
 }
 
-/**
- * Splits a JSON array string into token-budget chunks.
- * If the content is not a valid JSON array, falls back to chunkText.
- */
-export async function chunkJson(
-  json: string,
-  chunkSize = CHUNK_TOKEN_SIZE,
-): Promise<string[]> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return chunkText(json, chunkSize);
-  }
+function chunkJsonArray(
+  data: unknown[],
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const parts = data.map((el) => JSON.stringify(el));
+  return chunkJsonParts(parts, '[', ']', chunkSizeChars, overlapChars);
+}
 
-  if (!Array.isArray(parsed)) {
-    // For objects, just use text chunking
-    return chunkText(json, chunkSize);
-  }
+function chunkJsonObject(
+  data: Record<string, unknown>,
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const parts = Object.entries(data).map(
+    ([k, v]) => JSON.stringify(k) + ':' + JSON.stringify(v),
+  );
+  return chunkJsonParts(parts, '{', '}', chunkSizeChars, overlapChars);
+}
 
-  if (estimateTokens(json) <= chunkSize) return [json];
+function chunkJsonParts(
+  parts: string[],
+  open: string,
+  close: string,
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const empty = open + close;
+  if (parts.length === 0) return [empty];
 
   const chunks: string[] = [];
-  let currentItems: unknown[] = [];
-  let currentTokens = 0;
+  let current: string[] = [];
+  let currentSize = 2;
 
-  for (const item of parsed) {
-    const itemStr = JSON.stringify(item);
-    const itemTokens = estimateTokens(itemStr);
+  for (const part of parts) {
+    let sep = current.length === 0 ? 0 : 1;
 
-    if (currentTokens + itemTokens > chunkSize && currentItems.length > 0) {
-      chunks.push(JSON.stringify(currentItems));
-      currentItems = [];
-      currentTokens = 0;
+    if (current.length > 0 && currentSize + sep + part.length > chunkSizeChars) {
+      chunks.push(open + current.join(',') + close);
+      current = takeOverlapParts(current, overlapChars);
+      currentSize = joinedJsonSize(current);
+      sep = current.length === 0 ? 0 : 1;
     }
 
-    currentItems.push(item);
-    currentTokens += itemTokens;
+    currentSize += sep + part.length;
+    current.push(part);
   }
 
-  if (currentItems.length > 0) {
-    chunks.push(JSON.stringify(currentItems));
+  if (current.length > 0) {
+    chunks.push(open + current.join(',') + close);
   }
+  return chunks.length > 0 ? chunks : [empty];
+}
 
-  return chunks.length > 0 ? chunks : [json];
+function joinedJsonSize(parts: string[]): number {
+  if (parts.length === 0) return 2;
+  let size = 2 + (parts.length - 1);
+  for (const p of parts) size += p.length;
+  return size;
+}
+
+function takeOverlapParts(parts: string[], overlapChars: number): string[] {
+  if (parts.length === 0) return [];
+  const overlap: string[] = [];
+  let size = 2;
+
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    const sep = overlap.length === 0 ? 0 : 1;
+    if (size + sep + p.length > overlapChars) break;
+    overlap.unshift(p);
+    size += sep + p.length;
+  }
+  return overlap;
 }
 
 /**
- * Dispatcher: routes content to the appropriate chunker based on episode type.
+ * Split text content at natural boundaries (paragraphs, sentences).
+ * Includes overlap to capture entities at chunk boundaries.
  */
-export async function chunkContent(
+export function chunkTextContent(
   content: string,
-  source: EpisodeType,
-): Promise<string[]> {
-  if (source === EpisodeType.json) {
-    return chunkJson(content);
+  chunkSizeTokens?: number,
+  overlapTokens?: number,
+): string[] {
+  const chunkSizeChars = tokensToChars(chunkSizeTokens ?? CHUNK_TOKEN_SIZE);
+  const overlapChars = tokensToChars(overlapTokens ?? CHUNK_OVERLAP_TOKENS);
+
+  if (content.length <= chunkSizeChars) return [content];
+
+  const paragraphs = content.split(/\n\s*\n/);
+
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentSize = 0;
+
+  for (let paragraph of paragraphs) {
+    paragraph = paragraph.trim();
+    if (!paragraph) continue;
+
+    const paraSize = paragraph.length;
+
+    if (paraSize > chunkSizeChars) {
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk.join('\n\n'));
+        currentChunk = [];
+        currentSize = 0;
+      }
+      const sentenceChunks = chunkBySentences(paragraph, chunkSizeChars, overlapChars);
+      chunks.push(...sentenceChunks);
+      continue;
+    }
+
+    if (currentChunk.length > 0 && currentSize + paraSize + 2 > chunkSizeChars) {
+      chunks.push(currentChunk.join('\n\n'));
+      const overlapText = getOverlapText(currentChunk.join('\n\n'), overlapChars);
+      if (overlapText) {
+        currentChunk = [overlapText];
+        currentSize = overlapText.length;
+      } else {
+        currentChunk = [];
+        currentSize = 0;
+      }
+    }
+
+    currentChunk.push(paragraph);
+    currentSize += paraSize + 2;
   }
-  // text and message types use recursive character text chunking
-  return chunkText(content);
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join('\n\n'));
+  }
+
+  return chunks.length > 0 ? chunks : [content];
+}
+
+function splitIntoSentences(text: string): string[] {
+  const sentences: string[] = [];
+  let start = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    if (!isSentenceEnd(text, i)) continue;
+    let j = i + 1;
+    while (j < text.length && /\s/.test(text[j])) j++;
+    const sentence = text.substring(start, j).trim();
+    if (sentence) sentences.push(sentence);
+    start = j;
+    i = j - 1;
+  }
+
+  if (start < text.length) {
+    const tail = text.substring(start).trim();
+    if (tail) sentences.push(tail);
+  }
+
+  return sentences;
+}
+
+function chunkBySentences(
+  text: string,
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const sentences = splitIntoSentences(text);
+
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentSize = 0;
+
+  for (let sentence of sentences) {
+    sentence = sentence.trim();
+    if (!sentence) continue;
+
+    const sentSize = sentence.length;
+
+    if (sentSize > chunkSizeChars) {
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk.join(' '));
+        currentChunk = [];
+        currentSize = 0;
+      }
+      const fixedChunks = chunkBySize(sentence, chunkSizeChars, overlapChars);
+      chunks.push(...fixedChunks);
+      continue;
+    }
+
+    if (currentChunk.length > 0 && currentSize + sentSize + 1 > chunkSizeChars) {
+      chunks.push(currentChunk.join(' '));
+      const overlapText = getOverlapText(currentChunk.join(' '), overlapChars);
+      if (overlapText) {
+        currentChunk = [overlapText];
+        currentSize = overlapText.length;
+      } else {
+        currentChunk = [];
+        currentSize = 0;
+      }
+    }
+
+    currentChunk.push(sentence);
+    currentSize += sentSize + 1;
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join(' '));
+  }
+
+  return chunks;
+}
+
+function chunkBySize(
+  text: string,
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < text.length) {
+    let end = Math.min(start + chunkSizeChars, text.length);
+
+    if (end < text.length) {
+      const slice = text.substring(start, end);
+      const relSpace = slice.lastIndexOf(' ');
+      if (relSpace > 0) {
+        end = start + relSpace;
+      }
+    }
+
+    chunks.push(text.substring(start, end).trim());
+
+    const minProgress = Math.max(1, chunkSizeChars - overlapChars);
+    start = Math.max(start + minProgress, end - overlapChars);
+  }
+
+  return chunks;
+}
+
+function getOverlapText(text: string, overlapChars: number): string {
+  if (text.length <= overlapChars) return text;
+
+  const overlapStart = text.length - overlapChars;
+  const spaceIdx = text.indexOf(' ', overlapStart);
+  if (spaceIdx !== -1) return text.substring(spaceIdx + 1);
+  return text.substring(overlapStart);
+}
+
+/**
+ * Split conversation content on speaker-turn boundaries.
+ *
+ * Callers must pre-format content as "Speaker: message" lines, which
+ * addMessageEpisodes normalization guarantees.
+ *
+ * TODO(examine): pass MessageTurn[] through to a chunkMessageTurns variant to drop
+ * the serialize -> re-split roundtrip. Requires widening the normalized
+ * episode content type to carry structured turns alongside the string form.
+ */
+export function chunkMessageContent(
+  content: string,
+  chunkSizeTokens?: number,
+  overlapTokens?: number,
+): string[] {
+  const chunkSizeChars = tokensToChars(chunkSizeTokens ?? CHUNK_TOKEN_SIZE);
+  const overlapChars = tokensToChars(overlapTokens ?? CHUNK_OVERLAP_TOKENS);
+
+  if (content.length <= chunkSizeChars) return [content];
+
+  return chunkSpeakerMessages(content, chunkSizeChars, overlapChars);
+}
+
+function chunkSpeakerMessages(
+  content: string,
+  chunkSizeChars: number,
+  overlapChars: number,
+): string[] {
+  const messages = content
+    .split(/(?=^[A-Za-z_][A-Za-z0-9_\s]*:)/m)
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0);
+
+  if (messages.length === 0) return [content];
+
+  const chunks: string[] = [];
+  let currentMessages: string[] = [];
+  let currentSize = 0;
+
+  for (const message of messages) {
+    const msgSize = message.length;
+
+    if (msgSize > chunkSizeChars) {
+      if (currentMessages.length > 0) {
+        chunks.push(currentMessages.join('\n'));
+        currentMessages = [];
+        currentSize = 0;
+      }
+      chunks.push(message);
+      continue;
+    }
+
+    if (currentMessages.length > 0 && currentSize + msgSize + 1 > chunkSizeChars) {
+      chunks.push(currentMessages.join('\n'));
+      const overlapMessages = getOverlapMessages(currentMessages, overlapChars);
+      currentMessages = overlapMessages;
+      currentSize =
+        currentMessages.reduce((sum, m) => sum + m.length, 0) +
+        Math.max(0, currentMessages.length - 1);
+    }
+
+    currentMessages.push(message);
+    currentSize += msgSize + 1;
+  }
+
+  if (currentMessages.length > 0) {
+    chunks.push(currentMessages.join('\n'));
+  }
+
+  return chunks.length > 0 ? chunks : [content];
+}
+
+function getOverlapMessages(messages: string[], overlapChars: number): string[] {
+  if (messages.length === 0) return [];
+
+  const overlap: string[] = [];
+  let currentSize = 0;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msgSize = messages[i].length + 1;
+    if (currentSize + msgSize > overlapChars) break;
+    overlap.unshift(messages[i]);
+    currentSize += msgSize;
+  }
+  return overlap;
 }

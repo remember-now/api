@@ -225,16 +225,29 @@ describe('EpisodicNode', () => {
         graphId: KG_TEST_GRAPH_ID,
         content: 'Some content',
         validAt,
+        sourceDescription: 'test',
       });
       expect(node.name).toBe('Episode 1');
       expect(node.content).toBe('Some content');
       expect(node.validAt).toBe(validAt);
       expect(node.source).toBe(EpisodeType.text);
-      expect(node.sourceDescription).toBe('');
+      expect(node.sourceDescription).toBe('test');
       expect(node.labels).toEqual(['Episodic']);
       expect(node.id).toBeDefined();
       expect(node.createdAt).toBeInstanceOf(Date);
       expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
+    });
+
+    it('should reject empty sourceDescription', () => {
+      expect(() =>
+        createEpisodicNode({
+          name: n('Episode'),
+          graphId: KG_TEST_GRAPH_ID,
+          content: 'content',
+          validAt,
+          sourceDescription: '',
+        }),
+      ).toThrow();
     });
 
     it('should allow overriding source', () => {
@@ -243,6 +256,7 @@ describe('EpisodicNode', () => {
         graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
+        sourceDescription: 'test',
         source: EpisodeType.message,
       });
       expect(node.source).toBe(EpisodeType.message);
@@ -256,6 +270,7 @@ describe('EpisodicNode', () => {
         graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
+        sourceDescription: 'test',
       });
       expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
     });
@@ -266,6 +281,7 @@ describe('EpisodicNode', () => {
         graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
+        sourceDescription: 'test',
       });
       expect(() => EpisodicNodeSchema.parse({ ...node, source: 'invalid' })).toThrow();
     });
@@ -277,6 +293,7 @@ describe('EpisodicNode', () => {
           graphId: KG_TEST_GRAPH_ID,
           content: 'content',
           validAt,
+          sourceDescription: 'test',
           source,
         });
         expect(() => EpisodicNodeSchema.parse(node)).not.toThrow();
@@ -289,6 +306,7 @@ describe('EpisodicNode', () => {
         graphId: KG_TEST_GRAPH_ID,
         content: 'content',
         validAt,
+        sourceDescription: 'test',
       });
       expect(() => EpisodicNodeSchema.parse({ ...node, graphId: '' })).toThrow();
     });

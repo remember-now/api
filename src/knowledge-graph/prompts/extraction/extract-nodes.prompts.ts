@@ -287,9 +287,7 @@ ${previousEpisodesText}
 ${formatCurrentEpisode(episode, { includeSource: true })}
 </CURRENT EPISODE>`;
 
-  if (episode.sourceDescription) {
-    humanContent += `\n\n<SOURCE DESCRIPTION>\n${episode.sourceDescription}\n</SOURCE DESCRIPTION>`;
-  }
+  humanContent += `\n\n<SOURCE DESCRIPTION>\n${episode.sourceDescription}\n</SOURCE DESCRIPTION>`;
 
   if (entityTypes && Object.keys(entityTypes).length > 0) {
     const entityTypesText = Object.entries(entityTypes)

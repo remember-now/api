@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { UuidSchema } from '@/common/schemas';
-import { Episode, EpisodeSchema } from '@/knowledge-graph/episode';
-import { EpisodeType } from '@/knowledge-graph/types';
+import { AddTextEpisodesOptionsInput } from '@/knowledge-graph/episode';
+import { NodeNameSchema } from '@/knowledge-graph/types';
 
 export const KG_TEST_USER_ID = UuidSchema.parse('00000000-0000-4000-8000-000000000042');
 export const KG_TEST_GRAPH_ID = UuidSchema.parse('00000000-0000-4000-8000-000000000043');
@@ -30,13 +30,14 @@ export const u = (s: string) => {
   );
 };
 
-export function makeEpisode(name: string): Episode {
-  return EpisodeSchema.parse({
-    name: name,
+export function makeEpisode(
+  name: string,
+): AddTextEpisodesOptionsInput['episodes'][number] {
+  return {
+    name: NodeNameSchema.parse(name),
     content: `Content: ${name}`,
-    source: EpisodeType.text,
     sourceDescription: 'test',
-    referenceTime: KG_REFERENCE_TIME,
+    referenceTime: KG_REFERENCE_TIME.toISOString(),
     graphId: KG_TEST_GRAPH_ID,
-  });
+  };
 }

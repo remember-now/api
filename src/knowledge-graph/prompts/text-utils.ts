@@ -11,19 +11,58 @@ export function formatPromptTimestamp(date: Date): string {
 }
 
 const ABBREVIATIONS = new Set([
+  // Latin shorthand
   'e.g',
   'i.e',
   'etc',
   'vs',
+  // Personal titles
   'mr',
   'mrs',
   'dr',
   'prof',
   'sr',
   'jr',
+  'rev',
+  'hon',
+  'capt',
+  'sgt',
+  'lt',
+  'maj',
+  'pres',
+  'gov',
+  'sen',
+  'fr',
+  'esq',
+  // Organizational suffixes
+  'inc',
+  'corp',
+  'ltd',
+  'co',
+  'bros',
+  'dept',
+  'univ',
+  // Geographic
+  'ave',
+  'blvd',
+  'rd',
+  'mt',
+  // Months
+  'jan',
+  'feb',
+  'mar',
+  'apr',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'sept',
+  'oct',
+  'nov',
+  'dec',
 ]);
 
-function isSentenceEnd(text: string, pos: number): boolean {
+export function isSentenceEnd(text: string, pos: number): boolean {
   const ch = text[pos];
   if (ch !== '.' && ch !== '!' && ch !== '?') return false;
 

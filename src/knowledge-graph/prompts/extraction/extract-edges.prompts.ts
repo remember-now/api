@@ -21,6 +21,11 @@ const ExtractedEdgeSchema = z.object({
   targetEntityName: z
     .string()
     .describe('The name of the target entity from the ENTITIES list'),
+  // TODO: This is where the model creates new relationship types. Unlike
+  // extract-nodes (which forces the model to pick an entityTypeId from a
+  // provided list), edges accept any SCREAMING_SNAKE_CASE name the model
+  // derives from the predicate when no provided FACT TYPE matches. Kept soft
+  // by design - tightening would require dropping support for novel relations.
   relationType: RelationshipTypeSchema.describe(
     'The type of relationship between the entities, in SCREAMING_SNAKE_CASE (e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH)',
   ),

@@ -9,7 +9,7 @@ import {
   EpisodicNodeSchema,
 } from '../../models';
 import {
-  EpisodeTypeSchema,
+  EpisodeType,
   NodeLabelSchema,
   NodeNameSchema,
   RelationshipTypeSchema,
@@ -21,20 +21,86 @@ export const PREVIOUS_EPISODES_WINDOW = 20;
 export const MAX_NODES_PER_SUMMARY_BATCH = 30;
 export const CANDIDATE_LIMIT = 10;
 
-// Schemas
+// ─── Per-ingestion-path input schemas ──────────────────────────────────────
+//
+// Each ingestion path (text, message, ...) gets its own flat input schema so
+// agents bind a tool with no oneOf branches to navigate. The service
+// normalises both into a single internal shape before running the pipeline.
 
-export const EpisodeSchema = z
-  .object({
-    graphId: UuidSchema,
-    name: NodeNameSchema,
-    content: z.string().min(1),
-    source: EpisodeTypeSchema,
-    sourceDescription: z.string().optional(),
-    referenceTime: z.date().default(() => new Date()),
-    id: UuidSchema.optional(),
-    sagaId: UuidSchema.optional(),
-  })
-  .brand<'Episode'>();
+const MessageTurnSchema = z.object({
+  speakerName: z
+    .string()
+    .min(1)
+    .describe(
+      'Name of the person who produced this turn. Use a real name when known; avoid generic role labels like "User"/"Assistant"/"Bot".',
+    ),
+  message: z
+    .string()
+    .min(1)
+    .describe('Verbatim text of the turn, exactly as the speaker produced it.'),
+});
+
+const EpisodeInputBaseSchema = z.object({
+  graphId: UuidSchema.describe('ID of the knowledge graph this episode belongs to.'),
+  name: NodeNameSchema.describe(
+    'Short identifier for the episode, used for logging and prompt context.',
+  ),
+  sourceDescription: z
+    .string()
+    .min(1)
+    .describe(
+      'Identifier of the ingestion source (e.g. "RememberNow UI", "Slack importer v1"). Surfaces in extraction prompts as supplementary context.',
+    ),
+  referenceTime: z.iso
+    .datetime()
+    .default(() => new Date().toISOString())
+    .describe(
+      'ISO 8601 timestamp with Z suffix marking when the content occurred. Used to resolve relative time references during extraction. Defaults to now.',
+    ),
+  id: UuidSchema.optional().describe(
+    'Optional explicit episode ID. Omit to have one generated.',
+  ),
+  sagaId: UuidSchema.optional().describe(
+    'Optional ID of a saga (topic/thread) this episode contributes to.',
+  ),
+});
+
+const TextEpisodeInputSchema = EpisodeInputBaseSchema.extend({
+  content: z
+    .string()
+    .min(1)
+    .describe('Free-form text. Narration, notes, or any single-string payload.'),
+});
+
+const MessageEpisodeInputSchema = EpisodeInputBaseSchema.extend({
+  content: z
+    .array(MessageTurnSchema)
+    .min(1)
+    .describe('Conversation turns in chronological order.'),
+});
+
+// prepareChunks in content-chunking.ts relies on this refine
+const JsonEpisodeInputSchema = EpisodeInputBaseSchema.extend({
+  content: z
+    .string()
+    .min(1)
+    .refine(
+      (s) => {
+        try {
+          JSON.parse(s);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: 'content must be valid JSON' },
+    )
+    .describe(
+      'JSON-stringified payload. Chunked per array element when the top-level value is an array.',
+    ),
+});
+
+// ─── Type-map schemas ──────────────────────────────────────────────────────
 
 const AttributeSchema = z
   .instanceof(z.ZodType)
@@ -62,15 +128,43 @@ export const EdgeTypeMappingsSchema = z.map(
   z.array(RelationshipTypeSchema),
 );
 
-export const AddEpisodeOptionsSchema = z.object({
+// ─── Public addEpisodes options (one per ingestion path) ───────────────────
+
+const AddEpisodesOptionsBaseSchema = z.object({
   userId: UuidSchema,
-  episodes: z.array(EpisodeSchema).min(1),
   entityTypes: EntityTypeMapSchema.optional(),
   edgeTypes: EdgeTypeMapSchema.optional(),
   edgeTypeMappings: EdgeTypeMappingsSchema.optional(),
   excludedEntityTypes: z.array(NodeLabelSchema).optional(),
   customInstructions: z.string().optional(),
   updateCommunities: z.boolean().optional(),
+});
+
+export const AddTextEpisodesOptionsSchema = AddEpisodesOptionsBaseSchema.extend({
+  episodes: z.array(TextEpisodeInputSchema).min(1),
+});
+
+export const AddMessageEpisodesOptionsSchema = AddEpisodesOptionsBaseSchema.extend({
+  episodes: z.array(MessageEpisodeInputSchema).min(1),
+});
+
+export const AddJsonEpisodesOptionsSchema = AddEpisodesOptionsBaseSchema.extend({
+  episodes: z.array(JsonEpisodeInputSchema).min(1),
+});
+
+// ─── Internal normalised shape (after content-flatten + source attached) ───
+//
+// Not exposed to callers; produced by the public methods and consumed by
+// the private pipeline impl.
+
+const NormalizedEpisodeSchema = EpisodeInputBaseSchema.extend({
+  source: z.enum(EpisodeType),
+  content: z.string().min(1),
+  referenceTime: z.date(),
+});
+
+export const NormalizedAddEpisodeOptionsSchema = AddEpisodesOptionsBaseSchema.extend({
+  episodes: z.array(NormalizedEpisodeSchema).min(1),
 });
 
 export const AddEpisodeResultSchema = z.object({
@@ -81,13 +175,19 @@ export const AddEpisodeResultSchema = z.object({
   episode: EpisodicNodeSchema,
 });
 
-// Types
+// ─── Types ─────────────────────────────────────────────────────────────────
 
 export type EntityTypeMap = z.infer<typeof EntityTypeMapSchema>;
 export type EdgeTypeMap = z.infer<typeof EdgeTypeMapSchema>;
 export type EdgeTypeMappings = z.infer<typeof EdgeTypeMappingsSchema>;
 
-export type Episode = z.infer<typeof EpisodeSchema>;
-export type AddEpisodeOptionsInput = z.input<typeof AddEpisodeOptionsSchema>;
-export type AddEpisodeOptions = z.infer<typeof AddEpisodeOptionsSchema>;
+export type AddTextEpisodesOptionsInput = z.input<typeof AddTextEpisodesOptionsSchema>;
+export type AddMessageEpisodesOptionsInput = z.input<
+  typeof AddMessageEpisodesOptionsSchema
+>;
+export type AddJsonEpisodesOptionsInput = z.input<typeof AddJsonEpisodesOptionsSchema>;
+
+export type NormalizedAddEpisodeOptions = z.infer<
+  typeof NormalizedAddEpisodeOptionsSchema
+>;
 export type AddEpisodeResult = z.infer<typeof AddEpisodeResultSchema>;

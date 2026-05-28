@@ -41,6 +41,7 @@ export class KgNodeFactory {
       content: 'test content',
       validAt: KG_REFERENCE_TIME,
       source: EpisodeType.text,
+      sourceDescription: 'test',
       labels: labels
         ? NodeLabelsSchema.parse(labels)
         : [NodeLabelSchema.parse('Episodic')],

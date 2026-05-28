@@ -7,7 +7,6 @@ import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
 import { Uuid } from '@/common/schemas';
 import { EpisodeService } from '@/knowledge-graph/episode';
-import { EpisodeType } from '@/knowledge-graph/models';
 import { SearchService } from '@/knowledge-graph/search';
 import {
   EdgeReranker,
@@ -20,11 +19,10 @@ import { UserWithoutPassword } from '@/user/dto';
 
 import { AgentService } from './agent.service';
 
-// TODO: REMOVE - test DTOs
+// TODO: REMOVE - test DTOs.
 const TestIngestSchema = z.object({
   name: z.string().min(1),
   content: z.string().min(1),
-  source: z.enum(EpisodeType).default(EpisodeType.message),
 });
 class TestIngestDto extends createZodDto(TestIngestSchema) {}
 
@@ -58,14 +56,14 @@ export class AgentController {
   })
   async testIngest(@Body() body: TestIngestDto, @GetUser() user: UserWithoutPassword) {
     const graphId = user.graphs.find((g) => g.name === 'main')!.id;
-    const [result] = await this.episodeService.addEpisodes({
+    const [result] = await this.episodeService.addTextEpisodes({
       userId: user.id,
       episodes: [
         {
           name: body.name,
           content: body.content,
           graphId,
-          source: body.source,
+          sourceDescription: 'RememberNow UI',
         },
       ],
     });

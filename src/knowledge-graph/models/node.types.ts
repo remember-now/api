@@ -24,7 +24,7 @@ export const EntityNodeSchema = NodeBaseSchema.extend({
 
 export const EpisodicNodeSchema = NodeBaseSchema.extend({
   source: z.enum(EpisodeType),
-  sourceDescription: z.string().default(''),
+  sourceDescription: z.string().min(1),
   content: z.string(),
   validAt: z.date(),
   // entityEdges omitted: upstream's Neo4j denormalization of "facts this
