@@ -13,6 +13,8 @@ import { PrismaInstrumentation } from '@prisma/instrumentation';
 import { parseLangfuseConfig } from '@/config/langfuse';
 import { parseOtelConfig } from '@/config/otel';
 
+import { setLangfuseEnabled } from './langfuse-state';
+
 const REMEMBER_NOW_SCOPE = 'remember-now';
 const PRISMA_SCOPE = 'prisma';
 
@@ -91,6 +93,7 @@ export function startOtel(): { shutdown: () => Promise<void> } {
   const processors: SpanProcessor[] = [];
 
   if (langfuseConfig.enabled) {
+    setLangfuseEnabled(true);
     const traceTracker = new RememberNowTraceTracker();
     processors.push(traceTracker);
 
@@ -100,7 +103,8 @@ export function startOtel(): { shutdown: () => Promise<void> } {
         secretKey: langfuseConfig.secretKey,
         baseUrl: langfuseConfig.baseUrl,
         environment: langfuseConfig.environment,
-        exportMode: 'immediate',
+        // `batched` is required for long-running servers like this one
+        exportMode: 'batched',
         // Default filter keeps only LLM-focused spans (langfuse-sdk scope,
         // gen_ai.* attrs, known LLM instrumentation). Also let through our
         // own `remember-now` scope so manually-traced pipeline spans appear

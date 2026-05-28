@@ -45,10 +45,17 @@ class TestTraceableAsLangfuseTrace {
   methodTwo() {}
 }
 
+@Traceable({ observationKind: 'retriever' })
+class TestTraceableWithKind {
+  methodOne() {}
+  methodTwo() {}
+}
+
 describe('Traceable', () => {
   let instance: TestTraceable;
   let instanceWithOptions: TestTraceableWithOptions;
   let instanceAsLangfuseTrace: TestTraceableAsLangfuseTrace;
+  let instanceWithKind: TestTraceableWithKind;
   let traceExporter: InMemorySpanExporter;
   let spanProcessor: SimpleSpanProcessor;
   let provider: NodeTracerProvider;
@@ -57,6 +64,7 @@ describe('Traceable', () => {
     instance = new TestTraceable();
     instanceWithOptions = new TestTraceableWithOptions();
     instanceAsLangfuseTrace = new TestTraceableAsLangfuseTrace();
+    instanceWithKind = new TestTraceableWithKind();
     traceExporter = new InMemorySpanExporter();
     spanProcessor = new SimpleSpanProcessor(traceExporter);
     provider = new NodeTracerProvider({
@@ -127,5 +135,14 @@ describe('Traceable', () => {
     expect(spans[1].attributes['langfuse.trace.name']).toBe(
       'TestTraceableAsLangfuseTrace.methodTwo',
     );
+  });
+
+  it('propagates observationKind to every method', () => {
+    instanceWithKind.methodOne();
+    instanceWithKind.methodTwo();
+    const spans = traceExporter.getFinishedSpans();
+    expect(spans).toHaveLength(2);
+    expect(spans[0].attributes['langfuse.observation.type']).toBe('retriever');
+    expect(spans[1].attributes['langfuse.observation.type']).toBe('retriever');
   });
 });

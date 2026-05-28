@@ -15,16 +15,36 @@ export interface LlmContext {
 }
 
 /**
+ * Vendor-neutral classification for a span's observation type. The `@Span`
+ * decorator translates this to whatever attribute the configured backend
+ * expects (today: Langfuse's `langfuse.observation.type`). `'span'` is the
+ * default and emits no attribute.
+ */
+export type ObservationKind = 'retriever' | 'embedding' | 'generation' | 'tool' | 'span';
+
+/**
  * Options accepted by the `@Span` / `@Traceable` decorators. Extends OTel's
- * `SpanOptions` with two opt-ins:
+ * `SpanOptions` with:
  *  - `onResult`: post-success callback to enrich the span with attributes
  *    derived from the return value.
  *  - `asLangfuseTrace`: write `langfuse.trace.name` so Langfuse promotes the
  *    span to the trace root. Use only on entry-point methods.
+ *  - `observationKind`: vendor-neutral observation classification. Distinct
+ *    from OTel's `kind` (SpanKind: INTERNAL/SERVER/PRODUCER/...), which
+ *    describes messaging semantics.
+ *  - `captureIo`: auto-serialize method args/return as observation input/output
+ *    on the span. Defaults to false; pass `true` to opt in. Synchronous
+ *    serialization of `args` runs before the wrapped method, so opt in only on
+ *    methods whose args are safe to walk via `JSON.stringify` - controller
+ *    methods that receive request-scoped objects (Passport users, NestJS
+ *    Request) have been observed to break OTel context propagation when their
+ *    args are serialized.
  */
 export interface ExtendedSpanOptions extends SpanOptions {
   onResult?: (result: unknown) => { attributes?: SpanOptions['attributes'] } | undefined;
   asLangfuseTrace?: boolean;
+  observationKind?: ObservationKind;
+  captureIo?: boolean;
 }
 
 /**

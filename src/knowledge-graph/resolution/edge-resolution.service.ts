@@ -27,8 +27,6 @@ import {
 } from './resolution-utils';
 import { EdgeResolutionResult } from './types';
 
-const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
-
 @Injectable()
 export class EdgeResolutionService {
   constructor(
@@ -42,7 +40,7 @@ export class EdgeResolutionService {
   }
 
   @Span('collectEdgeCandidates', {
-    attributes: RETRIEVER_ATTRS,
+    observationKind: 'retriever',
     onResult: metricsOnResult,
   })
   private async collectCandidatesImpl(

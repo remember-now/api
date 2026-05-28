@@ -81,7 +81,6 @@ export class EpisodeService {
     const uniqueGraphIds = [...new Set(parsed.episodes.map((e) => e.graphId))];
     return {
       userId: parsed.userId,
-      sessionId: parsed.userId,
       tags: [
         'knowledge-graph',
         'ingestion',
@@ -178,14 +177,13 @@ export class EpisodeService {
     const { userId, sagaId, graphId } = options;
     const ctx: LlmContext = {
       userId,
-      sessionId: userId,
       tags: ['knowledge-graph', 'saga'],
       metadata: { sagaId, graphId },
     };
 
     const baseMetrics: SpanMetrics = {
       'user.id': ctx.userId,
-      'session.id': ctx.sessionId ?? ctx.userId,
+      'session.id': ctx.sessionId,
       'saga.id': sagaId,
       'graph.id': graphId,
     };
@@ -721,7 +719,7 @@ export class EpisodeService {
       results,
       metrics: {
         'user.id': ctx.userId,
-        'session.id': ctx.sessionId ?? ctx.userId,
+        'session.id': ctx.sessionId,
         'episode.count': episodes.length,
         'episode.ids': episodicNodes.map((e) => e.id).join(','),
         'graph.ids': graphIds.join(','),

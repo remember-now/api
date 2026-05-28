@@ -9,9 +9,20 @@
 import { type Span as ApiSpan, SpanStatusCode, trace } from '@opentelemetry/api';
 import 'reflect-metadata';
 
-import type { ExtendedSpanOptions } from '../types';
+import { isLangfuseEnabled } from '../langfuse-state';
+import type { ExtendedSpanOptions, ObservationKind } from '../types';
+import { safeStringify } from './serialize';
 
 const TRACER_NAME = 'remember-now';
+
+const OBSERVATION_TYPE_ATTR = 'langfuse.observation.type';
+const OBSERVATION_INPUT_ATTR = 'langfuse.observation.input';
+const OBSERVATION_OUTPUT_ATTR = 'langfuse.observation.output';
+const TRACE_INPUT_ATTR = 'langfuse.trace.input';
+const TRACE_OUTPUT_ATTR = 'langfuse.trace.output';
+
+const kindAttribute = (kind: ObservationKind | undefined): string | undefined =>
+  kind && kind !== 'span' ? kind : undefined;
 
 function copyMetadata(from: object, to: object): void {
   for (const key of Reflect.getMetadataKeys(from)) {
@@ -85,11 +96,30 @@ export function Span<TArgs extends unknown[], TReturn>(
       const spanOptions =
         typeof options === 'function' ? options(...(args as TArgs)) : options;
 
-      const { onResult, asLangfuseTrace, ...otelOptions } = spanOptions;
+      const { onResult, asLangfuseTrace, observationKind, captureIo, ...otelOptions } =
+        spanOptions;
+      const shouldCaptureIo = captureIo !== false && isLangfuseEnabled();
 
       return tracer.startActiveSpan(name, otelOptions, (span): unknown => {
         if (asLangfuseTrace) {
           span.setAttribute('langfuse.trace.name', name);
+        }
+        const kindAttr = kindAttribute(observationKind);
+        if (kindAttr) {
+          span.setAttribute(OBSERVATION_TYPE_ATTR, kindAttr);
+        }
+        // `isRecording()` is false when no SDK is registered (telemetry off),
+        // so serialization is skipped entirely on the no-op path.
+        if (shouldCaptureIo && span.isRecording()) {
+          const inputStr = safeStringify(args);
+          span.setAttribute(OBSERVATION_INPUT_ATTR, inputStr);
+          // Langfuse derives trace input/output from the root observation, but
+          // only when the SDK can identify that observation as the root. Setting
+          // `langfuse.trace.input/output` directly removes that dependency and
+          // guarantees the Langfuse trace gets populated.
+          if (asLangfuseTrace) {
+            span.setAttribute(TRACE_INPUT_ATTR, inputStr);
+          }
         }
         try {
           const result = (originalFunction as AnyMethod).apply(this, args);
@@ -98,6 +128,13 @@ export function Span<TArgs extends unknown[], TReturn>(
             return result
               .then((res: unknown) => {
                 handleOnResult(span, onResult, res);
+                if (shouldCaptureIo && span.isRecording()) {
+                  const outputStr = safeStringify(res);
+                  span.setAttribute(OBSERVATION_OUTPUT_ATTR, outputStr);
+                  if (asLangfuseTrace) {
+                    span.setAttribute(TRACE_OUTPUT_ATTR, outputStr);
+                  }
+                }
                 return res;
               })
               .catch((error: unknown) => {
@@ -110,6 +147,13 @@ export function Span<TArgs extends unknown[], TReturn>(
           }
 
           handleOnResult(span, onResult, result);
+          if (shouldCaptureIo && span.isRecording()) {
+            const outputStr = safeStringify(result);
+            span.setAttribute(OBSERVATION_OUTPUT_ATTR, outputStr);
+            if (asLangfuseTrace) {
+              span.setAttribute(TRACE_OUTPUT_ATTR, outputStr);
+            }
+          }
           span.end();
           return result;
         } catch (error) {

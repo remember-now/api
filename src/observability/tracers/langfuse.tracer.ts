@@ -35,7 +35,7 @@ export class LangfuseLlmTracer implements LlmTracer {
       // single deduped install. Runtime is identical.
       new CallbackHandler({
         userId: ctx.userId,
-        sessionId: ctx.sessionId ?? ctx.userId,
+        sessionId: ctx.sessionId,
         tags: ctx.tags,
         traceMetadata: ctx.metadata,
       }) as unknown as BaseCallbackHandler,

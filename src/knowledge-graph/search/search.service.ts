@@ -54,8 +54,6 @@ import {
   SearchResults,
 } from './types';
 
-const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
-
 @Injectable()
 export class SearchService {
   constructor(
@@ -99,7 +97,6 @@ export class SearchService {
     const parsed: SearchOptions = SearchOptionsSchema.parse(options);
     const ctx: LlmContext = {
       userId: parsed.userId,
-      sessionId: parsed.userId,
       tags: [
         'knowledge-graph',
         'retrieval',
@@ -115,7 +112,7 @@ export class SearchService {
 
     const baseMetrics: SpanMetrics = {
       'user.id': ctx.userId,
-      'session.id': ctx.sessionId ?? ctx.userId,
+      'session.id': ctx.sessionId,
       'query.length': query.length,
     };
 
@@ -279,7 +276,7 @@ export class SearchService {
     return [edges, scores];
   }
 
-  @Span('search.edge', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  @Span('search.edge', { observationKind: 'retriever', onResult: metricsOnResult })
   private async edgeSearchImpl(
     query: string,
     queryVector: number[] | null,
@@ -484,7 +481,7 @@ export class SearchService {
     return [nodes, scores];
   }
 
-  @Span('search.node', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  @Span('search.node', { observationKind: 'retriever', onResult: metricsOnResult })
   private async nodeSearchImpl(
     query: string,
     queryVector: number[] | null,
@@ -661,7 +658,7 @@ export class SearchService {
     return [episodes, scores];
   }
 
-  @Span('search.episode', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  @Span('search.episode', { observationKind: 'retriever', onResult: metricsOnResult })
   private async episodeSearchImpl(
     query: string,
     graphIds: Uuid[],
@@ -741,7 +738,7 @@ export class SearchService {
     return [communities, scores];
   }
 
-  @Span('search.community', { attributes: RETRIEVER_ATTRS, onResult: metricsOnResult })
+  @Span('search.community', { observationKind: 'retriever', onResult: metricsOnResult })
   private async communitySearchImpl(
     query: string,
     queryVector: number[] | null,

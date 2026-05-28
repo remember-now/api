@@ -1288,16 +1288,6 @@
           "content": {
             "type": "string",
             "minLength": 1
-          },
-          "source": {
-            "default": "message",
-            "type": "string",
-            "enum": [
-              "message",
-              "json",
-              "text",
-              "fact_triple"
-            ]
           }
         },
         "required": [

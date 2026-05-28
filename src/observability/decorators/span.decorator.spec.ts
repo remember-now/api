@@ -15,6 +15,7 @@ import {
 } from '@opentelemetry/sdk-trace-node';
 import 'reflect-metadata';
 
+import { isLangfuseEnabled, setLangfuseEnabled } from '../langfuse-state';
 import { Span } from './span.decorator';
 
 const TestDecoratorThatSetsMetadata = (): MethodDecorator =>
@@ -115,6 +116,45 @@ class TestSpan {
 
   @Span()
   notLangfuseTrace() {}
+
+  @Span('retriever.search', { observationKind: 'retriever' })
+  retrieverKind() {}
+
+  @Span('embedding.embed', { observationKind: 'embedding' })
+  embeddingKind() {}
+
+  @Span('plain.span', { observationKind: 'span' })
+  spanKind() {}
+
+  @Span('captures.io')
+  capturesIo(_arg: { query: string }): { rows: number[] } {
+    return { rows: [1, 2, 3] };
+  }
+
+  @Span('captures.io.opt-out', { captureIo: false })
+  capturesIoOptOut(_arg: { query: string }) {
+    return 'should-not-be-captured';
+  }
+
+  @Span('captures.io.throws')
+  capturesIoThrows(_arg: { query: string }): never {
+    throw new Error('boom');
+  }
+
+  @Span('captures.io.async')
+  capturesIoAsync(arg: { query: string }): Promise<{ rows: number[] }> {
+    return Promise.resolve({ rows: [arg.query.length] });
+  }
+
+  @Span('langfuse.trace.io', { asLangfuseTrace: true })
+  langfuseTraceCapturesIo(_arg: { query: string }): { rows: number[] } {
+    return { rows: [1, 2, 3] };
+  }
+
+  @Span('langfuse.trace.io.opt-out', { asLangfuseTrace: true, captureIo: false })
+  langfuseTraceOptedOutOfIo(_arg: { query: string }): { rows: number[] } {
+    return { rows: [1, 2, 3] };
+  }
 }
 
 const symbolDescriptor = Object.getOwnPropertyDescriptor(
@@ -406,6 +446,138 @@ describe('Span', () => {
       const spans = traceExporter.getFinishedSpans();
       expect(spans).toHaveLength(1);
       expect(spans[0].attributes['langfuse.trace.name']).toBeUndefined();
+    });
+  });
+
+  describe('observationKind', () => {
+    it("translates observationKind: 'retriever' to langfuse.observation.type", () => {
+      instance.retrieverKind();
+      const spans = traceExporter.getFinishedSpans();
+      expect(spans[0].attributes['langfuse.observation.type']).toBe('retriever');
+    });
+
+    it("translates observationKind: 'embedding' to langfuse.observation.type", () => {
+      instance.embeddingKind();
+      const spans = traceExporter.getFinishedSpans();
+      expect(spans[0].attributes['langfuse.observation.type']).toBe('embedding');
+    });
+
+    it("does not emit the attribute for observationKind: 'span'", () => {
+      instance.spanKind();
+      const spans = traceExporter.getFinishedSpans();
+      expect(spans[0].attributes['langfuse.observation.type']).toBeUndefined();
+    });
+
+    it('does not emit the attribute when observationKind is omitted', () => {
+      instance.singleSpan();
+      const spans = traceExporter.getFinishedSpans();
+      expect(spans[0].attributes['langfuse.observation.type']).toBeUndefined();
+    });
+  });
+
+  describe('captureIo', () => {
+    let initialEnabled: boolean;
+
+    beforeAll(() => {
+      initialEnabled = isLangfuseEnabled();
+    });
+
+    afterAll(() => {
+      setLangfuseEnabled(initialEnabled);
+    });
+
+    describe('when Langfuse is enabled', () => {
+      beforeEach(() => {
+        setLangfuseEnabled(true);
+      });
+
+      it('captures input as a JSON-stringified args array', () => {
+        instance.capturesIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBe(
+          JSON.stringify([{ query: 'hello' }]),
+        );
+      });
+
+      it('captures the return value as output', () => {
+        instance.capturesIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.output']).toBe(
+          JSON.stringify({ rows: [1, 2, 3] }),
+        );
+      });
+
+      it('captures input from async methods and output once the promise resolves', async () => {
+        await instance.capturesIoAsync({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBe(
+          JSON.stringify([{ query: 'hello' }]),
+        );
+        expect(spans[0].attributes['langfuse.observation.output']).toBe(
+          JSON.stringify({ rows: [5] }),
+        );
+      });
+
+      it('captures input even when the method throws; output is skipped', () => {
+        expect(() => instance.capturesIoThrows({ query: 'hello' })).toThrow('boom');
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBe(
+          JSON.stringify([{ query: 'hello' }]),
+        );
+        expect(spans[0].attributes['langfuse.observation.output']).toBeUndefined();
+      });
+
+      it('captures neither when captureIo is false', () => {
+        instance.capturesIoOptOut({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBeUndefined();
+        expect(spans[0].attributes['langfuse.observation.output']).toBeUndefined();
+      });
+
+      it('mirrors observation IO to langfuse.trace.input/output when asLangfuseTrace is set', () => {
+        instance.langfuseTraceCapturesIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        const expectedInput = JSON.stringify([{ query: 'hello' }]);
+        const expectedOutput = JSON.stringify({ rows: [1, 2, 3] });
+        expect(spans[0].attributes['langfuse.observation.input']).toBe(expectedInput);
+        expect(spans[0].attributes['langfuse.observation.output']).toBe(expectedOutput);
+        expect(spans[0].attributes['langfuse.trace.input']).toBe(expectedInput);
+        expect(spans[0].attributes['langfuse.trace.output']).toBe(expectedOutput);
+      });
+
+      it('does not set trace IO when captureIo is opted out, even with asLangfuseTrace', () => {
+        instance.langfuseTraceOptedOutOfIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.trace.input']).toBeUndefined();
+        expect(spans[0].attributes['langfuse.trace.output']).toBeUndefined();
+      });
+
+      it('does not set trace IO on non-trace spans, even when capturing observation IO', () => {
+        instance.capturesIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBeDefined();
+        expect(spans[0].attributes['langfuse.trace.input']).toBeUndefined();
+        expect(spans[0].attributes['langfuse.trace.output']).toBeUndefined();
+      });
+    });
+
+    describe('when Langfuse is disabled', () => {
+      beforeEach(() => {
+        setLangfuseEnabled(false);
+      });
+
+      it('captures nothing - even with captureIo defaulted on', () => {
+        instance.capturesIo({ query: 'hello' });
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBeUndefined();
+        expect(spans[0].attributes['langfuse.observation.output']).toBeUndefined();
+      });
+
+      it('captures nothing even on throw', () => {
+        expect(() => instance.capturesIoThrows({ query: 'hello' })).toThrow('boom');
+        const spans = traceExporter.getFinishedSpans();
+        expect(spans[0].attributes['langfuse.observation.input']).toBeUndefined();
+      });
     });
   });
 });

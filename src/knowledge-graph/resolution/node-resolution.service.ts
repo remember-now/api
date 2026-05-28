@@ -28,8 +28,6 @@ import {
 } from './resolution-utils';
 import { NodeResolutionResult } from './types';
 
-const RETRIEVER_ATTRS = { 'langfuse.observation.type': 'retriever' };
-
 @Injectable()
 export class NodeResolutionService {
   constructor(
@@ -43,7 +41,7 @@ export class NodeResolutionService {
   }
 
   @Span('collectNodeCandidates', {
-    attributes: RETRIEVER_ATTRS,
+    observationKind: 'retriever',
     onResult: metricsOnResult,
   })
   private async collectCandidatesImpl(

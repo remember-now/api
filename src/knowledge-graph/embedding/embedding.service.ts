@@ -11,8 +11,6 @@ import { metricsOnResult, Span, type SpanMetrics } from '@/observability';
 
 import { EntityEdge, EntityNode } from '../models';
 
-const EMBEDDING_ATTRS = { 'langfuse.observation.type': 'embedding' };
-
 @Injectable()
 export class EmbeddingService {
   private readonly client: GoogleGenAI | null;
@@ -57,7 +55,7 @@ export class EmbeddingService {
     return out;
   }
 
-  @Span('embed.nodes', { attributes: EMBEDDING_ATTRS, onResult: metricsOnResult })
+  @Span('embed.nodes', { observationKind: 'embedding', onResult: metricsOnResult })
   private async embedNodesImpl(
     nodes: EntityNode[],
   ): Promise<{ nodes: EntityNode[]; metrics: SpanMetrics }> {
@@ -85,7 +83,7 @@ export class EmbeddingService {
     return vector;
   }
 
-  @Span('embed.text', { attributes: EMBEDDING_ATTRS, onResult: metricsOnResult })
+  @Span('embed.text', { observationKind: 'embedding', onResult: metricsOnResult })
   private async embedTextImpl(
     text: string,
   ): Promise<{ vector: number[] | null; metrics: SpanMetrics }> {
@@ -101,7 +99,7 @@ export class EmbeddingService {
     return out;
   }
 
-  @Span('embed.edges', { attributes: EMBEDDING_ATTRS, onResult: metricsOnResult })
+  @Span('embed.edges', { observationKind: 'embedding', onResult: metricsOnResult })
   private async embedEdgesImpl(
     edges: EntityEdge[],
   ): Promise<{ edges: EntityEdge[]; metrics: SpanMetrics }> {
