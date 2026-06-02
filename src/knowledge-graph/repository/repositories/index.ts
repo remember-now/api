@@ -1,6 +1,9 @@
-export { CommunityNodeRepository } from './community-node.repository';
-export { CommunityEdgeRepository } from './community-edge.repository';
-export { GdsCommunityRepository } from './gds-community.repository';
+export {
+  CommunityRepository,
+  type ClusterMatch,
+  type ClusterMatchResult,
+  type ExistingCommunitySnapshot,
+} from './community.repository';
 export { EntityNodeRepository } from './entity-node.repository';
 export { EntityEdgeRepository } from './entity-edge.repository';
 export { EpisodicNodeRepository } from './episodic-node.repository';

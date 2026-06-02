@@ -36,9 +36,21 @@ export const EpisodicNodeSchema = NodeBaseSchema.extend({
   // concrete filterable-metadata requirement materializes.
 });
 
-export const CommunityNodeSchema = NodeBaseSchema.extend({
-  nameEmbedding: z.array(z.number()).nullable().default(null),
+// Communities are auto-generated clusters of entity nodes; they don't carry
+// user-defined labels (always implicitly 'Community') and have no `attributes`.
+//
+// member_signature lives in the DB but is intentionally absent here: a
+// BEFORE INSERT/UPDATE trigger derives it from member_ids + entity_nodes.summary,
+// so it's never a value the application produces, passes, or compares in TS.
+export const CommunitySchema = z.object({
+  id: UuidSchema,
+  graphId: UuidSchema,
+  name: NodeNameSchema,
   summary: z.string().default(''),
+  nameEmbedding: z.array(z.number()).nullable().default(null),
+  memberIds: z.array(UuidSchema).default([]),
+  createdAt: z.date(),
+  updatedAt: z.date(),
 });
 
 export const SagaNodeSchema = NodeBaseSchema.extend({
@@ -54,7 +66,7 @@ export const SagaNodeSchema = NodeBaseSchema.extend({
 export type NodeBase = z.infer<typeof NodeBaseSchema>;
 export type EntityNode = z.infer<typeof EntityNodeSchema>;
 export type EpisodicNode = z.infer<typeof EpisodicNodeSchema>;
-export type CommunityNode = z.infer<typeof CommunityNodeSchema>;
+export type Community = z.infer<typeof CommunitySchema>;
 export type SagaNode = z.infer<typeof SagaNodeSchema>;
 
 // Factories
@@ -93,12 +105,18 @@ export function createEpisodicNode(
   });
 }
 
-export function createCommunityNode(
-  partial: Partial<CommunityNode> & { name: NodeName; graphId: Uuid },
-): CommunityNode {
-  return CommunityNodeSchema.parse({
-    ...createNodeDefaults(),
-    labels: [NodeLabelSchema.parse('Community')],
+export function createCommunity(
+  partial: Partial<Community> & {
+    name: NodeName;
+    graphId: Uuid;
+    memberIds: Uuid[];
+  },
+): Community {
+  const now = new Date();
+  return CommunitySchema.parse({
+    id: UuidSchema.parse(randomUUID()),
+    createdAt: now,
+    updatedAt: now,
     ...partial,
   });
 }

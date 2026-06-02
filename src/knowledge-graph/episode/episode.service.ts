@@ -18,7 +18,7 @@ import {
   resolveEdgePointers,
   withConcurrency,
 } from '../batch-utils';
-import { CommunityService } from '../community';
+import { CommunityMaintenanceService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import { invokeStructured } from '../llm';
@@ -62,7 +62,7 @@ import {
 export class EpisodeService {
   constructor(
     private readonly llmService: LlmService,
-    private readonly communityService: CommunityService,
+    private readonly communityMaintenance: CommunityMaintenanceService,
     private readonly embeddingService: EmbeddingService,
     private readonly nodeExtractionService: NodeExtractionService,
     private readonly edgeExtractionService: EdgeExtractionService,
@@ -98,13 +98,15 @@ export class EpisodeService {
     return this.episodicNodeRepository.retrieveEpisodes(params);
   }
 
-  // TODO: Deletion is currently best-effort and leaves downstream graph state
-  // inconsistent. Non-originating episodes can still mutate surviving edges
-  // (invalidAt/expiredAt stamps, episodes[] arrays, node attributes); none of
-  // that is unwound here. The right design is dependency-aware reconsolidation
-  // on retrieval over an append-only graph, but the trade-offs only become
-  // legible against a real graph with real query patterns - revisit once we
-  // have one. Design notes: PLAN.md.
+  /**
+   * TODO: Deletion is currently best-effort and leaves downstream graph state
+   * inconsistent. Non-originating episodes can still mutate surviving edges
+   * (invalidAt/expiredAt stamps, episodes[] arrays, node attributes); none of
+   * that is unwound here. The right design is dependency-aware reconsolidation
+   * on retrieval over an append-only graph, but the trade-offs only become
+   * legible against a real graph with real query patterns - revisit once we
+   * have one. Design notes: PLAN.md.
+   */
   async deleteEpisode(id: Uuid): Promise<void> {
     await this.deleteEpisodeImpl(id);
   }
@@ -147,8 +149,10 @@ export class EpisodeService {
     };
   }
 
-  // TODO: For very large batches a bulk variant would be preferred over
-  // sequential per-episode deletion. (graph consistency problem though)
+  /**
+   * TODO: For very large batches a bulk variant would be preferred over
+   * sequential per-episode deletion. (graph consistency problem though)
+   */
   async deleteEpisodesById(ids: Uuid[]): Promise<void> {
     await this.deleteEpisodesByIdImpl(ids);
   }
@@ -688,15 +692,18 @@ export class EpisodeService {
       );
     }
 
-    // 24. Optional community build per distinct graphId
-    // TODO: Concurrent addEpisodes calls for the same graphId can race here -
-    // two community builds may project conflicting graph snapshots and race
-    // on the per-graph community teardown/rebuild. Investigate a per-graphId
-    // mutex or advisory lock before enabling concurrent bulk ingestion.
+    // 24. Optional community maintenance per distinct graphId. The maintenance
+    //      service routes each graph to a debounced full rebuild or the
+    //      incremental update path based on its size.
     if (updateCommunities) {
-      await Promise.all(
-        graphIds.map((gid) => this.communityService.buildCommunities(userId, gid)),
-      );
+      for (const gid of graphIds) {
+        const entityIds = allCanonicalNodes
+          .filter((n) => n.graphId === gid)
+          .map((n) => n.id);
+        if (entityIds.length === 0) continue;
+
+        await this.communityMaintenance.scheduleMaintenance(userId, gid, entityIds);
+      }
     }
 
     // TODO: per-entry `nodes` includes both newly-resolved canonical nodes AND

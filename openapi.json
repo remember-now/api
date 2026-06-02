@@ -409,6 +409,21 @@
         ]
       }
     },
+    "/agent/test/rebuild-communities": {
+      "post": {
+        "operationId": "AgentController_testRebuildCommunities",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "[TEST] Force rebuild communities (bypasses 5min debounce)",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
     "/llms": {
       "get": {
         "operationId": "LlmController_listProviders",

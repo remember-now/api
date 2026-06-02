@@ -16,7 +16,7 @@ import {
   u,
 } from '@/test/factories';
 
-import { CommunityService } from '../community';
+import { CommunityMaintenanceService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
 import {
@@ -34,7 +34,7 @@ describe('EpisodeService', () => {
   let service: EpisodeService;
 
   let mockLlmService: DeepMocked<LlmService>;
-  let mockCommunityService: DeepMocked<CommunityService>;
+  let mockCommunityMaintenance: DeepMocked<CommunityMaintenanceService>;
   let mockEmbeddingService: DeepMocked<EmbeddingService>;
   let mockNodeExtraction: DeepMocked<NodeExtractionService>;
   let mockEdgeExtraction: DeepMocked<EdgeExtractionService>;
@@ -59,7 +59,7 @@ describe('EpisodeService', () => {
 
     service = module.get(EpisodeService);
     mockLlmService = module.get(LlmService);
-    mockCommunityService = module.get(CommunityService);
+    mockCommunityMaintenance = module.get(CommunityMaintenanceService);
     mockEmbeddingService = module.get(EmbeddingService);
     mockNodeExtraction = module.get(NodeExtractionService);
     mockEdgeExtraction = module.get(EdgeExtractionService);
@@ -109,7 +109,7 @@ describe('EpisodeService', () => {
     mockEpisodicEdgeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityNodeRepo.saveBulk.mockResolvedValue(undefined);
     mockEntityEdgeRepo.saveBulk.mockResolvedValue(undefined);
-    mockCommunityService.buildCommunities.mockResolvedValue(undefined);
+    mockCommunityMaintenance.scheduleMaintenance.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -547,19 +547,42 @@ describe('EpisodeService', () => {
     });
   });
 
-  // ─── Community building ───────────────────────────────────────────────────
+  // ─── Community update enqueue ─────────────────────────────────────────────
 
-  describe('addEpisodes - community building', () => {
-    it('does not call buildCommunities by default', async () => {
+  describe('addEpisodes - community maintenance', () => {
+    it('does not schedule maintenance by default', async () => {
       await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
       });
 
-      expect(mockCommunityService.buildCommunities).not.toHaveBeenCalled();
+      expect(mockCommunityMaintenance.scheduleMaintenance).not.toHaveBeenCalled();
     });
 
-    it('calls buildCommunities after persist when updateCommunities is true', async () => {
+    it('does not schedule when updateCommunities is true but no entities resolved', async () => {
+      // Default resolveNodes mock returns empty resolvedNodes - no entities to
+      // update. The call site skips the call.
+      await service.addTextEpisodes({
+        userId: KG_TEST_USER_ID,
+        episodes: [makeEpisode('ep1')],
+        updateCommunities: true,
+      });
+
+      expect(mockCommunityMaintenance.scheduleMaintenance).not.toHaveBeenCalled();
+    });
+
+    it('schedules maintenance after persist with the canonical entity ids', async () => {
+      const resolved = KgNodeFactory.createEntityNode({ name: 'Alice' });
+      mockNodeExtraction.extractNodes.mockResolvedValue([resolved]);
+      mockEmbeddingService.embedNodes.mockResolvedValue([
+        { ...resolved, nameEmbedding: [1, 0, 0] },
+      ]);
+      mockNodeResolution.resolveNodes.mockResolvedValue({
+        resolvedNodes: [resolved],
+        idMap: new Map(),
+        duplicatePairs: [],
+      });
+
       await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
         episodes: [makeEpisode('ep1')],
@@ -567,35 +590,61 @@ describe('EpisodeService', () => {
       });
 
       const persistOrder = mockEntityNodeRepo.saveBulk.mock.invocationCallOrder[0];
-      const communityOrder =
-        mockCommunityService.buildCommunities.mock.invocationCallOrder[0];
-      expect(persistOrder).toBeLessThan(communityOrder);
-      expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
+      const scheduleOrder =
+        mockCommunityMaintenance.scheduleMaintenance.mock.invocationCallOrder[0];
+      expect(persistOrder).toBeLessThan(scheduleOrder);
+      expect(mockCommunityMaintenance.scheduleMaintenance).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
         KG_TEST_GRAPH_ID,
+        [resolved.id],
       );
     });
 
-    it('calls buildCommunities once per distinct graphId across the batch', async () => {
+    it('schedules once per distinct graphId, skipping graphs with no resolved entities', async () => {
       const otherGraphId = UuidSchema.parse('00000000-0000-4000-8000-000000000002');
+      const resolvedA = KgNodeFactory.createEntityNode({ name: 'Alice' });
+      const resolvedB = {
+        ...KgNodeFactory.createEntityNode({ name: 'Bob' }),
+        graphId: otherGraphId,
+      };
       const ep1 = makeEpisode('ep1');
-      const ep2 = makeEpisode('ep2');
-      const ep3 = { ...makeEpisode('ep3'), graphId: otherGraphId };
+      const ep2 = { ...makeEpisode('ep2'), graphId: otherGraphId };
+
+      mockNodeExtraction.extractNodes
+        .mockResolvedValueOnce([resolvedA])
+        .mockResolvedValueOnce([resolvedB]);
+      mockEmbeddingService.embedNodes.mockResolvedValue([
+        { ...resolvedA, nameEmbedding: [1, 0, 0] },
+        { ...resolvedB, nameEmbedding: [0, 1, 0] },
+      ]);
+      mockNodeResolution.resolveNodes
+        .mockResolvedValueOnce({
+          resolvedNodes: [resolvedA],
+          idMap: new Map(),
+          duplicatePairs: [],
+        })
+        .mockResolvedValueOnce({
+          resolvedNodes: [resolvedB],
+          idMap: new Map(),
+          duplicatePairs: [],
+        });
 
       await service.addTextEpisodes({
         userId: KG_TEST_USER_ID,
-        episodes: [ep1, ep2, ep3],
+        episodes: [ep1, ep2],
         updateCommunities: true,
       });
 
-      expect(mockCommunityService.buildCommunities).toHaveBeenCalledTimes(2);
-      expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
+      expect(mockCommunityMaintenance.scheduleMaintenance).toHaveBeenCalledTimes(2);
+      expect(mockCommunityMaintenance.scheduleMaintenance).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
         KG_TEST_GRAPH_ID,
+        [resolvedA.id],
       );
-      expect(mockCommunityService.buildCommunities).toHaveBeenCalledWith(
+      expect(mockCommunityMaintenance.scheduleMaintenance).toHaveBeenCalledWith(
         KG_TEST_USER_ID,
         otherGraphId,
+        [resolvedB.id],
       );
     });
   });

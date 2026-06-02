@@ -1,9 +1,9 @@
 import { Inject, Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { RedisStore } from 'connect-redis';
-import * as session from 'express-session';
+import session from 'express-session';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
-import * as passport from 'passport';
+import passport from 'passport';
 import { RedisClientType } from 'redis';
 
 import { AgentModule } from './agent/agent.module';
@@ -74,8 +74,6 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - express-session works with namespace import at runtime
         session({
           store: new RedisStore({
             client: this.redis,

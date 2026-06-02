@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { GetUser } from '@/auth/decorator';
 import { LoggedInGuard } from '@/auth/guard';
 import { Uuid } from '@/common/schemas';
+import { CommunityService } from '@/knowledge-graph/community';
 import { EpisodeService } from '@/knowledge-graph/episode';
 import { SearchService } from '@/knowledge-graph/search';
 import {
@@ -41,6 +42,7 @@ export class AgentController {
     private readonly agentService: AgentService,
     private readonly episodeService: EpisodeService, // TODO: REMOVE
     private readonly searchService: SearchService, // TODO: REMOVE
+    private readonly communityService: CommunityService, // TODO: REMOVE
   ) {}
 
   @Get()
@@ -131,5 +133,18 @@ export class AgentController {
         score: results.episodeScores.get(ep.id) ?? 0,
       })),
     };
+  }
+
+  // TODO: REMOVE - test endpoint; replace with proper user-facing button later.
+  @Post('test/rebuild-communities')
+  @ApiOperation({ summary: '[TEST] Force rebuild communities (bypasses 5min debounce)' })
+  async testRebuildCommunities(@GetUser() user: UserWithoutPassword) {
+    const graphId = user.graphs.find((g) => g.name === 'main')!.id;
+    await this.communityService.buildCommunities(user.id, graphId, {
+      userId: user.id,
+      tags: ['knowledge-graph', 'community-rebuild', `graph:${graphId}`],
+      metadata: { trigger: 'manual' },
+    });
+    return { ok: true, graphId };
   }
 }

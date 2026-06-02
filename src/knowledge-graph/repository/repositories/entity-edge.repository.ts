@@ -89,6 +89,62 @@ export class EntityEdgeRepository {
     await this.prisma.entityEdge.deleteMany({ where: { id: { in: ids } } });
   }
 
+  /**
+   * Undirected, aggregated neighbor counts for label propagation. Postgres
+   * collapses parallel edges into edge_count and normalizes direction so each
+   * unordered pair appears once.
+   */
+  @Span()
+  async findAggregatedNeighborCounts(
+    graphId: Uuid,
+  ): Promise<Array<{ a: Uuid; b: Uuid; edgeCount: number }>> {
+    const rows = await this.prisma.$queryRaw<
+      { a: string; b: string; edge_count: number }[]
+    >`
+      SELECT LEAST(source_id, target_id)::uuid    AS a,
+             GREATEST(source_id, target_id)::uuid AS b,
+             count(*)::int                        AS edge_count
+      FROM entity_edges
+      WHERE graph_id = ${graphId}::uuid AND source_id <> target_id
+      GROUP BY a, b
+    `;
+    return rows.map((r) => ({
+      a: r.a as Uuid,
+      b: r.b as Uuid,
+      edgeCount: r.edge_count,
+    }));
+  }
+
+  /**
+   * Raw edge count for a graph. Used by community maintenance routing as a
+   * cheap memory proxy (the rebuild loads aggregated edges into RAM).
+   */
+  @Span()
+  async countForGraph(graphId: Uuid): Promise<number> {
+    const rows = await this.prisma.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM entity_edges WHERE graph_id = ${graphId}::uuid
+    `;
+    return rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Undirected neighbor ids for a single entity. Used by the incremental
+   * community update path to find which community a new entity should join.
+   */
+  @Span()
+  async findNeighborIds(entityId: Uuid): Promise<Uuid[]> {
+    const rows = await this.prisma.$queryRaw<{ neighbor_id: string }[]>`
+      SELECT DISTINCT CASE
+               WHEN source_id = ${entityId}::uuid THEN target_id
+               ELSE source_id
+             END AS neighbor_id
+      FROM entity_edges
+      WHERE (source_id = ${entityId}::uuid OR target_id = ${entityId}::uuid)
+        AND source_id <> target_id
+    `;
+    return rows.map((r) => r.neighbor_id as Uuid);
+  }
+
   @Span()
   async getIdsForEpisodeDeletion(episodeId: Uuid): Promise<Uuid[]> {
     // Only edges whose FIRST episode in the

@@ -13,9 +13,9 @@ import {
 } from '@/observability';
 
 import { EmbeddingService } from '../embedding';
-import { CommunityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
+import { Community, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
-  CommunityNodeRepository,
+  CommunityRepository,
   EntityEdgeRepository,
   EntityNodeRepository,
   EpisodicNodeRepository,
@@ -62,7 +62,7 @@ export class SearchService {
     private readonly entityNodeRepository: EntityNodeRepository,
     private readonly entityEdgeRepository: EntityEdgeRepository,
     private readonly episodicNodeRepository: EpisodicNodeRepository,
-    private readonly communityNodeRepository: CommunityNodeRepository,
+    private readonly communityRepository: CommunityRepository,
     @Inject(LLM_TRACER) private readonly llmTracer: LlmTracer,
   ) {}
 
@@ -218,7 +218,7 @@ export class SearchService {
             model,
             ctx,
           )
-        : Promise.resolve([[], []] as [CommunityNode[], number[]]),
+        : Promise.resolve([[], []] as [Community[], number[]]),
     ]);
 
     const [edges, edgeScoreArr] = edgeResult;
@@ -724,7 +724,7 @@ export class SearchService {
     minScore: number,
     model: BaseChatModel | null,
     ctx?: LlmContext,
-  ): Promise<[CommunityNode[], number[]]> {
+  ): Promise<[Community[], number[]]> {
     const { communities, scores } = await this.communitySearchImpl(
       query,
       queryVector,
@@ -748,9 +748,9 @@ export class SearchService {
     minScore: number,
     model: BaseChatModel | null,
     ctx?: LlmContext,
-  ): Promise<{ communities: CommunityNode[]; scores: number[]; metrics: SpanMetrics }> {
+  ): Promise<{ communities: Community[]; scores: number[]; metrics: SpanMetrics }> {
     const fetch = 2 * limit;
-    const communityMap = new Map<Uuid, CommunityNode>();
+    const communityMap = new Map<Uuid, Community>();
     const rerankerMin = config.rerankerMinScore ?? minScore;
 
     const bm25Ids: Uuid[] = [];
@@ -760,7 +760,7 @@ export class SearchService {
 
     if (config.searchMethods.includes(CommunitySearchMethod.bm25)) {
       tasks.push(
-        this.communityNodeRepository
+        this.communityRepository
           .searchByName(SearchByTextParamsSchema.parse({ query, graphIds, limit: fetch }))
           .then((nodes) => {
             for (const n of nodes) communityMap.set(n.id, n);
@@ -774,7 +774,7 @@ export class SearchService {
       queryVector
     ) {
       tasks.push(
-        this.communityNodeRepository
+        this.communityRepository
           .searchBySimilarity(
             SearchBySimilarityParamsSchema.parse({
               embedding: queryVector,
@@ -830,7 +830,7 @@ export class SearchService {
     const resultCommunities = rankedIds
       .slice(0, limit)
       .map((id) => communityMap.get(id))
-      .filter((c): c is CommunityNode => c !== undefined);
+      .filter((c): c is Community => c !== undefined);
     const resultScores = rankedScores.slice(0, limit).slice(0, resultCommunities.length);
 
     return {

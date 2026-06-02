@@ -2,8 +2,6 @@ import { KG_REFERENCE_TIME, KG_TEST_GRAPH_ID, kgId } from '@/test/factories';
 
 import { RelationshipTypeSchema } from '../types';
 import {
-  CommunityEdgeSchema,
-  createCommunityEdge,
   createEdgeDefaults,
   createEntityEdge,
   createEpisodicEdge,
@@ -263,55 +261,6 @@ describe('EpisodicEdge', () => {
       expect(() =>
         EpisodicEdgeSchema.parse({ ...edge, sourceNodeId: 'not-a-uuid' }),
       ).toThrow();
-    });
-  });
-});
-
-describe('CommunityEdge', () => {
-  const sourceNodeId = kgId();
-  const targetNodeId = kgId();
-
-  describe('createCommunityEdge', () => {
-    it('should create with correct defaults', () => {
-      const edge = createCommunityEdge({
-        graphId: KG_TEST_GRAPH_ID,
-        sourceNodeId,
-        targetNodeId,
-      });
-      expect(edge.sourceNodeId).toBe(sourceNodeId);
-      expect(edge.targetNodeId).toBe(targetNodeId);
-      expect(edge.id).toBeDefined();
-      expect(edge.createdAt).toBeInstanceOf(Date);
-      expect(edge.graphId).toBe(KG_TEST_GRAPH_ID);
-    });
-  });
-
-  describe('CommunityEdgeSchema', () => {
-    it('should accept valid community edge', () => {
-      const edge = createCommunityEdge({
-        graphId: KG_TEST_GRAPH_ID,
-        sourceNodeId,
-        targetNodeId,
-      });
-      expect(() => CommunityEdgeSchema.parse(edge)).not.toThrow();
-    });
-
-    it('should reject empty graphId', () => {
-      const edge = createCommunityEdge({
-        graphId: KG_TEST_GRAPH_ID,
-        sourceNodeId,
-        targetNodeId,
-      });
-      expect(() => CommunityEdgeSchema.parse({ ...edge, graphId: '' })).toThrow();
-    });
-
-    it('should reject invalid id', () => {
-      const edge = createCommunityEdge({
-        graphId: KG_TEST_GRAPH_ID,
-        sourceNodeId,
-        targetNodeId,
-      });
-      expect(() => CommunityEdgeSchema.parse({ ...edge, id: 'not-a-uuid' })).toThrow();
     });
   });
 });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { UuidSchema } from '@/common/schemas';
 
 import {
-  CommunityNodeSchema,
+  CommunitySchema,
   EntityEdgeSchema,
   EntityNodeSchema,
   EpisodicNodeSchema,
@@ -20,7 +20,7 @@ export const SearchResultsSchema = z.object({
   nodeScores: z.map(UuidSchema, z.number()),
   episodes: z.array(EpisodicNodeSchema),
   episodeScores: z.map(UuidSchema, z.number()),
-  communities: z.array(CommunityNodeSchema),
+  communities: z.array(CommunitySchema),
   communityScores: z.map(UuidSchema, z.number()),
 });
 

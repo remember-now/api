@@ -1,21 +1,17 @@
 import { Module } from '@nestjs/common';
 
 import {
-  CommunityEdgeRepository,
-  CommunityNodeRepository,
+  CommunityRepository,
   EntityEdgeRepository,
   EntityNodeRepository,
   EpisodicEdgeRepository,
   EpisodicNodeRepository,
-  GdsCommunityRepository,
   HasEpisodeEdgeRepository,
   SagaNodeRepository,
 } from './repositories';
 
 const repositories = [
-  CommunityNodeRepository,
-  CommunityEdgeRepository,
-  GdsCommunityRepository,
+  CommunityRepository,
   EntityNodeRepository,
   EntityEdgeRepository,
   EpisodicNodeRepository,

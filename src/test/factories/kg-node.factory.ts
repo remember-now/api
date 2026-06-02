@@ -1,6 +1,6 @@
 import {
-  CommunityNode,
-  createCommunityNode,
+  Community,
+  createCommunity,
   createEntityNode,
   createEpisodicNode,
   createSagaNode,
@@ -49,14 +49,14 @@ export class KgNodeFactory {
     });
   }
 
-  static createCommunityNode(opts: WithStrings<CommunityNode> = {}): CommunityNode {
-    const { name, labels, ...rest } = opts;
-    return createCommunityNode({
+  static createCommunity(
+    opts: Partial<Omit<Community, 'name'>> & { name?: string } = {},
+  ): Community {
+    const { name, ...rest } = opts;
+    return createCommunity({
       name: NodeNameSchema.parse(name ?? 'Test Community'),
       graphId: KG_TEST_GRAPH_ID,
-      labels: labels
-        ? NodeLabelsSchema.parse(labels)
-        : [NodeLabelSchema.parse('Community')],
+      memberIds: [],
       ...rest,
     });
   }

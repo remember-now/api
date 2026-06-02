@@ -70,6 +70,44 @@ export class EntityNodeRepository {
     }
   }
 
+  /**
+   * Structure-only load for the minimal graph used by community detection.
+   * Skips name, summary, attributes, embeddings - returns just IDs sorted
+   * ascending for deterministic graph construction.
+   */
+  @Span()
+  async findIdsForGraph(graphId: Uuid): Promise<Uuid[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM entity_nodes WHERE graph_id = ${graphId}::uuid ORDER BY id ASC
+    `;
+    return rows.map((r) => r.id as Uuid);
+  }
+
+  /**
+   * Node count for a graph. Used by community maintenance routing to decide
+   * between a full rebuild and the incremental fallback.
+   */
+  @Span()
+  async countForGraph(graphId: Uuid): Promise<number> {
+    const rows = await this.prisma.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM entity_nodes WHERE graph_id = ${graphId}::uuid
+    `;
+    return rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Batch (id, summary) load for community summarization. Skips embeddings,
+   * attributes, labels - the tournament prompt only needs the summary text.
+   */
+  @Span()
+  async findSummariesByIds(ids: Uuid[]): Promise<Array<{ id: Uuid; summary: string }>> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ id: string; summary: string | null }[]>`
+      SELECT id, summary FROM entity_nodes WHERE id = ANY(${ids}::uuid[])
+    `;
+    return rows.map((r) => ({ id: r.id as Uuid, summary: r.summary ?? '' }));
+  }
+
   @Span()
   async deleteIfSoleMentioned(nodeId: Uuid): Promise<void> {
     await this.prisma.$executeRaw`
@@ -162,9 +200,11 @@ export class EntityNodeRepository {
     return rows.map((r) => this.mapRow(r));
   }
 
-  // Currently emits only 1-hop scores (score=1 for direct neighbors, absent otherwise).
-  // The reranker treats score as graph distance with harmonic decay (1/d), so this can be
-  // extended to multi-hop via BFS (e.g. buildBfsCte) without changing the caller contract.
+  /**
+   * Currently emits only 1-hop scores (score=1 for direct neighbors, absent otherwise).
+   * The reranker treats score as graph distance with harmonic decay (1/d), so this can be
+   * extended to multi-hop via BFS (e.g. buildBfsCte) without changing the caller contract.
+   */
   @Span()
   async getNodeDistanceScores(
     nodeIds: Uuid[],

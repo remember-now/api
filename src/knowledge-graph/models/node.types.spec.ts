@@ -5,8 +5,8 @@ import { kgId as _kgId, KG_REFERENCE_TIME, KG_TEST_GRAPH_ID } from '@/test/facto
 
 import { EpisodeType, NodeNameSchema } from '../types';
 import {
-  CommunityNodeSchema,
-  createCommunityNode,
+  CommunitySchema,
+  createCommunity,
   createEntityNode,
   createEpisodicNode,
   createNodeDefaults,
@@ -313,77 +313,86 @@ describe('EpisodicNode', () => {
   });
 });
 
-describe('CommunityNode', () => {
-  describe('createCommunityNode', () => {
+describe('Community', () => {
+  describe('createCommunity', () => {
     it('should create with correct defaults', () => {
-      const node = createCommunityNode({
+      const c = createCommunity({
         name: n('Community 1'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
       });
-      expect(node.name).toBe('Community 1');
-      expect(node.nameEmbedding).toBeNull();
-      expect(node.summary).toBe('');
-      expect(node.labels).toEqual(['Community']);
-      expect(node.id).toBeDefined();
-      expect(node.createdAt).toBeInstanceOf(Date);
-      expect(node.graphId).toBe(KG_TEST_GRAPH_ID);
+      expect(c.name).toBe('Community 1');
+      expect(c.nameEmbedding).toBeNull();
+      expect(c.summary).toBe('');
+      expect(c.memberIds).toEqual([]);
+      expect(c.id).toBeDefined();
+      expect(c.createdAt).toBeInstanceOf(Date);
+      expect(c.updatedAt).toBeInstanceOf(Date);
+      expect(c.graphId).toBe(KG_TEST_GRAPH_ID);
     });
 
     it('should allow overriding nameEmbedding', () => {
-      const node = createCommunityNode({
+      const c = createCommunity({
         name: n('Community'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
         nameEmbedding: [0.1, 0.2],
       });
-      expect(node.nameEmbedding).toEqual([0.1, 0.2]);
+      expect(c.nameEmbedding).toEqual([0.1, 0.2]);
     });
 
     it('should allow overriding summary', () => {
-      const node = createCommunityNode({
+      const c = createCommunity({
         name: n('Community'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
         summary: 'A summary',
       });
-      expect(node.summary).toBe('A summary');
+      expect(c.summary).toBe('A summary');
     });
   });
 
-  describe('CommunityNodeSchema', () => {
-    it('should accept valid community node', () => {
-      const node = createCommunityNode({
+  describe('CommunitySchema', () => {
+    it('should accept valid community', () => {
+      const c = createCommunity({
         name: n('Community'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
       });
-      expect(() => CommunityNodeSchema.parse(node)).not.toThrow();
+      expect(() => CommunitySchema.parse(c)).not.toThrow();
     });
 
     it('should reject missing name', () => {
       expect(() =>
-        CommunityNodeSchema.parse({
+        CommunitySchema.parse({
           id: randomUUID(),
           graphId: KG_TEST_GRAPH_ID,
           createdAt: new Date(),
+          updatedAt: new Date(),
           nameEmbedding: null,
           summary: '',
+          memberIds: [],
         }),
       ).toThrow();
     });
 
     it('should reject empty graphId', () => {
-      const node = createCommunityNode({
+      const c = createCommunity({
         name: n('Community'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
       });
-      expect(() => CommunityNodeSchema.parse({ ...node, graphId: '' })).toThrow();
+      expect(() => CommunitySchema.parse({ ...c, graphId: '' })).toThrow();
     });
 
     it('should accept null nameEmbedding', () => {
-      const node = createCommunityNode({
+      const c = createCommunity({
         name: n('Community'),
         graphId: KG_TEST_GRAPH_ID,
+        memberIds: [],
         nameEmbedding: null,
       });
-      expect(() => CommunityNodeSchema.parse(node)).not.toThrow();
+      expect(() => CommunitySchema.parse(c)).not.toThrow();
     });
   });
 });

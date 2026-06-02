@@ -1,6 +1,4 @@
 import {
-  CommunityEdge,
-  createCommunityEdge,
   createEntityEdge,
   createEpisodicEdge,
   createHasEpisodeEdge,
@@ -39,15 +37,6 @@ export class KgEdgeFactory {
 
   static createHasEpisodeEdge(opts: Partial<HasEpisodeEdge> = {}): HasEpisodeEdge {
     return createHasEpisodeEdge({
-      graphId: KG_TEST_GRAPH_ID,
-      sourceNodeId: kgId(),
-      targetNodeId: kgId(),
-      ...opts,
-    });
-  }
-
-  static createCommunityEdge(opts: Partial<CommunityEdge> = {}): CommunityEdge {
-    return createCommunityEdge({
       graphId: KG_TEST_GRAPH_ID,
       sourceNodeId: kgId(),
       targetNodeId: kgId(),

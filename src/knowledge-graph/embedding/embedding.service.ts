@@ -47,7 +47,18 @@ export class EmbeddingService {
       contents: texts.map((text) => ({ parts: [{ text }] })),
       config: { outputDimensionality: this._dimensions },
     });
-    return (res.embeddings ?? []).map((e) => e.values ?? []);
+    const embeddings = res.embeddings;
+    if (!embeddings || embeddings.length !== texts.length) {
+      throw new Error(
+        `Embedding API returned ${embeddings?.length ?? 0} vectors for ${texts.length} inputs`,
+      );
+    }
+    return embeddings.map((e, i) => {
+      if (!e.values) {
+        throw new Error(`Embedding API returned no values for input index ${i}`);
+      }
+      return e.values;
+    });
   }
 
   async embedNodes(nodes: EntityNode[]): Promise<EntityNode[]> {
