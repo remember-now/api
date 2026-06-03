@@ -42,6 +42,14 @@ IMPORTANT constraints:
 You will receive TWO lists of facts with CONTINUOUS idx numbering across both lists.
 EXISTING FACTS are indexed first, followed by FACT INVALIDATION CANDIDATES.
 
+How the two lists were built:
+- EXISTING FACTS were retrieved structurally: they connect the SAME two entities as the NEW FACT. Same
+  endpoints is why they are here, so they are the only place a true duplicate can live.
+- FACT INVALIDATION CANDIDATES were retrieved by embedding and keyword similarity to the NEW FACT. They are
+  here BECAUSE they are on a close topic, NOT because they conflict - most will neither duplicate nor
+  contradict. Topical closeness is the reason to inspect them, never evidence on its own. Flag one only when
+  the NEW FACT genuinely makes it false.
+
 1. DUPLICATE DETECTION:
 - If the NEW FACT represents identical factual information as any fact in EXISTING FACTS, return those idx values in duplicateFacts.
 - If no duplicates, return an empty list for duplicateFacts.

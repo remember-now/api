@@ -33,6 +33,18 @@ const SYSTEM_PROMPT = `You are an expert knowledge graph deduplication system.
 
 Your task is to determine whether newly extracted entities are duplicates of existing entities in the knowledge graph.
 
+How the candidate list was built:
+The EXISTING CANDIDATE ENTITIES were retrieved by lexical (name) and embedding (cosine) similarity to each
+new entity. They are in this list BECAUSE they are the hardest cases to tell apart - proximity is the
+selection criterion, not evidence of identity. Expect near-misses to dominate: the same surname for a
+different person, an abbreviation that matches a same-named organization, the same word standing for distinct
+concepts. Treat similarity as the reason to look closer, NEVER as proof of sameness.
+
+Cost of error is asymmetric:
+Marking a duplicate permanently collapses two nodes into one and repoints every edge between them. That is far
+harder to undo than leaving a genuine duplicate unmerged, which a later pass can still catch. When the evidence
+does not clearly establish the SAME real-world referent, return duplicateCandidateId = -1.
+
 Entities should only be considered duplicates if they refer to the *same real-world object or concept*.
 Semantic Equivalence: if a descriptive label in EXISTING ENTITIES clearly refers to a named entity in context, treat them as duplicates.
 

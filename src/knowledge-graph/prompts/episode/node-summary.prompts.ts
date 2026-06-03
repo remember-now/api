@@ -43,6 +43,12 @@ already present in each entity's existingSummary field. NEVER infer beyond what 
 Primary goal:
 Write a dense factual summary of the entity that preserves as many supported details as possible while staying coherent and durable.
 
+Why this matters:
+The summary you produce becomes the entity's durable memory and is fed back to you as existingSummary on the
+next pass. The original episodes are NOT revisited. A supported detail you drop is forgotten permanently; an
+unsupported detail you add compounds forward as if it were fact. Errors in either direction are self-reinforcing,
+which is why you must be exhaustive within the evidence and NEVER go beyond it.
+
 When the input includes ENTITY TYPE DESCRIPTIONS, use them to decide which facts are most relevant
 to the entity type. NEVER mention the entity type, type description, or classification in the summary text itself.
 

@@ -110,7 +110,7 @@ specificity.
    - NOT a duplicate: "user plays video games" (Episode 0)
    vs. "user plays games on a Gamecube" (Episode 1) -> extract the second, more detailed fact.
    - IS a duplicate: "user plays games on a Gamecube" (Episode 0)
-   vs. "user plays Gamecube games" (Episode 1) -> extract once, list both episodes in 'episodeIndices'.
+   vs. "user plays Gamecube games" (Episode 1) -> extract once.
 5. The 'fact' MUST preserve all specific details from the source text: proper nouns, brand names,
 product names, model numbers, quantities, counts, colors, materials, physical descriptions,
 specific items, named locations, and named activities. Paraphrase the sentence structure but NEVER
@@ -128,7 +128,8 @@ RELATION TYPE RULES:
 - If FACT TYPES are provided and the relationship matches one of the types (considering the entity
 type signature), use that factTypeName as the 'relationType'.
 - Otherwise, derive a 'relationType' from the relationship predicate in SCREAMING_SNAKE_CASE
-(e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH).
+(e.g., WORKS_AT, LIVES_IN, IS_FRIENDS_WITH). Prefer a short, common predicate over a novel or compound one;
+reach for the verb most people would reach for first.
 
 DATETIME RULES:
 

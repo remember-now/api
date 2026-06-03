@@ -43,6 +43,13 @@ export type ExtractedEntitiesOutput = z.infer<typeof ExtractedEntitiesSchema>;
 // Prompt builders
 
 const EXTRACTION_RULES = `
+Why specificity matters:
+Every node you extract becomes a standalone, independently-retrievable memory atom. It is stored on its own
+and surfaced to the user weeks or months later with none of the surrounding sentence for context. So the test
+behind every rule below is a single question: read entirely alone, later, would this name still identify one
+specific, distinguishable thing? If it would be vague, generic, or ambiguous without its sentence, do NOT
+extract it.
+
 NEVER EXTRACT any of the following:
 - Pronouns (you, me, I, he, she, they, we, us, it, them, him, her, this, that, those)
 - Abstract concepts or feelings (joy, balance, growth, resilience, happiness, passion, motivation)
@@ -210,6 +217,10 @@ Do NOT extract: "pic" (generic media noun), "event" (generic event noun), "baske
 
 const JSON_SYSTEM_PROMPT = `You are an entity extraction specialist for JSON data.
 NEVER extract abstract concepts, dates, or generic field values.
+
+Every node you extract becomes a standalone, independently-retrievable memory atom, surfaced to the user
+later with none of the surrounding JSON for context. The test behind every rule is: read entirely alone,
+later, would this name still identify one specific, distinguishable thing? If not, do NOT extract it.
 
 NEVER extract:
 - Date, time, or timestamp values
