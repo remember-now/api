@@ -1,6 +1,7 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import type { Violation } from '@/knowledge-graph/llm';
 import { EpisodicNode } from '@/knowledge-graph/models';
 import { NodeNameSchema } from '@/knowledge-graph/types';
 
@@ -29,6 +30,8 @@ export const NodeSummarySchema = z.object({
       'List of entity summaries. Only include entities that need summary updates.',
     ),
 });
+
+export type NodeSummaryOutput = z.infer<typeof NodeSummarySchema>;
 
 // Prompt builder
 
@@ -170,4 +173,32 @@ ${formatCurrentEpisode(episode)}
   humanContent += `\n\n<ENTITIES>\n${entitiesText}\n</ENTITIES>`;
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+export function buildNodeSummaryValidator(ctx: {
+  nodes: ReadonlyArray<{ name: string }>;
+}): (parsed: NodeSummaryOutput) => Violation[] {
+  const validNames = new Set(ctx.nodes.map((n) => n.name));
+
+  return (parsed) => {
+    const violations: Violation[] = [];
+    const seen = new Set<string>();
+
+    for (const s of parsed.summaries) {
+      if (!validNames.has(s.name)) {
+        violations.push({
+          code: 'summary.unknown-name',
+          message: `name "${s.name}" is not in the input ENTITIES set`,
+        });
+      }
+      if (seen.has(s.name)) {
+        violations.push({
+          code: 'summary.duplicate-name',
+          message: `duplicate name "${s.name}" in summaries`,
+        });
+      }
+      seen.add(s.name);
+    }
+    return violations;
+  };
 }

@@ -271,7 +271,7 @@ describe('NodeResolutionService', () => {
       ];
 
       mockRunnable.invoke.mockResolvedValue({
-        entityResolutions: [{ id: 0, name: 'Alice', duplicateCandidateId: -1 }],
+        entityResolutions: [{ id: 0, name: 'Alice Smith', duplicateCandidateId: -1 }],
       });
 
       const result = await service.resolveNodes(
@@ -281,7 +281,7 @@ describe('NodeResolutionService', () => {
         existing,
       );
 
-      expect(result.resolvedNodes[0].name).toBe('Alice');
+      expect(result.resolvedNodes[0].name).toBe('Alice Smith');
     });
 
     it('should bypass cosine for low-entropy names and go to LLM', async () => {

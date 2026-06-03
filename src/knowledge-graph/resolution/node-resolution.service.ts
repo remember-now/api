@@ -13,7 +13,11 @@ import {
 
 import { invokeStructured } from '../llm';
 import { EntityNode, EpisodicNode } from '../models';
-import { buildDedupeNodesMessages, NodeResolutionsSchema } from '../prompts';
+import {
+  buildDedupeNodesMessages,
+  buildDedupeNodesValidator,
+  NodeResolutionsSchema,
+} from '../prompts';
 import { EntityNodeRepository } from '../repository/repositories';
 import { SearchBySimilarityParamsSchema, SearchByTextParamsSchema } from '../types';
 import {
@@ -206,14 +210,15 @@ export class NodeResolutionService {
         labels: n.labels,
       }));
 
+      const extractedForPrompt = llmExtractedWithIdx.map(({ id, name, labels }) => ({
+        id,
+        name,
+        labels,
+      }));
       const messages = buildDedupeNodesMessages({
         episode,
         previousEpisodes,
-        extractedNodes: llmExtractedWithIdx.map(({ id, name, labels }) => ({
-          id,
-          name,
-          labels,
-        })),
+        extractedNodes: extractedForPrompt,
         candidateNodes: allCandidates,
         customInstructions,
       });
@@ -222,35 +227,30 @@ export class NodeResolutionService {
         callbacks: this.llmTracer.getCallbacks(ctx),
         runName: 'resolve-nodes',
         tags: ['knowledge-graph', 'resolution.node'],
+        validate: buildDedupeNodesValidator({
+          extractedNodes: extractedForPrompt,
+          candidateNodes: allCandidates,
+        }),
       });
 
       const resolutions = raw.entityResolutions;
 
       for (const resolution of resolutions) {
-        const extractedId = idxToEntityId.get(resolution.id);
-        if (!extractedId) continue;
+        const extractedId = idxToEntityId.get(resolution.id)!;
 
         if (resolution.duplicateCandidateId >= 0) {
-          const canonical = candidateIdToEntity.get(resolution.duplicateCandidateId);
-          if (canonical) {
-            idMap.set(extractedId, canonical.id);
-            duplicatePairs.push({
-              extractedId,
-              canonicalId: canonical.id,
-            });
-            continue;
-          }
+          const canonical = candidateIdToEntity.get(resolution.duplicateCandidateId)!;
+          idMap.set(extractedId, canonical.id);
+          duplicatePairs.push({ extractedId, canonicalId: canonical.id });
+          continue;
         }
 
-        // Apply canonical name if LLM returned a better one.
         // nameEmbedding is cleared because it was computed for the old name -
         // persisting a stale embedding would corrupt vector search results.
-        if (resolution.name) {
-          const node = extractedNodes.find((n) => n.id === extractedId);
-          if (node && resolution.name !== node.name) {
-            node.name = resolution.name;
-            node.nameEmbedding = null;
-          }
+        const node = extractedNodes.find((n) => n.id === extractedId);
+        if (node && resolution.name !== node.name) {
+          node.name = resolution.name;
+          node.nameEmbedding = null;
         }
       }
     }

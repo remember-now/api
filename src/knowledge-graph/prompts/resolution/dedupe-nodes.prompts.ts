@@ -1,6 +1,7 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import type { Violation } from '@/knowledge-graph/llm';
 import { EpisodicNode } from '@/knowledge-graph/models';
 import { NodeNameSchema } from '@/knowledge-graph/types';
 
@@ -9,12 +10,11 @@ import { formatCurrentEpisode, formatPreviousEpisodes } from '../text-utils';
 // Schema
 
 const NodeResolutionSchema = z.object({
-  id: z.number().describe('integer id of the entity'),
+  id: z.int().nonnegative().describe('integer id of the entity'),
   name: NodeNameSchema.describe(
     'Name of the entity. Should be the most complete and descriptive name of the entity. Do not include any JSON formatting in the Entity name such as {}.',
   ),
   duplicateCandidateId: z
-    .number()
     .int()
     .describe(
       'candidateId of the matching EXISTING CANDIDATE ENTITY, or -1 if no duplicate exists.',
@@ -24,6 +24,8 @@ const NodeResolutionSchema = z.object({
 export const NodeResolutionsSchema = z.object({
   entityResolutions: z.array(NodeResolutionSchema).describe('List of resolved nodes'),
 });
+
+export type NodeResolutionsOutput = z.infer<typeof NodeResolutionsSchema>;
 
 // Prompt builder
 
@@ -42,6 +44,8 @@ Task:
 1. Compare the NEW ENTITY against each EXISTING ENTITY (identified by 'candidateId').
 2. If it refers to the same real-world object or concept, return the 'candidateId' of that match.
 3. Return 'duplicateCandidateId = -1' when there is no match or you are unsure.
+
+The 'name' field MUST be copied verbatim (exact case and whitespace) from either the EXTRACTED ENTITIES list or the EXISTING CANDIDATE ENTITIES list.
 
 <EXAMPLES>
 <EXTRACTED ENTITIES>
@@ -105,7 +109,7 @@ function formatCandidateEntities(
     .join('\n');
 }
 
-export function buildDedupeNodesMessages(ctx: {
+export type DedupeNodesCtx = {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   extractedNodes: Array<{ id: number; name: string; labels: readonly string[] }>;
@@ -115,7 +119,9 @@ export function buildDedupeNodesMessages(ctx: {
     labels: readonly string[];
   }>;
   customInstructions?: string;
-}): BaseMessage[] {
+};
+
+export function buildDedupeNodesMessages(ctx: DedupeNodesCtx): BaseMessage[] {
   const {
     episode,
     previousEpisodes,
@@ -156,4 +162,66 @@ ${candidatesText}
   }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+export function buildDedupeNodesValidator(
+  ctx: Pick<DedupeNodesCtx, 'extractedNodes' | 'candidateNodes'>,
+): (parsed: NodeResolutionsOutput) => Violation[] {
+  const validIds = new Set(ctx.extractedNodes.map((e) => e.id));
+  const expectedCount = ctx.extractedNodes.length;
+  const validCandidateIds = new Set(ctx.candidateNodes.map((c) => c.candidateId));
+  // A non-duplicate resolution's name is written back verbatim as the canonical
+  // node name (node-resolution.service.ts), so the name must be one we provided
+  // rather than a free-form string.
+  const allowedNames = new Set([
+    ...ctx.extractedNodes.map((e) => e.name),
+    ...ctx.candidateNodes.map((c) => c.name),
+  ]);
+
+  return (parsed) => {
+    const violations: Violation[] = [];
+    const { entityResolutions } = parsed;
+
+    if (entityResolutions.length !== expectedCount) {
+      violations.push({
+        code: 'dedupe-nodes.wrong-resolution-count',
+        message: `expected ${expectedCount} resolutions, got ${entityResolutions.length}`,
+      });
+    }
+
+    const seenIds = new Set<number>();
+    for (const r of entityResolutions) {
+      if (!validIds.has(r.id)) {
+        violations.push({
+          code: 'dedupe-nodes.unknown-id',
+          message: `id ${r.id} was not in the extracted entities set`,
+        });
+      }
+      if (seenIds.has(r.id)) {
+        violations.push({
+          code: 'dedupe-nodes.duplicate-id',
+          message: `duplicate id ${r.id} in entityResolutions`,
+        });
+      }
+      seenIds.add(r.id);
+
+      if (
+        r.duplicateCandidateId !== -1 &&
+        !validCandidateIds.has(r.duplicateCandidateId)
+      ) {
+        violations.push({
+          code: 'dedupe-nodes.invalid-candidate-id',
+          message: `duplicateCandidateId ${r.duplicateCandidateId} for id ${r.id} is neither -1 nor a valid candidateId`,
+        });
+      }
+
+      if (!allowedNames.has(r.name)) {
+        violations.push({
+          code: 'dedupe-nodes.unknown-name',
+          message: `name "${r.name}" for id ${r.id} is not among the extracted or candidate entity names`,
+        });
+      }
+    }
+    return violations;
+  };
 }

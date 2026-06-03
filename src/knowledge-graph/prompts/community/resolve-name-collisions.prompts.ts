@@ -1,12 +1,13 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import type { Violation } from '@/knowledge-graph/llm';
 import { NodeNameSchema } from '@/knowledge-graph/types';
 
 // Schema
 
 const ResolvedNameSchema = z.object({
-  tempId: z.number().int().describe('Echo of the input tempId for the collider'),
+  tempId: z.int().nonnegative().describe('Echo of the input tempId for the collider'),
   name: NodeNameSchema.describe(
     'New, distinct noun-phrase label (2-6 words) for this collider',
   ),
@@ -79,10 +80,14 @@ function formatColliders(colliders: readonly Collider[]): string {
     .join('\n');
 }
 
-export function buildResolveNameCollisionsMessages(ctx: {
+export type ResolveNameCollisionsCtx = {
   colliders: readonly Collider[];
   namesInUse: readonly string[];
-}): BaseMessage[] {
+};
+
+export function buildResolveNameCollisionsMessages(
+  ctx: ResolveNameCollisionsCtx,
+): BaseMessage[] {
   const { colliders, namesInUse } = ctx;
 
   const namesInUseText =
@@ -101,4 +106,60 @@ ${namesInUseText}
 Your response MUST include EXACTLY ${colliders.length} ${colliders.length === 1 ? 'resolution' : 'resolutions'}, one per input collider, echoing each input tempId exactly.`;
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+const norm = (s: string): string => s.trim().toLowerCase();
+
+export function buildResolveNameCollisionsValidator(
+  ctx: ResolveNameCollisionsCtx,
+): (parsed: ResolveNameCollisionsOutput) => Violation[] {
+  const validTempIds = new Set(ctx.colliders.map((c) => c.tempId));
+  const expectedCount = ctx.colliders.length;
+  const namesInUseNorm = new Set(ctx.namesInUse.map(norm));
+
+  return (parsed) => {
+    const violations: Violation[] = [];
+    const { resolutions } = parsed;
+
+    if (resolutions.length !== expectedCount) {
+      violations.push({
+        code: 'resolve-name-collisions.wrong-resolution-count',
+        message: `expected ${expectedCount} resolutions, got ${resolutions.length}`,
+      });
+    }
+
+    const seenTempIds = new Set<number>();
+    const seenNames = new Set<string>();
+    for (const r of resolutions) {
+      if (!validTempIds.has(r.tempId)) {
+        violations.push({
+          code: 'resolve-name-collisions.unknown-temp-id',
+          message: `tempId ${r.tempId} was not in the input collider set`,
+        });
+      }
+      if (seenTempIds.has(r.tempId)) {
+        violations.push({
+          code: 'resolve-name-collisions.duplicate-temp-id',
+          message: `duplicate tempId ${r.tempId} in resolutions`,
+        });
+      }
+      seenTempIds.add(r.tempId);
+
+      const n = norm(r.name);
+      if (namesInUseNorm.has(n)) {
+        violations.push({
+          code: 'resolve-name-collisions.collides-with-existing',
+          message: `name "${r.name}" collides with an existing NAMES IN USE entry`,
+        });
+      }
+      if (seenNames.has(n)) {
+        violations.push({
+          code: 'resolve-name-collisions.duplicate-name',
+          message: `duplicate name "${r.name}" across resolutions`,
+        });
+      }
+      seenNames.add(n);
+    }
+    return violations;
+  };
 }

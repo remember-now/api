@@ -21,6 +21,7 @@ import { Community, createCommunity } from '../models';
 import {
   buildCommunityNameMessages,
   buildResolveNameCollisionsMessages,
+  buildResolveNameCollisionsValidator,
   buildSummarizePairMessages,
   type Collider,
   CommunityNameSchema,
@@ -566,10 +567,8 @@ export class CommunityService {
       ...fresh.filter((p) => !colliderTempIds.has(p.tempId)).map((p) => p.name),
     ];
 
-    const messages = buildResolveNameCollisionsMessages({
-      colliders,
-      namesInUse: survivingPlusNonCollider,
-    });
+    const validatorCtx = { colliders, namesInUse: survivingPlusNonCollider };
+    const messages = buildResolveNameCollisionsMessages(validatorCtx);
     const { resolutions } = await invokeStructured(
       model,
       ResolveNameCollisionsSchema,
@@ -578,15 +577,13 @@ export class CommunityService {
         callbacks: this.llmTracer.getCallbacks(ctx),
         runName: 'community.resolve-name-collisions',
         tags: ['knowledge-graph', 'community', 'resolve-name-collisions'],
+        validate: buildResolveNameCollisionsValidator(validatorCtx),
       },
     );
 
-    const renameByTempId = new Map(resolutions.map((r) => [r.tempId, r.name]));
-    for (const p of fresh) {
-      const newName = renameByTempId.get(p.tempId);
-      if (newName !== undefined) {
-        p.name = newName;
-      }
+    const freshByTempId = new Map(fresh.map((p) => [p.tempId, p]));
+    for (const r of resolutions) {
+      freshByTempId.get(r.tempId)!.name = r.name;
     }
     return colliderTempIds.size;
   }

@@ -14,7 +14,11 @@ import {
 import { compressIdMap, LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
 import { invokeStructured } from '../llm';
 import { EntityEdge, EpisodicNode } from '../models';
-import { buildDedupeEdgesMessages, EdgeDedupeSchema } from '../prompts';
+import {
+  buildDedupeEdgesMessages,
+  buildDedupeEdgesValidator,
+  EdgeDedupeSchema,
+} from '../prompts';
 import { EntityEdgeRepository } from '../repository/repositories';
 import { SearchBySimilarityParamsSchema, SearchByTextParamsSchema } from '../types';
 import {
@@ -220,9 +224,7 @@ export class EdgeResolutionService {
         customInstructions,
         ctx,
       );
-
-      // A fact is duplicate only if it matches an endpoint-range index
-      const isDuplicate = dedupe.duplicateFacts.some((idx) => idx < endpointEdges.length);
+      const isDuplicate = dedupe.duplicateFacts.length > 0;
 
       if (!isDuplicate) {
         if (edge.invalidAt && !edge.expiredAt) {
@@ -233,8 +235,7 @@ export class EdgeResolutionService {
         // the edge is superseded by information already in the graph.
         if (!edge.expiredAt) {
           const contradictionCandidates = dedupe.contradictedFacts
-            .map((idx) => idxToEdge.get(idx))
-            .filter((e): e is EntityEdge => e !== undefined)
+            .map((idx) => idxToEdge.get(idx)!)
             .filter((c) => c.validAt !== null)
             .sort((a, b) => a.validAt!.getTime() - b.validAt!.getTime());
           for (const candidate of contradictionCandidates) {
@@ -253,16 +254,14 @@ export class EdgeResolutionService {
         // and include them in resolvedEdges so they are re-saved with updated episodes.
         // Mirrors Python edge_operations.py:523-524 and 581-582.
         for (const idx of dedupe.duplicateFacts) {
-          if (idx < endpointEdges.length) {
-            const existingEdge = idxToEdge.get(idx);
-            if (existingEdge && !resolvedExistingIds.has(existingEdge.id)) {
-              if (!existingEdge.episodes.includes(episode.id)) {
-                existingEdge.episodes.push(episode.id);
-              }
-              resolvedEdges.push(existingEdge);
-              resolvedExistingIds.add(existingEdge.id);
-            }
+          const existingEdge = idxToEdge.get(idx)!;
+
+          if (resolvedExistingIds.has(existingEdge.id)) continue;
+          if (!existingEdge.episodes.includes(episode.id)) {
+            existingEdge.episodes.push(episode.id);
           }
+          resolvedEdges.push(existingEdge);
+          resolvedExistingIds.add(existingEdge.id);
         }
       }
 
@@ -270,8 +269,8 @@ export class EdgeResolutionService {
       // validity window and predate it. Mirrors Python resolve_edge_contradictions
       // (edge_operations.py:425-460).
       for (const idx of dedupe.contradictedFacts) {
-        const existing = idxToEdge.get(idx);
-        if (!existing || invalidatedEdgesMap.has(existing.id)) continue;
+        const existing = idxToEdge.get(idx)!;
+        if (invalidatedEdgesMap.has(existing.id)) continue;
 
         const edgeInvalidAt = existing.invalidAt;
         const resolvedValidAt = edge.validAt;
@@ -553,6 +552,18 @@ export class EdgeResolutionService {
       callbacks: this.llmTracer.getCallbacks(ctx),
       runName: 'resolve-edges',
       tags: ['knowledge-graph', 'resolution.edge'],
+      validate: buildDedupeEdgesValidator({
+        endpointEdges: endpointWithIdx.map(({ idx, edge: e }) => ({
+          idx,
+          name: e.name,
+          fact: e.fact,
+        })),
+        similarEdges: similarWithIdx.map(({ idx, edge: e }) => ({
+          idx,
+          name: e.name,
+          fact: e.fact,
+        })),
+      }),
     });
 
     return { dedupe, idxToEdge };

@@ -2,6 +2,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { z } from 'zod';
 
 import { EntityTypeMap } from '@/knowledge-graph/episode/types';
+import type { Violation } from '@/knowledge-graph/llm';
 import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 import { NodeNameSchema } from '@/knowledge-graph/types';
 
@@ -16,7 +17,8 @@ import { formatCurrentEpisode, formatPreviousEpisodes } from '../text-utils';
 const ExtractedEntitySchema = z.object({
   name: NodeNameSchema.describe('Name of the extracted entity'),
   entityTypeId: z
-    .number()
+    .int()
+    .nonnegative()
     .optional()
     .describe(
       'ID of the classified entity type. Must be one of the integer IDs from the ENTITY TYPES list provided in the user message. Omit when no provided type fits.',
@@ -35,6 +37,8 @@ export const ExtractedEntitiesSchema = z.object({
     .array(ExtractedEntitySchema)
     .describe('List of extracted entities'),
 });
+
+export type ExtractedEntitiesOutput = z.infer<typeof ExtractedEntitiesSchema>;
 
 // Prompt builders
 
@@ -303,4 +307,26 @@ ${formatCurrentEpisode(episode, { includeSource: true })}
     humanContent += `\n\n<CUSTOM INSTRUCTIONS>\n${customInstructions}\n</CUSTOM INSTRUCTIONS>`;
   }
   return [new SystemMessage(systemPrompt), new HumanMessage(humanContent)];
+}
+
+export function buildExtractNodesValidator(ctx: {
+  entityTypes?: EntityTypeMap;
+}): (parsed: ExtractedEntitiesOutput) => Violation[] {
+  const typeCount = ctx.entityTypes ? Object.keys(ctx.entityTypes).length : 0;
+
+  return (parsed) => {
+    if (typeCount === 0) return [];
+    const violations: Violation[] = [];
+
+    for (const e of parsed.extractedEntities) {
+      if (e.entityTypeId === undefined) continue;
+      if (e.entityTypeId < 0 || e.entityTypeId >= typeCount) {
+        violations.push({
+          code: 'extract-nodes.entity-type-id-out-of-range',
+          message: `entityTypeId ${e.entityTypeId} for "${e.name}" is out of range [0, ${typeCount})`,
+        });
+      }
+    }
+    return violations;
+  };
 }

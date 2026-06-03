@@ -2,6 +2,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { z } from 'zod';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
+import type { Violation } from '@/knowledge-graph/llm';
 import { EntityNode, EpisodicNode } from '@/knowledge-graph/models';
 import { RelationshipTypeSchema } from '@/knowledge-graph/types';
 
@@ -15,12 +16,14 @@ import {
 
 // TODO: Too much cognitive load for a model
 const ExtractedEdgeSchema = z.object({
-  sourceEntityName: z
-    .string()
-    .describe('The name of the source entity from the ENTITIES list'),
-  targetEntityName: z
-    .string()
-    .describe('The name of the target entity from the ENTITIES list'),
+  sourceEntityIdx: z
+    .int()
+    .nonnegative()
+    .describe('The 0-based id of the source entity from the ENTITIES list'),
+  targetEntityIdx: z
+    .int()
+    .nonnegative()
+    .describe('The 0-based id of the target entity from the ENTITIES list'),
   // TODO: This is where the model creates new relationship types. Unlike
   // extract-nodes (which forces the model to pick an entityTypeId from a
   // provided list), edges accept any SCREAMING_SNAKE_CASE name the model
@@ -61,6 +64,8 @@ export const ExtractedEdgesSchema = z.object({
   edges: z.array(ExtractedEdgeSchema).describe('List of extracted relationship facts'),
 });
 
+export type ExtractedEdgesOutput = z.infer<typeof ExtractedEdgesSchema>;
+
 // Prompt builder
 
 const SYSTEM_PROMPT = `You are an expert fact extractor. Extract factual relationships (edges)
@@ -81,11 +86,11 @@ is a fallback for when no per-episode timestamp is available.
 
 EXTRACTION RULES:
 
-1. Entity Name Validation: 'sourceEntityName' and 'targetEntityName' MUST use only the 'name'
-values from the ENTITIES list provided in the human message.
-   - CRITICAL: Using names not in the list will cause the edge to be rejected.
-2. Each fact must involve two DISTINCT entities - 'sourceEntityName' and 'targetEntityName' NEVER
-refer to the same entity.
+1. Entity Id Validation: 'sourceEntityIdx' and 'targetEntityIdx' MUST be the 'id' value of an entry
+in the ENTITIES list provided in the human message.
+   - CRITICAL: Using an id not present in the list will cause the edge to be rejected.
+2. Each fact must involve two DISTINCT entities - 'sourceEntityIdx' and 'targetEntityIdx' NEVER
+refer to the same entity (their ids MUST differ).
 3. Prefer facts that involve two distinct entities from the ENTITIES list. When a sentence
 describes a specific, concrete detail about a single entity (a brand name, a specific item, a
 physical description, a quantity, a location, a named activity), do NOT drop it. Instead, look for
@@ -138,6 +143,13 @@ originates from. If no per-episode timestamp is available, use REFERENCE TIME.
 the CURRENT EPISODE contains multiple episodes with per-episode timestamps, prefer the timestamp
 of the specific episode the fact originates from.`;
 
+function formatEntitiesBlock(nodes: ReadonlyArray<EntityNode>): string {
+  if (nodes.length === 0) return 'None';
+  return nodes
+    .map((n, idx) => `- id: ${idx}, name: "${n.name}", labels: [${n.labels.join(', ')}]`)
+    .join('\n');
+}
+
 export function buildExtractEdgesMessages(ctx: {
   episode: EpisodicNode;
   nodes: EntityNode[];
@@ -185,11 +197,7 @@ ${formatCurrentEpisode(episode)}
 </CURRENT EPISODE>
 
 <ENTITIES>
-${JSON.stringify(
-  nodes.map((n) => ({ name: n.name, labels: n.labels })),
-  null,
-  2,
-)}
+${formatEntitiesBlock(nodes)}
 </ENTITIES>
 
 <REFERENCE TIME>
@@ -209,6 +217,53 @@ ${JSON.stringify(edgeTypesContext, null, 2)}
   }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+// Both bounds are schema-validated ISO 8601, so Date.parse is safe here.
+function timestampOrderViolation(
+  validAt: string | null | undefined,
+  invalidAt: string | null | undefined,
+): Violation | null {
+  if (!validAt || !invalidAt) return null;
+  return Date.parse(validAt) > Date.parse(invalidAt)
+    ? {
+        code: 'edge.invalid-temporal-order',
+        message: `invalidAt (${invalidAt}) must not precede validAt (${validAt})`,
+      }
+    : null;
+}
+
+export function buildExtractEdgesValidator(ctx: {
+  nodes: ReadonlyArray<unknown>;
+}): (parsed: ExtractedEdgesOutput) => Violation[] {
+  const nodeCount = ctx.nodes.length;
+
+  return (parsed) => {
+    const violations: Violation[] = [];
+    for (const e of parsed.edges) {
+      if (e.sourceEntityIdx >= nodeCount) {
+        violations.push({
+          code: 'edge.source-idx-out-of-range',
+          message: `sourceEntityIdx ${e.sourceEntityIdx} is out of range (ENTITIES has ${nodeCount})`,
+        });
+      }
+      if (e.targetEntityIdx >= nodeCount) {
+        violations.push({
+          code: 'edge.target-idx-out-of-range',
+          message: `targetEntityIdx ${e.targetEntityIdx} is out of range (ENTITIES has ${nodeCount})`,
+        });
+      }
+      if (e.sourceEntityIdx === e.targetEntityIdx) {
+        violations.push({
+          code: 'edge.self-loop',
+          message: `self-loop: sourceEntityIdx and targetEntityIdx both refer to id ${e.sourceEntityIdx}`,
+        });
+      }
+      const order = timestampOrderViolation(e.validAt, e.invalidAt);
+      if (order) violations.push(order);
+    }
+    return violations;
+  };
 }
 
 // Per-edge timestamp fallback
@@ -275,4 +330,13 @@ ${formatPromptTimestamp(referenceTime)}
     new SystemMessage(TIMESTAMPS_FALLBACK_SYSTEM_PROMPT),
     new HumanMessage(humanContent),
   ];
+}
+
+export function buildExtractTimestampsValidator(): (
+  parsed: z.infer<typeof EdgeTimestampsSchema>,
+) => Violation[] {
+  return (parsed) => {
+    const v = timestampOrderViolation(parsed.validAt, parsed.invalidAt);
+    return v ? [v] : [];
+  };
 }

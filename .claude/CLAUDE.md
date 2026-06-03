@@ -10,9 +10,9 @@ This is a GraphRAG application, the core of which is in `src/knowledge-graph`.
 
 It is a modified and improved TypeScript port of Graphiti by Zep, which is written in Python originally.
 
-The original Graphiti codebase can be inspected in `REPO_ROOT/graphiti`.
-`REPO_ROOT` is api (cwd). Please stop checking the directory above `api` - there is
-nothing there.
+The original Graphiti codebase can only be accessed if the
+user cloned the repository. Check existence with `ls graphiti/`
+if you deem referencing necessary.
 
 Tech stack:
 NestJS 11
@@ -27,7 +27,11 @@ Prisma (PostgreSQL + pgvector + pgvectorscale for ANN search)
 All environment variables are split by domain and loaded in `src/config`.
 
 Everything is eventually unit tested, and e2e tested. Unit tests are in `src/`, and they use helpers (e.g. factories) from `src/test`.
-E2e tests are in `REPO_ROOT/test`
+
+E2e tests are in `test/`.
+
+Important: only run unit tests with `--runInBand` set as app compilation cost
+is heavy.
 
 There are pre-commit hooks - `npm run lint` and `npm run format`.
 

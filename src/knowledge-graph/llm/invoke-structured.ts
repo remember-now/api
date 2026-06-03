@@ -5,13 +5,17 @@ import { z } from 'zod';
 import { DEFAULT_MAX_RETRIES, type InvokeStructuredOptions } from './types';
 
 // TODO: We do not handle this error in any way.
+// `issues` carries only structural identifiers: `path: zod-code` for schema
+// failures, and validator-defined codes for invariant failures. User-derived
+// text from validator/Zod messages is fed back to the model in the retry
+// HumanMessage but never stored or surfaced here.
 export class StructuredOutputValidationError extends Error {
   constructor(
     public readonly runName: string,
-    public readonly zodError: z.ZodError,
+    public readonly issues: readonly string[],
   ) {
     super(
-      `Structured output validation failed for "${runName}" after retries: ${summarize(zodError)}`,
+      `Structured output validation failed for "${runName}" after retries: ${issues.slice(0, 3).join('; ')}`,
     );
     this.name = 'StructuredOutputValidationError';
   }
@@ -21,14 +25,20 @@ export async function invokeStructured<S extends z.ZodType>(
   model: BaseChatModel,
   schema: S,
   messages: BaseMessage[],
-  opts: InvokeStructuredOptions,
+  opts: InvokeStructuredOptions<z.infer<S>>,
 ): Promise<z.infer<S>> {
-  const { runName, tags = [], callbacks, maxRetries = DEFAULT_MAX_RETRIES } = opts;
+  const {
+    runName,
+    tags = [],
+    callbacks,
+    maxRetries = DEFAULT_MAX_RETRIES,
+    validate,
+  } = opts;
   const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
   const runnable = model.withStructuredOutput(jsonSchema);
 
   let currentMessages = messages;
-  let lastError: z.ZodError | undefined;
+  let lastCodes: string[] = [];
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const raw: unknown = await runnable.invoke(currentMessages, {
@@ -38,28 +48,44 @@ export async function invokeStructured<S extends z.ZodType>(
     });
 
     const parsed = await schema.safeParseAsync(raw);
-    if (parsed.success) return parsed.data;
+    if (!parsed.success) {
+      lastCodes = zodCodes(parsed.error);
+      currentMessages = [
+        ...currentMessages,
+        new HumanMessage(formatSchemaFeedback(parsed.error)),
+      ];
+      continue;
+    }
 
-    lastError = parsed.error;
+    const violations = validate?.(parsed.data) ?? [];
+    if (violations.length === 0) return parsed.data;
+
+    lastCodes = violations.map((v) => v.code);
     currentMessages = [
       ...currentMessages,
-      new HumanMessage(formatFeedback(parsed.error)),
+      new HumanMessage(formatInvariantFeedback(violations.map((v) => v.message))),
     ];
   }
-
-  throw new StructuredOutputValidationError(runName, lastError!);
+  throw new StructuredOutputValidationError(runName, lastCodes);
 }
 
-function formatFeedback(error: z.ZodError): string {
-  const bullets = error.issues
-    .map((i) => `- ${i.path.length ? i.path.join('.') : '(root)'}: ${i.message}`)
-    .join('\n');
-  return `Your previous response did not match the required schema. Validation errors:\n${bullets}\n\nPlease retry with a response that conforms to the schema.`;
+function zodCodes(error: z.ZodError): string[] {
+  return error.issues.map(
+    (i) => `${i.path.length ? i.path.join('.') : '(root)'}: ${i.code}`,
+  );
 }
 
-function summarize(error: z.ZodError): string {
-  return error.issues
-    .slice(0, 3)
-    .map((i) => `${i.path.length ? i.path.join('.') : '(root)'}: ${i.message}`)
-    .join('; ');
+function formatSchemaFeedback(error: z.ZodError): string {
+  let out =
+    'Your previous response did not match the required schema. Validation errors:\n';
+  out += z.prettifyError(error);
+  out += '\n\nPlease retry with a response that resolves them.';
+  return out;
+}
+
+function formatInvariantFeedback(messages: readonly string[]): string {
+  const bullets = messages.map((v) => `- ${v}`).join('\n');
+  let out = `Your previous response parsed but violated these output invariants:\n${bullets}`;
+  out += '\n\nPlease retry with a response that resolves them.';
+  return out;
 }

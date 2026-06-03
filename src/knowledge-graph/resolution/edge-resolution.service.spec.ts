@@ -246,7 +246,7 @@ describe('EdgeResolutionService', () => {
     expect(result.invalidatedEdges[0].expiredAt).toBeInstanceOf(Date);
   });
 
-  it('should not treat edge as duplicate when duplicateFacts index is in similar range only', async () => {
+  it('should reject duplicateFacts pointing into the similar range via the validator', async () => {
     const edge = makeEdge({
       name: 'WORKS_AT',
       fact: 'Alice works at Acme',
@@ -270,23 +270,23 @@ describe('EdgeResolutionService', () => {
     similarEdge.id = u('similar-id');
 
     // idx 0 = endpoint edge, idx 1 = similar edge
-    // duplicateFacts = [1] (similar range idx) → should NOT trigger isDuplicate
+    // duplicateFacts must only contain EXISTING FACTS range idx; the validator
+    // surfaces this violation rather than silently filtering.
     mockRunnable.invoke.mockResolvedValue({
       duplicateFacts: [1],
       contradictedFacts: [],
     });
 
-    const result = await service.resolveEdges(
-      mockModel,
-      baseEpisode,
-      [edge],
-      [endpointEdge, similarEdge],
-      new Map(),
-      KG_REFERENCE_TIME,
-    );
-
-    // Similar range idx in duplicateFacts does NOT mark as duplicate
-    expect(result.resolvedEdges).toHaveLength(1);
+    await expect(
+      service.resolveEdges(
+        mockModel,
+        baseEpisode,
+        [edge],
+        [endpointEdge, similarEdge],
+        new Map(),
+        KG_REFERENCE_TIME,
+      ),
+    ).rejects.toThrow();
   });
 
   it('should set factEmbedding on resolved edges', async () => {

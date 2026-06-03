@@ -78,7 +78,7 @@ describe('NodeExtractionService', () => {
     expect(nodes[1].labels).toEqual(['Entity', 'Organization']);
   });
 
-  it('should fall back to Entity label for unknown entityTypeId', async () => {
+  it('should reject out-of-range entityTypeId via the validator and surface after retries', async () => {
     const entityTypes = {
       Person: { description: 'A human individual', schema: z.object({}) },
     };
@@ -86,9 +86,9 @@ describe('NodeExtractionService', () => {
       extractedEntities: [{ name: 'Alice', entityTypeId: 99 }],
     });
 
-    const nodes = await service.extractNodes(mockModel, baseEpisode, [], entityTypes);
-
-    expect(nodes[0].labels).toEqual(['Entity']);
+    await expect(
+      service.extractNodes(mockModel, baseEpisode, [], entityTypes),
+    ).rejects.toThrow();
   });
 
   it('should assign id to each returned node', async () => {

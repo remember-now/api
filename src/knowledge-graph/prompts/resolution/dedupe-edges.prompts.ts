@@ -1,6 +1,7 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import type { Violation } from '@/knowledge-graph/llm';
 import { EpisodicNode } from '@/knowledge-graph/models';
 
 import {
@@ -13,16 +14,18 @@ import {
 
 export const EdgeDedupeSchema = z.object({
   duplicateFacts: z
-    .array(z.number())
+    .array(z.int().nonnegative())
     .describe(
       'List of idx values of duplicate facts (only from EXISTING FACTS range). Empty list if none.',
     ),
   contradictedFacts: z
-    .array(z.number())
+    .array(z.int().nonnegative())
     .describe(
       'List of idx values of contradicted facts (from full idx range). Empty list if none.',
     ),
 });
+
+export type EdgeDedupeOutput = z.infer<typeof EdgeDedupeSchema>;
 
 // Prompt builder
 
@@ -112,7 +115,7 @@ function rangeLabel(offset: number, count: number): string {
   return count === 1 ? `index ${offset}` : `indices ${offset}-${offset + count - 1}`;
 }
 
-export function buildDedupeEdgesMessages(ctx: {
+export type DedupeEdgesCtx = {
   episode: EpisodicNode;
   previousEpisodes: EpisodicNode[];
   newEdge: { name: string; fact: string };
@@ -120,7 +123,9 @@ export function buildDedupeEdgesMessages(ctx: {
   similarEdges: Array<{ idx: number; name: string; fact: string }>;
   referenceTime: Date;
   customInstructions?: string;
-}): BaseMessage[] {
+};
+
+export function buildDedupeEdgesMessages(ctx: DedupeEdgesCtx): BaseMessage[] {
   const {
     episode,
     previousEpisodes,
@@ -168,4 +173,34 @@ ${formatEdges(similarEdges)}
   }
 
   return [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(humanContent)];
+}
+
+export function buildDedupeEdgesValidator(
+  ctx: Pick<DedupeEdgesCtx, 'endpointEdges' | 'similarEdges'>,
+): (parsed: EdgeDedupeOutput) => Violation[] {
+  const endpointCount = ctx.endpointEdges.length;
+  const totalCount = endpointCount + ctx.similarEdges.length;
+
+  return (parsed) => {
+    const violations: Violation[] = [];
+
+    for (const idx of parsed.duplicateFacts) {
+      if (idx < 0 || idx >= endpointCount) {
+        violations.push({
+          code: 'dedupe-edges.duplicate-idx-out-of-range',
+          message: `duplicateFacts idx ${idx} must be in EXISTING FACTS range [0, ${endpointCount})`,
+        });
+      }
+    }
+    for (const idx of parsed.contradictedFacts) {
+      if (idx < 0 || idx >= totalCount) {
+        violations.push({
+          code: 'dedupe-edges.contradicted-idx-out-of-range',
+          message: `contradictedFacts idx ${idx} must be in full range [0, ${totalCount})`,
+        });
+      }
+    }
+
+    return violations;
+  };
 }

@@ -16,8 +16,10 @@ import { invokeStructured } from '../llm';
 import { createEntityNode, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
   buildExtractNodesMessages,
+  buildExtractNodesValidator,
   buildFillEntityAttributesMessages,
   buildNodeSummaryMessages,
+  buildNodeSummaryValidator,
   ExtractedEntitiesSchema,
   NodeSummarySchema,
 } from '../prompts';
@@ -41,12 +43,7 @@ function resolveLabels(
     return [entity];
   }
   const labels = Object.keys(entityTypes) as NodeLabel[];
-  const label = labels[entityTypeId];
-  return label ? [entity, label] : [entity];
-}
-
-function normalizeStringForKey(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  return [entity, labels[entityTypeId]];
 }
 
 @Injectable()
@@ -140,6 +137,7 @@ export class NodeExtractionService {
       callbacks: this.llmTracer.getCallbacks(ctx),
       runName: 'extract-nodes',
       tags: ['knowledge-graph', 'extraction.node'],
+      validate: buildExtractNodesValidator({ entityTypes }),
     });
 
     return result.extractedEntities
@@ -312,19 +310,19 @@ export class NodeExtractionService {
             callbacks: this.llmTracer.getCallbacks(ctx),
             runName: 'summarize-nodes',
             tags: ['knowledge-graph', 'node.summary'],
+            validate: buildNodeSummaryValidator({ nodes: batch }),
           },
         );
         for (const s of summaryResult.summaries) {
-          summaryMap.set(normalizeStringForKey(s.name), s.summary);
+          summaryMap.set(s.name, s.summary);
         }
       }
     }
 
     for (const node of nodes) {
-      const summary = summaryMap.get(normalizeStringForKey(node.name));
+      const summary = summaryMap.get(node.name);
       if (summary !== undefined) node.summary = summary;
     }
-
     return {
       metrics: {
         'nodes.count': nodes.length,

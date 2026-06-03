@@ -67,9 +67,7 @@ describe('invokeStructured', () => {
       { runName?: string; tags?: string[] },
     ];
     expect(secondMessages).toHaveLength(baseMessages.length + 1);
-    const feedback = secondMessages[secondMessages.length - 1];
-    expect(feedback).toBeInstanceOf(HumanMessage);
-    expect(feedback.content).toContain('validAt');
+    expect(secondMessages[secondMessages.length - 1]).toBeInstanceOf(HumanMessage);
     expect(secondConfig.runName).toBe('extract-test.retry-1');
     expect(secondConfig.tags).toEqual(['test', 'retry']);
   });
@@ -95,9 +93,11 @@ describe('invokeStructured', () => {
 
     const err = caught as StructuredOutputValidationError;
     expect(err.runName).toBe('extract-test');
-    expect(err.zodError).toBeInstanceOf(z.ZodError);
-    expect((err as unknown as Record<string, unknown>).raw).toBeUndefined();
+    expect(err.issues.length).toBeGreaterThan(0);
     expect(err.message).not.toContain('Alice works at Acme');
+    // issues are structural `path: zod-code`, never the raw value `never`.
+    expect(err.issues.every((s) => !s.includes('never'))).toBe(true);
+    expect(err.issues.some((s) => s.startsWith('validAt:'))).toBe(true);
   });
 
   it('does not retry when maxRetries=1', async () => {
@@ -113,6 +113,108 @@ describe('invokeStructured', () => {
       }),
     ).rejects.toBeInstanceOf(StructuredOutputValidationError);
 
+    expect(mockRunnable.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries with appended HumanMessage on invariant violation, then succeeds', async () => {
+    mockRunnable.invoke
+      .mockResolvedValueOnce({ fact: 'wrong', validAt: '2025-04-30T00:00:00Z' })
+      .mockResolvedValueOnce({ fact: 'right', validAt: '2025-04-30T00:00:00Z' });
+
+    const validate = jest
+      .fn()
+      .mockReturnValueOnce([{ code: 'fact.wrong', message: 'fact must be "right"' }])
+      .mockReturnValueOnce([]);
+
+    const result = await invokeStructured(mockModel, EdgeSchema, baseMessages, {
+      runName: 'extract-test',
+      validate,
+    });
+
+    expect(result.fact).toBe('right');
+    expect(mockRunnable.invoke).toHaveBeenCalledTimes(2);
+    expect(validate).toHaveBeenCalledTimes(2);
+
+    const [secondMessages] = mockRunnable.invoke.mock.calls[1] as [
+      Array<HumanMessage | SystemMessage>,
+    ];
+    expect(secondMessages).toHaveLength(baseMessages.length + 1);
+    expect(secondMessages[secondMessages.length - 1]).toBeInstanceOf(HumanMessage);
+  });
+
+  it('throws StructuredOutputValidationError after exhausting attempts on persistent violations', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      fact: 'wrong',
+      validAt: '2025-04-30T00:00:00Z',
+    });
+    const validate = jest
+      .fn()
+      .mockReturnValue([{ code: 'fact.wrong', message: 'fact must be "right"' }]);
+
+    let caught: unknown;
+    try {
+      await invokeStructured(mockModel, EdgeSchema, baseMessages, {
+        runName: 'extract-test',
+        maxRetries: 2,
+        validate,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(StructuredOutputValidationError);
+    expect(mockRunnable.invoke).toHaveBeenCalledTimes(2);
+    const err = caught as StructuredOutputValidationError;
+    expect(err.runName).toBe('extract-test');
+    expect(err.issues.length).toBeGreaterThan(0);
+  });
+
+  it('feeds verbose message to LLM retry but keeps structural code in error', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      fact: 'wrong',
+      validAt: '2025-04-30T00:00:00Z',
+    });
+    const validate = jest.fn().mockReturnValue([
+      {
+        code: 'fact.unknown-entity',
+        message: 'name "Alice Smith" is not in the input ENTITIES set',
+      },
+    ]);
+
+    let caught: unknown;
+    try {
+      await invokeStructured(mockModel, EdgeSchema, baseMessages, {
+        runName: 'extract-test',
+        maxRetries: 2,
+        validate,
+      });
+    } catch (e) {
+      caught = e;
+    }
+
+    const [retryMessages] = mockRunnable.invoke.mock.calls[1] as [
+      Array<HumanMessage | SystemMessage>,
+    ];
+    const retryFeedback = retryMessages[retryMessages.length - 1] as HumanMessage;
+    const retryContent = retryFeedback.content as string;
+    expect(retryContent).toContain('Alice Smith');
+
+    const err = caught as StructuredOutputValidationError;
+    expect(err.issues).toEqual(['fact.unknown-entity']);
+    expect(err.message).not.toContain('Alice Smith');
+  });
+
+  it('skips validate when not provided', async () => {
+    mockRunnable.invoke.mockResolvedValue({
+      fact: 'anything',
+      validAt: '2025-04-30T00:00:00Z',
+    });
+
+    const result = await invokeStructured(mockModel, EdgeSchema, baseMessages, {
+      runName: 'extract-test',
+    });
+
+    expect(result.fact).toBe('anything');
     expect(mockRunnable.invoke).toHaveBeenCalledTimes(1);
   });
 

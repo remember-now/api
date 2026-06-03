@@ -19,7 +19,9 @@ import { invokeStructured } from '../llm';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
   buildExtractEdgesMessages,
+  buildExtractEdgesValidator,
   buildExtractTimestampsMessages,
+  buildExtractTimestampsValidator,
   buildFillEdgeAttributesMessages,
   EdgeTimestampsSchema,
   ExtractedEdgesSchema,
@@ -68,10 +70,6 @@ export class EdgeExtractionService {
     edgeTypeMappings?: EdgeTypeMappings,
     ctx?: LlmContext,
   ): Promise<{ edges: EntityEdge[]; metrics: SpanMetrics }> {
-    const nameToNode = new Map<string, EntityNode>(
-      nodes.map((n) => [n.name.toLowerCase(), n]),
-    );
-
     const messages = buildExtractEdgesMessages({
       episode,
       nodes,
@@ -85,28 +83,21 @@ export class EdgeExtractionService {
       callbacks: this.llmTracer.getCallbacks(ctx),
       runName: 'extract-edges',
       tags: ['knowledge-graph', 'extraction.edge'],
+      validate: buildExtractEdgesValidator({ nodes }),
     });
 
-    const edges = result.edges
-      .filter((e) => {
-        const hasSource = nameToNode.has(e.sourceEntityName.toLowerCase());
-        const hasTarget = nameToNode.has(e.targetEntityName.toLowerCase());
-        return hasSource && hasTarget;
-      })
-      .map((e) => {
-        const sourceNode = nameToNode.get(e.sourceEntityName.toLowerCase())!;
-        const targetNode = nameToNode.get(e.targetEntityName.toLowerCase())!;
-        return createEntityEdge({
-          name: e.relationType,
-          fact: e.fact,
-          graphId: episode.graphId,
-          sourceNodeId: sourceNode.id,
-          targetNodeId: targetNode.id,
-          episodes: [episode.id],
-          validAt: e.validAt ? new Date(e.validAt) : null,
-          invalidAt: e.invalidAt ? new Date(e.invalidAt) : null,
-        });
-      });
+    const edges = result.edges.map((e) =>
+      createEntityEdge({
+        name: e.relationType,
+        fact: e.fact,
+        graphId: episode.graphId,
+        sourceNodeId: nodes[e.sourceEntityIdx].id,
+        targetNodeId: nodes[e.targetEntityIdx].id,
+        episodes: [episode.id],
+        validAt: e.validAt ? new Date(e.validAt) : null,
+        invalidAt: e.invalidAt ? new Date(e.invalidAt) : null,
+      }),
+    );
 
     return {
       edges,
@@ -114,8 +105,6 @@ export class EdgeExtractionService {
         'episode.id': episode.id,
         'nodes.input.count': nodes.length,
         'edgeTypes.count': edgeTypes ? Object.keys(edgeTypes).length : 0,
-        'edges.llm_returned.count': result.edges.length,
-        'edges.dropped.count': result.edges.length - edges.length,
         'edges.extracted.count': edges.length,
       },
     };
@@ -245,6 +234,7 @@ export class EdgeExtractionService {
             callbacks: this.llmTracer.getCallbacks(ctx),
             runName: 'extract-edge-timestamps-fallback',
             tags: ['knowledge-graph', 'timestamps.edge.fallback'],
+            validate: buildExtractTimestampsValidator(),
           },
         );
 

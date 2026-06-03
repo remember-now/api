@@ -42,8 +42,8 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
@@ -70,8 +70,8 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
           validAt: '2024-01-01T00:00:00.000Z',
@@ -96,8 +96,8 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
@@ -116,98 +116,46 @@ describe('EdgeExtractionService', () => {
     expect(edges[0].invalidAt).toBeNull();
   });
 
-  it('should filter edges with unrecognized source names', async () => {
+  it('should reject edges with out-of-range source idx via the validator', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Unknown Person',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 99,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Someone works at Acme.',
         },
-        {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
-          relationType: 'WORKS_AT',
-          fact: 'Alice works at Acme Corp.',
-        },
       ],
     });
 
-    const edges = await service.extractEdges(
-      mockModel,
-      baseEpisode,
-      nodes,
-      [],
-      KG_REFERENCE_TIME,
-    );
-
-    expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeId).toBe(aliceNode.id);
+    await expect(
+      service.extractEdges(mockModel, baseEpisode, nodes, [], KG_REFERENCE_TIME),
+    ).rejects.toThrow();
   });
 
-  it('should filter edges with unrecognized target names', async () => {
+  it('should reject edges with out-of-range target idx via the validator', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Unknown Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 99,
           relationType: 'WORKS_AT',
           fact: 'Alice works somewhere.',
         },
-        {
-          sourceEntityName: 'Bob',
-          targetEntityName: 'Acme Corp',
-          relationType: 'CEO_OF',
-          fact: 'Bob is the CEO of Acme Corp.',
-        },
       ],
     });
 
-    const edges = await service.extractEdges(
-      mockModel,
-      baseEpisode,
-      nodes,
-      [],
-      KG_REFERENCE_TIME,
-    );
-
-    expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeId).toBe(bobNode.id);
-    expect(edges[0].targetNodeId).toBe(acmeNode.id);
-  });
-
-  it('should be case-insensitive for name matching', async () => {
-    mockRunnable.invoke.mockResolvedValue({
-      edges: [
-        {
-          sourceEntityName: 'alice',
-          targetEntityName: 'acme corp',
-          relationType: 'WORKS_AT',
-          fact: 'Alice works at Acme Corp.',
-        },
-      ],
-    });
-
-    const edges = await service.extractEdges(
-      mockModel,
-      baseEpisode,
-      nodes,
-      [],
-      KG_REFERENCE_TIME,
-    );
-
-    expect(edges).toHaveLength(1);
-    expect(edges[0].sourceNodeId).toBe(aliceNode.id);
-    expect(edges[0].targetNodeId).toBe(acmeNode.id);
+    await expect(
+      service.extractEdges(mockModel, baseEpisode, nodes, [], KG_REFERENCE_TIME),
+    ).rejects.toThrow();
   });
 
   it('should set episodes to [episode.id] on each extracted edge', async () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
@@ -243,14 +191,14 @@ describe('EdgeExtractionService', () => {
     mockRunnable.invoke.mockResolvedValue({
       edges: [
         {
-          sourceEntityName: 'Alice',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 0,
+          targetEntityIdx: 2,
           relationType: 'WORKS_AT',
           fact: 'Alice works at Acme Corp.',
         },
         {
-          sourceEntityName: 'Bob',
-          targetEntityName: 'Acme Corp',
+          sourceEntityIdx: 1,
+          targetEntityIdx: 2,
           relationType: 'CEO_OF',
           fact: 'Bob is CEO of Acme Corp.',
         },

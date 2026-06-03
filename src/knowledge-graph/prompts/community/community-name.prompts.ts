@@ -1,13 +1,14 @@
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
+import { NodeNameSchema } from '@/knowledge-graph/types';
+
 // Schema
 
 export const CommunityNameSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .describe('Short noun-phrase label (2-6 words) identifying the community'),
+  name: NodeNameSchema.describe(
+    'Short noun-phrase label (2-6 words) identifying the community',
+  ),
 });
 
 export type CommunityNameOutput = z.infer<typeof CommunityNameSchema>;
