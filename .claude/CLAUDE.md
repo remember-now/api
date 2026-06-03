@@ -1,10 +1,12 @@
-# RememberNow API
+# Hoard API
 
-RememberNow is an automatically managed, graph-enabled, time-aware knowledge bank.
+Hoard is an automatically managed, graph-enabled, time-aware knowledge bank:
+a provider-agnostic memory layer that any AI agent can plug into. RememberNow
+is one consumer of Hoard.
 
-The point is to allow users to dump any amount of information into the app,
-and it will embed it into the graph, reminding people of things when necessary
-(e.g. appointments).
+The point is to allow users (or agents) to dump any amount of information into
+Hoard, and it will embed it into the graph, reminding people of things when
+necessary (e.g. appointments).
 
 This is a GraphRAG application, the core of which is in `src/knowledge-graph`.
 

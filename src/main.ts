@@ -39,7 +39,7 @@ async function bootstrap() {
   logger.log(`CORS set up for origin: ${appConfig.frontendUrl}`);
 
   const config = new DocumentBuilder()
-    .setTitle('RememberNow API')
+    .setTitle('Hoard API')
     .setDescription('Epic memory augmentation app!')
     .setVersion('1.0')
     .setOpenAPIVersion('3.1.0')

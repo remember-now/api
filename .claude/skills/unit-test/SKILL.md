@@ -1,6 +1,6 @@
 ---
 name: unit-test
-description: Testing knowledge base for the RememberNow API. Invoke when writing unit or e2e tests.
+description: Testing knowledge base for the Hoard API. Invoke when writing unit or e2e tests.
 ---
 
 Please note that you should still read test files when implementing tests.
@@ -141,10 +141,7 @@ await h.logoutUser(sessionKey);
 await spec().post(`${s.baseUrl}/auth/signup`).withBody(data).expectStatus(201);
 
 // Authenticated (session cookie injected via pactum store)
-await h
-  .authenticatedRequest(sessionKey)
-  .get(`${s.baseUrl}/users/me`)
-  .expectStatus(200);
+await h.authenticatedRequest(sessionKey).get(`${s.baseUrl}/users/me`).expectStatus(200);
 ```
 
 **Custom expect handlers** (defined in `TestAssertions.initializeHandlers()`):

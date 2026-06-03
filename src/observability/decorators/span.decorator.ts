@@ -13,7 +13,7 @@ import { isLangfuseEnabled } from '../langfuse-state';
 import type { ExtendedSpanOptions, ObservationKind } from '../types';
 import { safeStringify } from './serialize';
 
-const TRACER_NAME = 'remember-now';
+const TRACER_NAME = 'hoard';
 
 const OBSERVATION_TYPE_ATTR = 'langfuse.observation.type';
 const OBSERVATION_INPUT_ATTR = 'langfuse.observation.input';

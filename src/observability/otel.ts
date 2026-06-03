@@ -15,16 +15,16 @@ import { parseOtelConfig } from '@/config/otel';
 
 import { setLangfuseEnabled } from './langfuse-state';
 
-const REMEMBER_NOW_SCOPE = 'remember-now';
+const HOARD_SCOPE = 'hoard';
 const PRISMA_SCOPE = 'prisma';
 const OBSERVATION_LEVEL_ATTR = 'langfuse.observation.level';
 
 /**
- * Ref-counts in-flight `remember-now` spans per trace id so `shouldExportSpan`
- * can gate Prisma spans on remember-now-rooted traces, and tags Prisma spans
+ * Ref-counts in-flight `hoard` spans per trace id so `shouldExportSpan`
+ * can gate Prisma spans on hoard-rooted traces, and tags Prisma spans
  * with `level=DEBUG` so Langfuse hides them behind the DEBUG filter.
  */
-class RememberNowTraceTracker implements SpanProcessor {
+class HoardTraceTracker implements SpanProcessor {
   private readonly counts = new Map<string, number>();
 
   has(traceId: string): boolean {
@@ -37,13 +37,13 @@ class RememberNowTraceTracker implements SpanProcessor {
       span.setAttribute(OBSERVATION_LEVEL_ATTR, 'DEBUG');
       return;
     }
-    if (scope !== REMEMBER_NOW_SCOPE) return;
+    if (scope !== HOARD_SCOPE) return;
     const traceId = span.spanContext().traceId;
     this.counts.set(traceId, (this.counts.get(traceId) ?? 0) + 1);
   }
 
   onEnd(span: ReadableSpan): void {
-    if (span.instrumentationScope.name !== REMEMBER_NOW_SCOPE) return;
+    if (span.instrumentationScope.name !== HOARD_SCOPE) return;
     const traceId = span.spanContext().traceId;
     const next = (this.counts.get(traceId) ?? 0) - 1;
     if (next <= 0) this.counts.delete(traceId);
@@ -100,7 +100,7 @@ export function startOtel(): { shutdown: () => Promise<void> } {
 
   if (langfuseConfig.enabled) {
     setLangfuseEnabled(true);
-    const traceTracker = new RememberNowTraceTracker();
+    const traceTracker = new HoardTraceTracker();
     processors.push(traceTracker);
 
     processors.push(
@@ -113,13 +113,13 @@ export function startOtel(): { shutdown: () => Promise<void> } {
         exportMode: 'batched',
         // Default filter keeps only LLM-focused spans (langfuse-sdk scope,
         // gen_ai.* attrs, known LLM instrumentation). Also let through our
-        // own `remember-now` scope so manually-traced pipeline spans appear
+        // own `hoard` scope so manually-traced pipeline spans appear
         // as parents of the LangChain generations, plus Prisma spans whose
-        // trace originated from a `remember-now` span
+        // trace originated from a `hoard` span
         shouldExportSpan: ({ otelSpan }) => {
           const scope = otelSpan.instrumentationScope.name;
           if (isDefaultExportSpan(otelSpan)) return true;
-          if (scope === REMEMBER_NOW_SCOPE) return true;
+          if (scope === HOARD_SCOPE) return true;
           if (scope === PRISMA_SCOPE) {
             return traceTracker.has(otelSpan.spanContext().traceId);
           }
@@ -136,7 +136,7 @@ export function startOtel(): { shutdown: () => Promise<void> } {
   }
 
   const sdk = new NodeSDK({
-    serviceName: 'remember-now-api',
+    serviceName: 'hoard-api',
     spanProcessors: processors,
     instrumentations: [
       getNodeAutoInstrumentations({

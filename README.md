@@ -1,6 +1,6 @@
-# RememberNow API
+# Hoard API
 
-NestJS backend for RememberNow - an automatically managed, graph-enabled, time-aware knowledge bank.
+NestJS backend for Hoard - a provider-agnostic, graph-enabled, time-aware memory layer that any AI agent can plug into. RememberNow is one consumer of Hoard.
 
 ## Project setup
 
@@ -169,7 +169,7 @@ The knowledge graph pipeline in this project is a modified TypeScript port of [G
 - I need to implement a Graph Versioning system to prevent data loss due to agent misbehavior, which is impossible without direct code access.
 - Graphiti couples tightly to specific providers. This port integrates with [LangChain](https://js.langchain.com/) so any supported model can be swapped in without changing pipeline code.
 - Graphiti maintains provider abstractions for its graph layer. Managed to make Graphiti work with just Postgres ([pgvector](https://github.com/pgvector/pgvector) + [pgvectorscale](https://github.com/timescale/pgvectorscale) for ANN search), so those abstractions are unnecessary and removing them adds room for enhancements.
-- RememberNow is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
+- Hoard is privacy-focused software. Depending on upstream code that cannot be audited, patched, or controlled introduces risk.
 
 Approximate nearest-neighbor vector search is powered by [pgvectorscale](https://github.com/timescale/pgvectorscale) (PostgreSQL License) from Tiger Data, layered on top of [pgvector](https://github.com/pgvector/pgvector). The knowledge-graph migration enables the `vectorscale` extension and builds StreamingDiskANN indexes (with SBQ compression and label-based filtering) over the knowledge graph's vector embeddings - see `prisma/migrations/20260517000000_knowledge_graph/migration.sql`.
 
@@ -177,4 +177,4 @@ The `@Span` and `@Traceable` decorators in `src/observability/decorators/` (and 
 
 ## License
 
-RememberNow is licensed under [Apache-2.0](https://github.com/remember-now/api/blob/main/LICENSE).
+Hoard is licensed under [Apache-2.0](https://github.com/hoard-ai/hoard/blob/main/LICENSE).

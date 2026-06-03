@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Debugging knowledge basis for the RememberNow codebase. Invoke when you encounter a non-trivial error during development.
+description: Debugging knowledge basis for the Hoard codebase. Invoke when you encounter a non-trivial error during development.
 ---
 
 Before running `npm run start:dev`, bring up the development infrastructure:
@@ -32,10 +32,10 @@ and runs with different ports due to a separate `.env.test` file.
     "infra:dev:start": "docker compose --profile observability start postgres redis clickhouse minio langfuse-web langfuse-worker",
     "infra:dev:rm": "docker compose --profile observability down -v",
     "infra:dev:reset": "npm run infra:dev:rm && npm run infra:dev:up && npm run prisma:dev:deploy",
-    "infra:test:up": "dotenv -e .env.test -- docker compose -p remember-now-test -f docker-compose.yml -f docker-compose.test.yml up --wait postgres redis -d",
-    "infra:test:stop": "docker compose -p remember-now-test -f docker-compose.yml -f docker-compose.test.yml stop postgres redis",
-    "infra:test:start": "docker compose -p remember-now-test -f docker-compose.yml -f docker-compose.test.yml start postgres redis",
-    "infra:test:rm": "docker compose -p remember-now-test -f docker-compose.yml -f docker-compose.test.yml down postgres redis -v",
+    "infra:test:up": "dotenv -e .env.test -- docker compose -p hoard-test -f docker-compose.yml -f docker-compose.test.yml up --wait postgres redis -d",
+    "infra:test:stop": "docker compose -p hoard-test -f docker-compose.yml -f docker-compose.test.yml stop postgres redis",
+    "infra:test:start": "docker compose -p hoard-test -f docker-compose.yml -f docker-compose.test.yml start postgres redis",
+    "infra:test:rm": "docker compose -p hoard-test -f docker-compose.yml -f docker-compose.test.yml down postgres redis -v",
     "infra:test:reset": "npm run infra:test:rm && npm run infra:test:up && npm run prisma:test:deploy",
     "build": "nest build",
     "generate": "nest generate",
