@@ -4,11 +4,13 @@ import { Prisma } from '@generated/prisma/client';
 
 import { Uuid } from '@/common/schemas';
 import { Community } from '@/knowledge-graph/models';
+import { FTS_NORM_NONE } from '@/knowledge-graph/search/types';
 import { Span } from '@/observability';
 import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
 import { NodeName, SearchBySimilarityParams, SearchByTextParams } from '../../types';
 import { fromPgVector, toPgVector } from '../pgvector-utils';
+import { websearchTsquery } from '../sql-filter-builders';
 
 type RawRow = {
   id: string;
@@ -208,16 +210,16 @@ export class CommunityRepository {
   async searchByName(params: SearchByTextParams): Promise<Community[]> {
     const { query, graphIds, limit } = params;
     if (graphIds.length === 0) return [];
-    const tsquery = Prisma.sql`plainto_tsquery('english', ${query})`;
+    const tsquery = websearchTsquery(query);
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
       SELECT c.id, c.graph_id, c.name, c.summary,
              c.name_embedding::text AS name_embedding,
              c.member_ids, c.created_at, c.updated_at,
-             ts_rank(to_tsvector('english', c.name || ' ' || c.summary), ${tsquery}) AS score
+             ts_rank_cd(c.fts_vector, ${tsquery}, ${FTS_NORM_NONE}) AS score
       FROM communities c
       WHERE c.graph_id = ANY(${graphIds}::uuid[])
-        AND to_tsvector('english', c.name || ' ' || c.summary) @@ ${tsquery}
+        AND c.fts_vector @@ ${tsquery}
       ORDER BY score DESC
       LIMIT ${limit}
     `;

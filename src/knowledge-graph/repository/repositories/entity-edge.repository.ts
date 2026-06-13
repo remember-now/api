@@ -4,7 +4,11 @@ import { Prisma } from '@generated/prisma/client';
 
 import { Uuid } from '@/common/schemas';
 import { EntityEdge } from '@/knowledge-graph/models';
-import { MAX_SEARCH_DEPTH, SearchFilters } from '@/knowledge-graph/search/types';
+import {
+  FTS_NORM_NONE,
+  MAX_SEARCH_DEPTH,
+  SearchFilters,
+} from '@/knowledge-graph/search/types';
 import { Span } from '@/observability';
 import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
@@ -16,7 +20,7 @@ import {
 } from '../../types';
 import { buildBfsCte } from '../bfs-cte';
 import { fromPgVector, toPgVector } from '../pgvector-utils';
-import { buildEdgeFilterClause } from '../sql-filter-builders';
+import { buildEdgeFilterClause, websearchTsquery } from '../sql-filter-builders';
 
 type RawRow = {
   id: string;
@@ -174,15 +178,16 @@ export class EntityEdgeRepository {
   async searchByFact(params: SearchByTextParams): Promise<EntityEdge[]> {
     const { query, graphIds, limit } = params;
     if (graphIds.length === 0) return [];
-    const tsquery = Prisma.sql`plainto_tsquery('english', ${query})`;
+    const tsquery = websearchTsquery(query);
+
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
       SELECT e.id, e.graph_id, e.source_id, e.target_id, e.name, e.fact,
              e.fact_embedding::text AS fact_embedding, e.attributes, e.episodes,
              e.valid_at, e.invalid_at, e.expired_at, e.created_at,
-             ts_rank(to_tsvector('english', e.name || ' ' || e.fact), ${tsquery}) AS score
+             ts_rank_cd(e.fts_vector, ${tsquery}, ${FTS_NORM_NONE}) AS score
       FROM entity_edges e
       WHERE e.graph_id = ANY(${graphIds}::uuid[])
-        AND to_tsvector('english', e.name || ' ' || e.fact) @@ ${tsquery}
+        AND e.fts_vector @@ ${tsquery}
       ORDER BY score DESC
       LIMIT ${limit}
     `;

@@ -1,4 +1,4 @@
-import { EpisodicNode } from '../models';
+import type { EpisodicNode } from '../models';
 
 export const MAX_SUMMARY_CHARS = 1000;
 

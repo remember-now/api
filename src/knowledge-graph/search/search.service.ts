@@ -31,27 +31,38 @@ import {
   mmr,
   nodeDistanceReranker,
   rrf,
+  weightedRrf,
 } from './search-utils';
 import {
+  AGENTIC_CANDIDATE_LIMIT,
+  AgenticSearchResults,
   CommunityReranker,
   CommunitySearchConfig,
   CommunitySearchMethod,
+  DEFAULT_MIN_SCORE,
   EdgeReranker,
   EdgeSearchConfig,
   EdgeSearchMethod,
+  emptyAgenticResults,
   emptySearchResults,
   EpisodeReranker,
   EpisodeSearchConfig,
   EpisodeSearchMethod,
+  ExpandedQuery,
   NodeReranker,
   NodeSearchConfig,
   NodeSearchMethod,
+  PREFETCH_BFS_DEPTH,
+  PREFETCH_CANDIDATES,
+  PREFETCH_LIMIT,
+  RRF_ORIGINAL_WEIGHT,
   SearchConfigInput,
   SearchFilters,
   SearchOptions,
   SearchOptionsInput,
   SearchOptionsSchema,
   SearchResults,
+  SubQueryType,
 } from './types';
 
 @Injectable()
@@ -89,6 +100,274 @@ export class SearchService {
     const { metrics: _m, ...rest } = await this.searchImpl(options);
     return rest;
   }
+
+  // =============== TODO: QMD STYLE FUNCTIONS ====================================
+  // Must evaluate these in order to derive some sort of superior hybrid
+  // with graph-native Graphiti search. Need eval set first in order to do that. Delaying until then.
+  // The agent should be able to traverse the graph.
+
+  // ─── Pre-fetch (vector + one BFS hop) ─────────────────────────────────────────
+  // Mode A: automatic, runs on every user message. Vector carries NL recall; one
+  // BFS hop pulls in connected facts the vector pass missed. No FTS, no rerank.
+
+  @Span('search.prefetch', { observationKind: 'retriever' })
+  async prefetch(params: {
+    query: string;
+    graphIds: Uuid[];
+    filters?: SearchFilters;
+  }): Promise<SearchResults> {
+    const { query, graphIds, filters } = params;
+    if (!query.trim() || graphIds.length === 0) return emptySearchResults();
+
+    const embedding = await this.embeddingService.embedText(query);
+    if (!embedding) return emptySearchResults();
+
+    const simParams = (limit: number) =>
+      SearchBySimilarityParamsSchema.parse({
+        embedding,
+        graphIds,
+        limit,
+        minScore: DEFAULT_MIN_SCORE,
+      });
+
+    // Pass 1: vector over nodes + edges.
+    const [vecNodes, vecEdges] = await Promise.all([
+      this.entityNodeRepository.searchBySimilarity(
+        simParams(PREFETCH_CANDIDATES),
+        filters,
+      ),
+      this.entityEdgeRepository.searchBySimilarity(
+        simParams(PREFETCH_CANDIDATES),
+        filters,
+      ),
+    ]);
+
+    const nodeMap = new Map<Uuid, EntityNode>(vecNodes.map((n) => [n.id, n]));
+    const edgeMap = new Map<Uuid, EntityEdge>(vecEdges.map((e) => [e.id, e]));
+
+    // Pass 2: one BFS hop seeded from the vector hits (nodes + edge endpoints).
+    const seedNodeIds = [
+      ...new Set<Uuid>([
+        ...vecNodes.map((n) => n.id),
+        ...vecEdges.flatMap((e) => [e.sourceNodeId, e.targetNodeId]),
+      ]),
+    ];
+
+    let bfsNodeIds: Uuid[] = [];
+    let bfsEdgeIds: Uuid[] = [];
+    if (seedNodeIds.length > 0) {
+      const bfsParams = SearchByBfsParamsSchema.parse({
+        originNodeIds: seedNodeIds,
+        graphIds,
+        limit: PREFETCH_CANDIDATES,
+        maxDepth: PREFETCH_BFS_DEPTH,
+      });
+      const [bfsNodes, bfsEdges] = await Promise.all([
+        this.entityNodeRepository.searchByBfs(bfsParams, filters),
+        this.entityEdgeRepository.searchByBfs(bfsParams, filters),
+      ]);
+      for (const n of bfsNodes) nodeMap.set(n.id, n);
+      for (const e of bfsEdges) edgeMap.set(e.id, e);
+      bfsNodeIds = bfsNodes.map((n) => n.id);
+      bfsEdgeIds = bfsEdges.map((e) => e.id);
+    }
+
+    // Fuse vector + BFS per entity type (single query → no original weighting).
+    const [nodeIds, nodeScores] = weightedRrf(
+      [vecNodes.map((n) => n.id), bfsNodeIds].filter((l) => l.length > 0),
+    );
+    const [edgeIds, edgeScores] = weightedRrf(
+      [vecEdges.map((e) => e.id), bfsEdgeIds].filter((l) => l.length > 0),
+    );
+
+    const nodeScoreById = new Map(nodeIds.map((id, i) => [id, nodeScores[i]]));
+    const edgeScoreById = new Map(edgeIds.map((id, i) => [id, edgeScores[i]]));
+
+    const topNodes = nodeIds
+      .slice(0, PREFETCH_LIMIT)
+      .map((id) => nodeMap.get(id))
+      .filter((n): n is EntityNode => n !== undefined);
+    const topEdges = edgeIds
+      .slice(0, PREFETCH_LIMIT)
+      .map((id) => edgeMap.get(id))
+      .filter((e): e is EntityEdge => e !== undefined);
+
+    return {
+      edges: topEdges,
+      edgeScores: new Map(topEdges.map((e) => [e.id, edgeScoreById.get(e.id) ?? 0])),
+      nodes: topNodes,
+      nodeScores: new Map(topNodes.map((n) => [n.id, nodeScoreById.get(n.id) ?? 0])),
+      episodes: [],
+      episodeScores: new Map(),
+      communities: [],
+      communityScores: new Map(),
+    };
+  }
+
+  // ─── Agentic search (typed multi-query, no cross-encoder) ─────────────────────
+  // Mode B: on-demand tool. The agent authors typed lex/vec/hyde sub-queries;
+  // they fan out, fuse via weighted RRF, and return ranked candidates for the
+  // agent to read and rerank. No cross-encoder.
+
+  @Span('search.expanded', { observationKind: 'retriever' })
+  async searchExpanded(params: {
+    queries: ExpandedQuery[];
+    originalQuery: string;
+    limit: number;
+    graphIds: Uuid[];
+    filters?: SearchFilters;
+  }): Promise<AgenticSearchResults> {
+    const { queries, originalQuery, limit, graphIds, filters } = params;
+    if (graphIds.length === 0) return emptyAgenticResults();
+
+    const edgeMap = new Map<Uuid, EntityEdge>();
+    const nodeMap = new Map<Uuid, EntityNode>();
+    const episodeMap = new Map<Uuid, EpisodicNode>();
+    const rankedLists: Uuid[][] = [];
+    const weights: number[] = [];
+
+    const pushList = (ids: Uuid[], weight: number) => {
+      if (ids.length > 0) {
+        rankedLists.push(ids);
+        weights.push(weight);
+      }
+    };
+
+    // lex sub-query → edge + node + episode ranked lists.
+    const runLex = async (text: string, weight: number) => {
+      const [edges, nodes, episodes] = await Promise.all([
+        this.entityEdgeRepository.searchByFact(
+          SearchByTextParamsSchema.parse({
+            query: text,
+            graphIds,
+            limit: AGENTIC_CANDIDATE_LIMIT,
+          }),
+        ),
+        this.entityNodeRepository.searchByName(
+          SearchByTextParamsSchema.parse({
+            query: text,
+            graphIds,
+            limit: AGENTIC_CANDIDATE_LIMIT,
+          }),
+          filters,
+        ),
+        this.episodicNodeRepository.searchByContent(
+          SearchByTextParamsSchema.parse({
+            query: text,
+            graphIds,
+            limit: AGENTIC_CANDIDATE_LIMIT,
+          }),
+        ),
+      ]);
+      for (const e of edges) edgeMap.set(e.id, e);
+      for (const n of nodes) nodeMap.set(n.id, n);
+      for (const ep of episodes) episodeMap.set(ep.id, ep);
+      pushList(
+        edges.map((e) => e.id),
+        weight,
+      );
+      pushList(
+        nodes.map((n) => n.id),
+        weight,
+      );
+      pushList(
+        episodes.map((ep) => ep.id),
+        weight,
+      );
+    };
+
+    // vec/hyde sub-query → edge + node ranked lists (episodes have no embedding).
+    const runVec = async (embedding: number[], weight: number) => {
+      const simParams = SearchBySimilarityParamsSchema.parse({
+        embedding,
+        graphIds,
+        limit: AGENTIC_CANDIDATE_LIMIT,
+        minScore: 0,
+      });
+      const [edges, nodes] = await Promise.all([
+        this.entityEdgeRepository.searchBySimilarity(simParams, filters),
+        this.entityNodeRepository.searchBySimilarity(simParams, filters),
+      ]);
+      for (const e of edges) edgeMap.set(e.id, e);
+      for (const n of nodes) nodeMap.set(n.id, n);
+      pushList(
+        edges.map((e) => e.id),
+        weight,
+      );
+      pushList(
+        nodes.map((n) => n.id),
+        weight,
+      );
+    };
+
+    // Embed the semantic texts (original + vec/hyde sub-queries) up front.
+    const semanticTexts = [
+      originalQuery,
+      ...queries.filter((q) => q.type !== SubQueryType.lex).map((q) => q.text),
+    ];
+    const embeddings = await Promise.all(
+      semanticTexts.map((t) => this.embeddingService.embedText(t)),
+    );
+    const embeddingByText = new Map<string, number[]>();
+    semanticTexts.forEach((t, i) => {
+      const e = embeddings[i];
+      if (e) embeddingByText.set(t, e);
+    });
+
+    const tasks: Promise<void>[] = [];
+    // Original query, double-weighted, as both lex and vec.
+    tasks.push(runLex(originalQuery, RRF_ORIGINAL_WEIGHT));
+    const origEmbedding = embeddingByText.get(originalQuery);
+    if (origEmbedding) tasks.push(runVec(origEmbedding, RRF_ORIGINAL_WEIGHT));
+    // Agent-authored sub-queries.
+    for (const q of queries) {
+      if (q.type === SubQueryType.lex) {
+        tasks.push(runLex(q.text, 1));
+      } else {
+        const emb = embeddingByText.get(q.text);
+        if (emb) tasks.push(runVec(emb, 1));
+      }
+    }
+    await Promise.all(tasks);
+
+    const [fusedIds, fusedScores] = weightedRrf(rankedLists, weights);
+    const scoreById = new Map(fusedIds.map((id, i) => [id, fusedScores[i]]));
+    const topIds = fusedIds.slice(0, limit);
+
+    const edges: EntityEdge[] = [];
+    const nodes: EntityNode[] = [];
+    const episodes: EpisodicNode[] = [];
+
+    for (const id of topIds) {
+      const edge = edgeMap.get(id);
+      if (edge) {
+        edges.push(edge);
+        continue;
+      }
+      const node = nodeMap.get(id);
+      if (node) {
+        nodes.push(node);
+        continue;
+      }
+      const episode = episodeMap.get(id);
+      if (episode) episodes.push(episode);
+    }
+    const episodeSnippets = episodes.length
+      ? await this.episodicNodeRepository.searchSnippets(
+          episodes.map((e) => e.id),
+          originalQuery,
+        )
+      : new Map<Uuid, string>();
+
+    return {
+      edges,
+      nodes,
+      episodes,
+      scores: new Map(topIds.map((id) => [id, scoreById.get(id) ?? 0])),
+      episodeSnippets,
+    };
+  }
+  // =============== TODO: QMD STYLE FUNCTIONS END ================================
 
   @Span('search', { onResult: metricsOnResult })
   private async searchImpl(

@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
 import { Uuid } from '@/common/schemas';
+import { invokeStructured } from '@/llm';
 import {
   LLM_TRACER,
   type LlmContext,
@@ -15,7 +16,6 @@ import {
 import { LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
 import { getApplicableEdgeTypes } from '../episode/episode-utils';
 import { EdgeTypeMap, EdgeTypeMappings } from '../episode/types';
-import { invokeStructured } from '../llm';
 import { createEntityEdge, EntityEdge, EntityNode, EpisodicNode } from '../models';
 import {
   buildExtractEdgesMessages,

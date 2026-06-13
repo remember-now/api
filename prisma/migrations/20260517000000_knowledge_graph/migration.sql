@@ -140,6 +140,61 @@ CREATE TRIGGER entity_edges_set_graph_diskann_bucket
   BEFORE INSERT OR UPDATE OF graph_id ON entity_edges
   FOR EACH ROW EXECUTE FUNCTION set_graph_diskann_bucket();
 
+-- ─── fts_vector columns + triggers (full-text search) ──────────────────────────
+-- Trigger-populated (not GENERATED ALWAYS AS … STORED) for the same reason as
+-- graph_diskann_bucket: Prisma's diff engine misreads a generation clause as a
+-- column default and proposes DROP DEFAULT on every migrate dev. setweight ranks
+-- name (A) above the body field (B) for ts_rank_cd.
+ALTER TABLE "entity_nodes" ADD COLUMN "fts_vector" tsvector;
+ALTER TABLE "entity_edges" ADD COLUMN "fts_vector" tsvector;
+ALTER TABLE "episodic_nodes" ADD COLUMN "fts_vector" tsvector;
+
+CREATE OR REPLACE FUNCTION set_name_summary_fts_vector()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.fts_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.summary, '')), 'B');
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION set_entity_edge_fts_vector()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.fts_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.fact, '')), 'B');
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION set_episodic_node_fts_vector()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.fts_vector := setweight(to_tsvector('english', coalesce(NEW.content, '')), 'A');
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER entity_nodes_set_fts_vector
+  BEFORE INSERT OR UPDATE OF name, summary ON entity_nodes
+  FOR EACH ROW EXECUTE FUNCTION set_name_summary_fts_vector();
+
+CREATE TRIGGER entity_edges_set_fts_vector
+  BEFORE INSERT OR UPDATE OF name, fact ON entity_edges
+  FOR EACH ROW EXECUTE FUNCTION set_entity_edge_fts_vector();
+
+CREATE TRIGGER episodic_nodes_set_fts_vector
+  BEFORE INSERT OR UPDATE OF content ON episodic_nodes
+  FOR EACH ROW EXECUTE FUNCTION set_episodic_node_fts_vector();
+
 -- ─── Indexes ─────────────────────────────────────────────────────────────────
 
 -- CreateIndex
@@ -194,15 +249,12 @@ CREATE INDEX "entity_nodes_embedding_idx"
 CREATE INDEX "entity_edges_embedding_idx"
   ON "entity_edges" USING diskann ("fact_embedding" vector_cosine_ops, "graph_diskann_bucket");
 
--- ─── Fulltext (GIN) indexes ──────────────────────────────────────────────────
-CREATE INDEX "entity_nodes_fts_idx"
-  ON "entity_nodes" USING gin (to_tsvector('english', "name" || ' ' || "summary"));
+-- ─── Fulltext (GIN) indexes on stored fts_vector ─────────────────────────────
+CREATE INDEX "entity_nodes_fts_idx" ON "entity_nodes" USING gin ("fts_vector");
 
-CREATE INDEX "entity_edges_fts_idx"
-  ON "entity_edges" USING gin (to_tsvector('english', "name" || ' ' || "fact"));
+CREATE INDEX "entity_edges_fts_idx" ON "entity_edges" USING gin ("fts_vector");
 
-CREATE INDEX "episodic_nodes_fts_idx"
-  ON "episodic_nodes" USING gin (to_tsvector('english', "content"));
+CREATE INDEX "episodic_nodes_fts_idx" ON "episodic_nodes" USING gin ("fts_vector");
 
 -- ─── Foreign keys ────────────────────────────────────────────────────────────
 

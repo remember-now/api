@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
+import { invokeStructured } from '@/llm';
 import { LlmService } from '@/llm/llm.service';
 import {
   LLM_TRACER,
@@ -21,7 +22,6 @@ import {
 import { CommunityMaintenanceService } from '../community';
 import { EmbeddingService } from '../embedding';
 import { EdgeExtractionService, NodeExtractionService } from '../extraction';
-import { invokeStructured } from '../llm';
 import {
   createEpisodicEdge,
   createEpisodicNode,

@@ -4,7 +4,11 @@ import { Prisma } from '@generated/prisma/client';
 
 import { Uuid } from '@/common/schemas';
 import { EntityNode } from '@/knowledge-graph/models';
-import { MAX_SEARCH_DEPTH, SearchFilters } from '@/knowledge-graph/search/types';
+import {
+  FTS_NORM_NONE,
+  MAX_SEARCH_DEPTH,
+  SearchFilters,
+} from '@/knowledge-graph/search/types';
 import { Span } from '@/observability';
 import { PrismaService } from '@/providers/database/postgres/prisma.service';
 
@@ -17,7 +21,7 @@ import {
 } from '../../types';
 import { buildBfsCte } from '../bfs-cte';
 import { fromPgVector, toPgVector } from '../pgvector-utils';
-import { buildNodeFilterClause } from '../sql-filter-builders';
+import { buildNodeFilterClause, websearchTsquery } from '../sql-filter-builders';
 
 type RawRow = {
   id: string;
@@ -124,16 +128,16 @@ export class EntityNodeRepository {
   ): Promise<EntityNode[]> {
     const { query, graphIds, limit } = params;
     if (graphIds.length === 0) return [];
-    const tsquery = Prisma.sql`plainto_tsquery('english', ${query})`;
+    const tsquery = websearchTsquery(query);
     const filterSql = buildNodeFilterClause(filters, 'n');
 
     const rows = await this.prisma.$queryRaw<(RawRow & { score: number })[]>`
       SELECT n.id, n.graph_id, n.name, n.summary, n.attributes, n.labels,
              n.name_embedding::text AS name_embedding, n.created_at,
-             ts_rank(to_tsvector('english', n.name || ' ' || n.summary), ${tsquery}) AS score
+             ts_rank_cd(n.fts_vector, ${tsquery}, ${FTS_NORM_NONE}) AS score
       FROM entity_nodes n
       WHERE n.graph_id = ANY(${graphIds}::uuid[])
-        AND to_tsvector('english', n.name || ' ' || n.summary) @@ ${tsquery}
+        AND n.fts_vector @@ ${tsquery}
         ${filterSql}
       ORDER BY score DESC
       LIMIT ${limit}

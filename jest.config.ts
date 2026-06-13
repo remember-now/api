@@ -12,6 +12,7 @@ const config: Config = {
   collectCoverageFrom: ['src/**/*.(t|j)s', '!src/**/*.spec.ts'],
   coverageDirectory: './coverage',
   moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@generated/(.*)$': '<rootDir>/generated/$1',
     '^@test/(.*)$': '<rootDir>/test/$1',

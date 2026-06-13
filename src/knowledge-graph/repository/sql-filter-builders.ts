@@ -88,3 +88,16 @@ export function buildEdgeFilterClause(
   if (parts.length === 0) return empty;
   return Prisma.sql` AND ${Prisma.join(parts, ' AND ')}`;
 }
+
+// TODO: examine if safe
+/**
+ * Builds a `websearch_to_tsquery` fragment for full-text search.
+ *
+ * websearch_to_tsquery never raises syntax errors (safe on raw agent input) and
+ * supports unquoted AND, "quoted" phrases, the literal word OR, and `-negation`.
+ * It does NOT support prefix-match (`*`) or weight labels - plain terms are
+ * stemmed-exact.
+ */
+export function websearchTsquery(query: string): Prisma.Sql {
+  return Prisma.sql`websearch_to_tsquery('english', ${query})`;
+}

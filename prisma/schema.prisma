@@ -10,6 +10,7 @@
 generator client {
   provider        = "prisma-client"
   output          = "../generated/prisma"
+  moduleFormat    = "cjs"
   previewFeatures = ["strictUndefinedChecks"]
 }
 
@@ -102,6 +103,8 @@ model EntityNode {
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
   // Declared here so Prisma's shadow-DB diff sees the column. Never written by app code.
   graphDiskannBucket Int[]                       @map("graph_diskann_bucket") @db.SmallInt
+  // Trigger-populated tsvector (name=A, summary=B) - see migration SQL. Never written by app code.
+  ftsVector          Unsupported("tsvector")?    @map("fts_vector")
   createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph       Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
@@ -113,6 +116,7 @@ model EntityNode {
   // Declared so Prisma's diff sees the index by name and stops proposing a drop.
   // Actual index is created as `USING diskann (name_embedding vector_cosine_ops, graph_diskann_bucket)` in the migration.
   @@index([nameEmbedding, graphDiskannBucket], map: "entity_nodes_embedding_idx")
+  @@index([ftsVector], type: Gin, map: "entity_nodes_fts_idx")
   @@map("entity_nodes")
 }
 
@@ -126,6 +130,8 @@ model EntityEdge {
   factEmbedding      Unsupported("vector(768)")? @map("fact_embedding")
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
   graphDiskannBucket Int[]                       @map("graph_diskann_bucket") @db.SmallInt
+  // Trigger-populated tsvector (name=A, fact=B) - see migration SQL. Never written by app code.
+  ftsVector          Unsupported("tsvector")?    @map("fts_vector")
   attributes         Json                        @default("{}")
   episodes           String[]                    @db.Uuid
   validAt            DateTime?                   @map("valid_at") @db.Timestamptz(3)
@@ -142,19 +148,22 @@ model EntityEdge {
   @@index([targetId])
   // See EntityNode for rationale
   @@index([factEmbedding, graphDiskannBucket], map: "entity_edges_embedding_idx")
+  @@index([ftsVector], type: Gin, map: "entity_edges_fts_idx")
   @@map("entity_edges")
 }
 
 model EpisodicNode {
-  id                String   @id @db.Uuid
-  graphId           String   @map("graph_id") @db.Uuid
+  id                String                   @id @db.Uuid
+  graphId           String                   @map("graph_id") @db.Uuid
   name              String
   labels            String[]
   source            String
-  sourceDescription String   @map("source_description")
+  sourceDescription String                   @map("source_description")
   content           String
-  validAt           DateTime @map("valid_at") @db.Timestamptz(3)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Trigger-populated tsvector (content=A) - see migration SQL. Never written by app code.
+  ftsVector         Unsupported("tsvector")? @map("fts_vector")
+  validAt           DateTime                 @map("valid_at") @db.Timestamptz(3)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
 
   graph           Graph            @relation(fields: [graphId], references: [id], onDelete: Cascade)
   mentions        EpisodicEdge[]
@@ -162,6 +171,7 @@ model EpisodicNode {
 
   @@index([graphId])
   @@index([validAt])
+  @@index([ftsVector], type: Gin, map: "episodic_nodes_fts_idx")
   @@map("episodic_nodes")
 }
 
@@ -231,6 +241,8 @@ model Community {
   memberSummaryHashes Json                        @map("member_summary_hashes")
   // Populated by a BEFORE INSERT/UPDATE trigger from graph_id - see migration SQL.
   graphDiskannBucket  Int[]                       @map("graph_diskann_bucket") @db.SmallInt
+  // Trigger-populated tsvector (name=A, summary=B) - see migration SQL. Never written by app code.
+  ftsVector           Unsupported("tsvector")?    @map("fts_vector")
   createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -240,5 +252,6 @@ model Community {
   @@index([graphId, memberSetSignature])
   // See EntityNode for rationale
   @@index([nameEmbedding, graphDiskannBucket], map: "communities_embedding_idx")
+  @@index([ftsVector], type: Gin, map: "communities_fts_idx")
   @@map("communities")
 }

@@ -8,6 +8,7 @@
 PLAN.md
 PROMPTS.md
 graphiti/
+qmd/
 
 # Logs
 logs
@@ -67,3 +68,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 prisma.config.js
 prisma.config.js.map
 prisma.config.d.ts
+
+# Chunk inspector build artifact (regenerated from source via esbuild)
+/eval/chunk-inspector/chunking.bundle.js

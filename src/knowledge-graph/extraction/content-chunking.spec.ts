@@ -1,6 +1,7 @@
 import { EpisodeType } from '@/knowledge-graph/models';
 
 import {
+  CHUNK_MAX_TOKENS,
   chunkJsonData,
   chunkMessageContent,
   chunkTextContent,
@@ -57,6 +58,22 @@ describe('prepareChunks', () => {
     // No mid-sentence capitalized words => density ~0, far below threshold.
     const content = prose.repeat(20);
     expect(prepareChunks(content, EpisodeType.text)).toEqual([content]);
+  });
+
+  it('force-chunks low-density prose at/above the max-token ceiling', () => {
+    const prose =
+      'the sun was setting over the horizon as the old man walked slowly ' +
+      'down the dusty road. he had been traveling for many days and his ' +
+      'feet were tired. the journey had been long but he knew that soon ' +
+      'he would reach his destination. the wind whispered through the trees ' +
+      'and the birds sang their evening songs. ';
+    // Grow past the ceiling. Density stays ~0 (no mid-sentence capitals), so a
+    // split here can only come from the max-token override, not the density gate.
+    const content = prose.repeat(Math.ceil((CHUNK_MAX_TOKENS * 4 * 1.5) / prose.length));
+    const tokens = estimateTokens(content);
+    expect(tokens).toBeGreaterThanOrEqual(CHUNK_MAX_TOKENS);
+    expect(textLikelyDense(content, tokens)).toBe(false);
+    expect(prepareChunks(content, EpisodeType.text).length).toBeGreaterThan(1);
   });
 });
 

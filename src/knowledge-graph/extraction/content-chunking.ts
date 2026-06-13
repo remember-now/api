@@ -1,4 +1,4 @@
-import { EpisodeType } from '@/knowledge-graph/models';
+import { EpisodeType } from '@/knowledge-graph/types';
 
 import { isSentenceEnd } from '../prompts/text-utils';
 
@@ -16,6 +16,10 @@ export const CHUNK_MIN_TOKENS = 1000;
 // Examples that trigger chunking at 0.15: AWS cost data (12mo), bulk data imports, entity-dense JSON
 // Examples that DON'T chunk at 0.15: meeting transcripts, news articles, documentation
 export const CHUNK_DENSITY_THRESHOLD = 0.15;
+// Hard upper bound: content at/above this many tokens is ALWAYS chunked, regardless
+// of density. Diverges from Graphiti (which has no ceiling, so large low-density
+// prose is never split and floods extraction). Tune against the eval set.
+export const CHUNK_MAX_TOKENS = 6000;
 
 // Approximate characters per token (conservative estimate).
 const CHARS_PER_TOKEN = 4;
@@ -28,25 +32,56 @@ function tokensToChars(tokens: number): number {
   return tokens * CHARS_PER_TOKEN;
 }
 
+/* Overrides for the density gates + chunk sizing. Each field defaults to the
+ * corresponding module constant, so omitting opts preserves prior behavior. */
+export type ChunkOptions = {
+  minTokens: number;
+  maxTokens: number;
+  densityThreshold: number;
+  chunkTokenSize: number;
+  overlapTokens: number;
+};
+
 /** Returns [content] when chunking isn't warranted (small or low-density); otherwise returns
  *  type-specific chunks. Always non-empty so callers can iterate uniformly. */
-export function prepareChunks(content: string, source: EpisodeType): string[] {
+export function prepareChunks(
+  content: string,
+  source: EpisodeType,
+  opts?: Partial<ChunkOptions>,
+): string[] {
+  const minTokens = opts?.minTokens ?? CHUNK_MIN_TOKENS;
+  const maxTokens = opts?.maxTokens ?? CHUNK_MAX_TOKENS;
+  const densityThreshold = opts?.densityThreshold ?? CHUNK_DENSITY_THRESHOLD;
+  const chunkTokenSize = opts?.chunkTokenSize ?? CHUNK_TOKEN_SIZE;
+  const overlapTokens = opts?.overlapTokens ?? CHUNK_OVERLAP_TOKENS;
+
   const tokens = estimateTokens(content);
-  if (tokens < CHUNK_MIN_TOKENS) return [content];
+  if (tokens < minTokens) return [content];
+
+  // Above the ceiling, always chunk regardless of density (protects extraction
+  // from oversized low-density inputs the density gate would otherwise pass through).
+  const forceChunk = tokens >= maxTokens;
 
   if (source === EpisodeType.json) {
     // Schema refine on JsonEpisodeInputSchema guarantees parseable JSON.
     const data: unknown = JSON.parse(content);
-    return jsonLikelyDense(data, tokens) ? chunkJsonData(data) : [content];
+    return forceChunk || jsonLikelyDense(data, tokens, densityThreshold)
+      ? chunkJsonData(data, chunkTokenSize, overlapTokens)
+      : [content];
   }
 
-  if (!textLikelyDense(content, tokens)) return [content];
+  if (!forceChunk && !textLikelyDense(content, tokens, densityThreshold))
+    return [content];
   return source === EpisodeType.message
-    ? chunkMessageContent(content)
-    : chunkTextContent(content);
+    ? chunkMessageContent(content, chunkTokenSize, overlapTokens)
+    : chunkTextContent(content, chunkTokenSize, overlapTokens);
 }
 
-export function jsonLikelyDense(data: unknown, tokens: number): boolean {
+export function jsonLikelyDense(
+  data: unknown,
+  tokens: number,
+  threshold = CHUNK_DENSITY_THRESHOLD,
+): boolean {
   if (tokens === 0) return false;
 
   // Scalars (number/string/bool/null) yield count 0 -> density 0 -> below threshold.
@@ -57,7 +92,7 @@ export function jsonLikelyDense(data: unknown, tokens: number): boolean {
       : 0;
 
   const density = (count / tokens) * 1000;
-  return density > CHUNK_DENSITY_THRESHOLD * 1000;
+  return density > threshold * 1000;
 }
 
 // Arrays are transparent to the depth budget - only object levels consume it.
@@ -77,7 +112,11 @@ export function countJsonKeys(data: unknown, maxDepth: number, currentDepth = 0)
   return count;
 }
 
-export function textLikelyDense(content: string, tokens: number): boolean {
+export function textLikelyDense(
+  content: string,
+  tokens: number,
+  threshold = CHUNK_DENSITY_THRESHOLD,
+): boolean {
   if (tokens === 0) return false;
   const words = content.match(/\S+/g) ?? [];
   if (words.length === 0) return false;
@@ -100,7 +139,7 @@ export function textLikelyDense(content: string, tokens: number): boolean {
   // Text density threshold is typically lower than JSON
   // A well-written article might have 5-10% named entities
   // Half the JSON threshold applied
-  return density > CHUNK_DENSITY_THRESHOLD * 500;
+  return density > threshold * 500;
 }
 
 /**

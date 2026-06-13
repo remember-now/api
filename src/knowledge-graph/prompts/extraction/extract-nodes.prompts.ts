@@ -2,9 +2,9 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { z } from 'zod';
 
 import { EntityTypeMap } from '@/knowledge-graph/episode/types';
-import type { Violation } from '@/knowledge-graph/llm';
 import { EpisodeType, EpisodicNode } from '@/knowledge-graph/models';
 import { NodeNameSchema } from '@/knowledge-graph/types';
+import type { Violation } from '@/llm';
 
 import { formatCurrentEpisode, formatPreviousEpisodes } from '../text-utils';
 

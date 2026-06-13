@@ -10,7 +10,9 @@ import {
   mmr,
   nodeDistanceReranker,
   rrf,
+  weightedRrf,
 } from './search-utils';
+import { RRF_K, RRF_SECOND_RANK_BONUS, RRF_TOP_RANK_BONUS } from './types';
 
 // Branded test sentinels - narrow string aliases for branded ids in mocks.
 const u = (s: string) => s as Uuid;
@@ -349,5 +351,52 @@ describe('crossEncoderReranker', () => {
       { id: u('c'), text: 'three' },
     ]);
     expect(mockRunnable.invoke).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ─── weightedRrf ──────────────────────────────────────────────────────────────
+
+describe('weightedRrf', () => {
+  it('ranks a single list in order with the qmd-style score formula', () => {
+    const [ids, scores] = weightedRrf([['a', 'b', 'c']]);
+    expect(ids).toEqual(['a', 'b', 'c']);
+    expect(scores[0]).toBeCloseTo(1 / (RRF_K + 1) + RRF_TOP_RANK_BONUS);
+    expect(scores[1]).toBeCloseTo(1 / (RRF_K + 2) + RRF_SECOND_RANK_BONUS);
+    expect(scores[2]).toBeCloseTo(1 / (RRF_K + 3) + RRF_SECOND_RANK_BONUS);
+  });
+
+  it('applies the per-list weight to the rank contribution', () => {
+    const [, base] = weightedRrf([['a']], [1]);
+    const [, doubled] = weightedRrf([['a']], [2]);
+    // Both get the same top-rank bonus; the weighted rank term doubles.
+    expect(doubled[0] - RRF_TOP_RANK_BONUS).toBeCloseTo(
+      2 * (base[0] - RRF_TOP_RANK_BONUS),
+    );
+  });
+
+  it('defaults missing weights to 1', () => {
+    const [, withDefault] = weightedRrf([['a'], ['b']]);
+    const [, explicit] = weightedRrf([['a'], ['b']], [1, 1]);
+    expect(withDefault).toEqual(explicit);
+  });
+
+  it('accumulates contributions for an id present in multiple lists', () => {
+    const [ids, scores] = weightedRrf([
+      ['a', 'b'],
+      ['a', 'c'],
+    ]);
+    expect(ids[0]).toBe('a');
+    // 'a' is rank 0 in both lists, so it outscores the rank-1 entries.
+    expect(scores[0]).toBeGreaterThan(scores[1]);
+  });
+
+  it('filters ids below minScore', () => {
+    const [ids] = weightedRrf([['a', 'b']], [1, 1], 1);
+    // No single entry reaches a score of 1 with k=60, so all are filtered.
+    expect(ids).toEqual([]);
+  });
+
+  it('returns empty arrays for empty input', () => {
+    expect(weightedRrf([])).toEqual([[], []]);
   });
 });

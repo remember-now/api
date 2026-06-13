@@ -2,11 +2,17 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { Uuid } from '@/common/schemas';
+import { invokeStructured } from '@/llm';
 import type { LlmContext, LlmTracer } from '@/observability';
 
-import { invokeStructured } from '../llm';
 import { EntityNodeRepository } from '../repository/repositories';
-import { CrossEncoderScoreSchema, DEFAULT_MMR_LAMBDA } from './types';
+import {
+  CrossEncoderScoreSchema,
+  DEFAULT_MMR_LAMBDA,
+  RRF_K,
+  RRF_SECOND_RANK_BONUS,
+  RRF_TOP_RANK_BONUS,
+} from './types';
 
 // ─── RRF ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +30,40 @@ export function rrf<T extends string = Uuid>(
     for (let i = 0; i < list.length; i++) {
       const id = list[i];
       scores.set(id, (scores.get(id) ?? 0) + 1 / (i + 1));
+    }
+  }
+
+  const sorted = [...scores.entries()]
+    .filter(([, score]) => score >= minScore)
+    .sort((a, b) => b[1] - a[1]);
+
+  return [sorted.map(([id]) => id), sorted.map(([, score]) => score)];
+}
+
+// ─── Weighted RRF ─────────────────────────────────────────────────────────────
+
+/**
+ * Weighted reciprocal rank fusion (qmd-style) for fusing many ranked lists from
+ * different signals/sub-queries: score = Σ weight / (RRF_K + rank + 1), plus a
+ * top-rank bonus so documents that rank #1 in any list aren't diluted by noisy
+ * expansions. `weights` is parallel to `resultIdLists` (defaults to 1 each).
+ */
+export function weightedRrf<T extends string = Uuid>(
+  resultIdLists: T[][],
+  weights: number[] = [],
+  minScore = 0,
+): [T[], number[]] {
+  const scores = new Map<T, number>();
+
+  for (let listIdx = 0; listIdx < resultIdLists.length; listIdx++) {
+    const list = resultIdLists[listIdx];
+    const weight = weights[listIdx] ?? 1;
+    for (let rank = 0; rank < list.length; rank++) {
+      const id = list[rank];
+      let contribution = weight / (RRF_K + rank + 1);
+      if (rank === 0) contribution += RRF_TOP_RANK_BONUS;
+      else if (rank <= 2) contribution += RRF_SECOND_RANK_BONUS;
+      scores.set(id, (scores.get(id) ?? 0) + contribution);
     }
   }
 

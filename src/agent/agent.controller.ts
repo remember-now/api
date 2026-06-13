@@ -8,13 +8,6 @@ import { LoggedInGuard } from '@/auth/guard';
 import { Uuid } from '@/common/schemas';
 import { CommunityService } from '@/knowledge-graph/community';
 import { EpisodeService } from '@/knowledge-graph/episode';
-import { SearchService } from '@/knowledge-graph/search';
-import {
-  EdgeReranker,
-  EdgeSearchMethod,
-  NodeReranker,
-  NodeSearchMethod,
-} from '@/knowledge-graph/search/types';
 import { Traceable } from '@/observability';
 import { UserWithoutPassword } from '@/user/dto';
 
@@ -27,11 +20,10 @@ const TestIngestSchema = z.object({
 });
 class TestIngestDto extends createZodDto(TestIngestSchema) {}
 
-// TODO: REMOVE - test DTOs
-const TestSearchSchema = z.object({
-  query: z.string().min(1),
+const ChatSchema = z.object({
+  message: z.string().min(1),
 });
-class TestSearchDto extends createZodDto(TestSearchSchema) {}
+class ChatDto extends createZodDto(ChatSchema) {}
 
 @ApiTags('Agent')
 @Controller('agent')
@@ -41,7 +33,6 @@ export class AgentController {
   constructor(
     private readonly agentService: AgentService,
     private readonly episodeService: EpisodeService, // TODO: REMOVE
-    private readonly searchService: SearchService, // TODO: REMOVE
     private readonly communityService: CommunityService, // TODO: REMOVE
   ) {}
 
@@ -89,50 +80,16 @@ export class AgentController {
     };
   }
 
-  // TODO: REMOVE
-  @Post('test/search')
-  @ApiOperation({ summary: '[TEST] Search the knowledge graph' })
-  async testSearch(@Body() body: TestSearchDto, @GetUser() user: UserWithoutPassword) {
+  @Post('chat')
+  @ApiOperation({ summary: 'Chat with the agent (pre-fetch + knowledge search)' })
+  async chat(@Body() body: ChatDto, @GetUser() user: UserWithoutPassword) {
     const graphId = user.graphs.find((g) => g.name === 'main')!.id;
-    const results = await this.searchService.search({
+    const { text, grounding } = await this.agentService.chat({
       userId: user.id,
-      query: body.query,
       graphIds: [graphId],
-      config: {
-        limit: 10,
-        edgeConfig: {
-          searchMethods: [EdgeSearchMethod.bm25, EdgeSearchMethod.cosine_similarity],
-          reranker: EdgeReranker.rrf,
-        },
-        nodeConfig: {
-          searchMethods: [NodeSearchMethod.bm25, NodeSearchMethod.cosine_similarity],
-          reranker: NodeReranker.rrf,
-        },
-      },
+      message: body.message,
     });
-
-    return {
-      edges: results.edges.map((e) => ({
-        id: e.id,
-        name: e.name,
-        fact: e.fact,
-        score: results.edgeScores.get(e.id) ?? 0,
-        validAt: e.validAt?.toISOString() ?? null,
-        invalidAt: e.invalidAt?.toISOString() ?? null,
-      })),
-      nodes: results.nodes.map((n) => ({
-        id: n.id,
-        name: n.name,
-        summary: n.summary,
-        score: results.nodeScores.get(n.id) ?? 0,
-      })),
-      episodes: results.episodes.map((ep) => ({
-        id: ep.id,
-        content: ep.content,
-        validAt: ep.validAt?.toISOString() ?? null,
-        score: results.episodeScores.get(ep.id) ?? 0,
-      })),
-    };
+    return { reply: text, grounding };
   }
 
   // TODO: REMOVE - test endpoint; replace with proper user-facing button later.

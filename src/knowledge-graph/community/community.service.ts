@@ -4,6 +4,7 @@ import { UndirectedGraph } from 'graphology';
 import louvain from 'graphology-communities-louvain';
 
 import { Uuid } from '@/common/schemas';
+import { invokeStructured } from '@/llm';
 import { LlmService } from '@/llm/llm.service';
 import {
   LLM_TRACER,
@@ -16,7 +17,6 @@ import {
 
 import { LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
 import { EmbeddingService } from '../embedding';
-import { invokeStructured } from '../llm';
 import { Community, createCommunity } from '../models';
 import {
   buildCommunityNameMessages,

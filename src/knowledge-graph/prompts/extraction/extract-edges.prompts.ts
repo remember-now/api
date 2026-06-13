@@ -2,9 +2,9 @@ import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messag
 import { z } from 'zod';
 
 import { EdgeTypeMap, EdgeTypeMappings } from '@/knowledge-graph/episode/types';
-import type { Violation } from '@/knowledge-graph/llm';
 import { EntityNode, EpisodicNode } from '@/knowledge-graph/models';
 import { RelationshipTypeSchema } from '@/knowledge-graph/types';
+import type { Violation } from '@/llm';
 
 import {
   formatCurrentEpisode,

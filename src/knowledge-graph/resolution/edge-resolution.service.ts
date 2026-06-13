@@ -2,6 +2,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Uuid } from '@/common/schemas';
+import { invokeStructured } from '@/llm';
 import {
   LLM_TRACER,
   type LlmContext,
@@ -12,7 +13,6 @@ import {
 } from '@/observability';
 
 import { compressIdMap, LLM_CONCURRENCY_LIMIT, withConcurrency } from '../batch-utils';
-import { invokeStructured } from '../llm';
 import { EntityEdge, EpisodicNode } from '../models';
 import {
   buildDedupeEdgesMessages,

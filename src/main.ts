@@ -17,9 +17,9 @@ async function bootstrap() {
   const { NestFactory } = await import('@nestjs/core');
   const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
   const { cleanupOpenApiDoc } = await import('nestjs-zod');
-  const { AppModule } = await import('./app.module');
-  const { AppConfigService, Environment } = await import('./config/app');
-  const { PinoLoggerService } = await import('./observability');
+  const { AppModule } = await import('./app.module.js');
+  const { AppConfigService, Environment } = await import('./config/app/index.js');
+  const { PinoLoggerService } = await import('./observability/index.js');
 
   // bufferLogs: true defers early bootstrap log lines until useLogger fires
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

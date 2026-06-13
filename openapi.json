@@ -384,16 +384,16 @@
         ]
       }
     },
-    "/agent/test/search": {
+    "/agent/chat": {
       "post": {
-        "operationId": "AgentController_testSearch",
+        "operationId": "AgentController_chat",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TestSearchDto"
+                "$ref": "#/components/schemas/ChatDto"
               }
             }
           }
@@ -403,7 +403,7 @@
             "description": ""
           }
         },
-        "summary": "[TEST] Search the knowledge graph",
+        "summary": "Chat with the agent (pre-fetch + knowledge search)",
         "tags": [
           "Agent"
         ]
@@ -1310,16 +1310,16 @@
           "content"
         ]
       },
-      "TestSearchDto": {
+      "ChatDto": {
         "type": "object",
         "properties": {
-          "query": {
+          "message": {
             "type": "string",
             "minLength": 1
           }
         },
         "required": [
-          "query"
+          "message"
         ]
       },
       "LlmConfigResponse_Output": {
